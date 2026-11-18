@@ -238,6 +238,15 @@ check("390 telefon: taşma yok, dokunma hedefleri ≥ 44 px", await measure(), C
 await fold("git"); await fold("git");
 check("telefonda başlığa dokununca kapanıp açılıyor", (await secs()).includes("git:açık"), true);
 await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+// Gerçek telefon yüksekliğinde sona kaydırınca yüzen + düğmesi (görünür hâlde) son düğmeleri örtmemeli.
+await sleep(300);
+await ev(`(document.scrollingElement || document.body).scrollTo(0, 1e6); document.body.scrollTo(0, 1e6)`); await sleep(500);
+await ev(`document.getElementById("btnNew").classList.remove("away")`); await sleep(300);
+check("390x844 sona kaydırınca + düğmesi hiçbir düğmeyi örtmüyor", await ev(`(() => { const f = document.getElementById("btnNew").getBoundingClientRect();
+  const sc = [document.scrollingElement, document.body].find(e => e && e.scrollTop > 0);
+  if (!sc || sc.scrollTop + sc.clientHeight < sc.scrollHeight - 2) return "sona kaydırılamadı";
+  return [...document.querySelectorAll("#viewFollow button, #viewFollow a")].filter(e => { const r = e.getBoundingClientRect();
+    return r.width && r.right > f.left && r.left < f.right && r.bottom > f.top && r.top < f.bottom; }).map(e => e.textContent.trim()); })()`), []);
 await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`);
 await newSession(P("Demo Mağaza"), "telefondan iş");
 b = await box();
