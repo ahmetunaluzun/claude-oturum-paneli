@@ -2,6 +2,9 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## 0.10.1 — 2026-11-18
+- **Exe ikonu.** Panel exe'si artık uygulama simgesini taşıyor (Gezgin, görev çubuğu, kısayol); önceden Windows varsayılan ikonu görünüyordu. `src/ClaudePanel/app.ico`, `wwwroot/icon-512.png`'den `tools/ikon_uret.py` ile üretilir (16–256 px).
+
 ## 0.10.0 — 2026-11-18
 - **Kota artık panelin içinde.** Kota okuma tek yerde (`Quota.cs`): `~/.claude/usage-cache.json` 5 dakikadan eskiyse ya da yoksa Anthropic kullanım API'sinden yenilenir. Önceden önbelleği yalnız kullanıcının kendi statusline betiği yazıyordu; başka bilgisayarda kota halkaları boş kalıyordu. Mac'te kimlik dosyada değil Anahtar Zinciri'nde (`Claude Code-credentials`), oradan okunur. Başarısız yenileme 3 dakika tekrar denenmez (tüm süreçler için).
 - **Kota koruması panel oturumlarında.** Panelin başlattığı her oturuma gece korumasıyla birlikte `ClaudePanel --quota-guard` hook'u verilir: 5 saatlik kotadan %5 ya da daha az kalınca okuma araçları, git status/diff/log ve hafıza dosyalarına yazma dışında her araç engellenir (exit 2), oturuma sıfırlanma saati ve "hafızayı kaydet, bekle" söylenir. Sıfırlanma saati geçmiş bayat önbellekte ve kota okunamazken engellemez. `settings.json`'da `quota-guard` geçen bir hook varsa eklenmez.
