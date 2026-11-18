@@ -2,6 +2,11 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## 0.12.1 — 2026-11-18
+- **"Bu projede N oturum açık" rozeti dokunulabilir.** Rozete dokununca projedeki oturumlar listelenir: panel oturumu için "Kaydet ve kapat: <ad>" (çalışıyorsa "İş bitince kaydet ve kapat"), terminalde boştaki oturum için "Panele al: <ad>", her oturum için "Konuşmayı aç". Menü rozetin altından açılır (`openMenu` için `alignStart`). Kartın ⋯ menüsü aynı kalır. "Birleştir" yapılmadı (iki konuşmayı birleştirmenin karşılığı yok).
+- **Çakışma penceresinde "Panele al".** Aynı projede terminalde boşta bir oturum varken yeni oturum istenirse pencerenin ilk seçeneği "Panele al ve gönder" (istem yoksa "Panele al"): terminal oturumu panele alınır, istem ona yazılır; ikinci oturum açılmaz. Telefondan ve arka plan işi varken sunulmaz. Yanıtta `sent: true`: kapalı oturuma yazılan mesaj bu yoldan gittiyse panele alınan oturumun konuşması açılır.
+- Test: `tools/takip2_test.sh` 65/65 (+3: rozet menüsü 2 kaydet-kapat + 2 konuşmayı aç, kart çekmecesi açılmaz; "Panele al ve gönder" ilk seçenek ve odakta, önce `/api/adopt` sonra `/send`, yeni oturum yok; 390x844 sona kaydırınca + düğmesi hiçbir düğmeyi örtmüyor). Terminal oturumu sunucuda taklit edilemediği için bu yol istemcide `fetch` taklidiyle sınandı; gerçek terminal oturumuyla denenmedi. Görüntü `_onizleme/takip2_1280_rozet_menu.png`. `tools/confirm_test.sh` geçti.
+
 ## 0.12.0 — 2026-11-18
 - **Takip 2. aşama: commit / gönder oturum açmıyor, depo başına tek düğme.** Canlıda yaşandı: bir depoda hem commit'lenmemiş dosya hem gönderilmemiş commit varken iki düğme çıkıyordu; ikisine basılınca aynı depoda iki oturum açıldı.
   - **Tek düğme:** depo durumuna göre "Commit et" / "Gönder" / "Commit et ve gönder". Git bölümünün başında "Tümünü commit et ve gönder": onay listesi (depo başına ne yapılacağı) → tek arka plan işi, depolar sırayla; sorunlu depo atlanır, nedeni satırında yazar.

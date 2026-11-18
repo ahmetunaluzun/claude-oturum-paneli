@@ -181,6 +181,8 @@ MIT — bkz. [LICENSE](LICENSE). Bağımsız bir projedir; Anthropic tarafından
 
 | Sürüm | Tarih | Değişen alan | Eski değer | Yeni değer | Neden |
 |---|---|---|---|---|---|
+| 0.12.1 | 2026-11-18 | Oturum kartı: "Bu projede N oturum açık" | Yalnız bilgi yazısı | Dokununca projedeki oturumlar için "Kaydet ve kapat", "Panele al", "Konuşmayı aç" | Çakışmayı kartın üstünden çözebilmek |
+| 0.12.1 | 2026-11-18 | Çakışma penceresi (terminal oturumu) | Terminal oturumunu Oturumlar sekmesinden panele alın diye hatırlatma | İlk seçenek "Panele al ve gönder": terminal oturumu panele alınır, istek ona yazılır | İkinci oturum açmadan aynı konuşmada devam etmek |
 | 0.12.0 | 2026-11-18 | Takip: commit / gönder | Ayrı "Commit et" ve "Gönder" düğmeleri, her biri görünür panel oturumu açıyordu (ikisine basınca aynı depoda iki oturum) | Depo başına tek düğme ("Commit et" / "Gönder" / "Commit et ve gönder") ve "Tümünü commit et ve gönder"; oturum kartı yok: gönderimi panel gizli bilgi denetiminden sonra kendisi yapar, commit gizli arka plan işi | Aynı depoda iki oturum açılıyordu; commit/gönder oturum listesini kalabalıklaştırmamalı |
 | 0.12.0 | 2026-11-18 | Aynı projede birden çok oturum | Aynı klasöre farklı istek her zaman yeni oturum açıyordu | Panel sorar (mevcut oturuma gönder / iş bitince gönder / ayrı çalışma kopyası / yine de aç); kartta rozet; önce başlayan oturum çalışırken sonrakinin yazması hook ile bekletilir | Aynı dosyalara yazan iki oturum birbirinin işini bozuyor |
 | 0.12.0 | 2026-11-18 | Takip: görünüm | Bölümler hep açık; oturumu açık projeler de listede | Açılır-kapanır bölümler (durum hatırlanır), "Tümünü aç/kapat"; oturumda açık projeler tek satırlık notla gizlenir | Kaydırmayı azaltmak; o projeyle açık oturum zaten ilgileniyor |

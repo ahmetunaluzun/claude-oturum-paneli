@@ -785,7 +785,11 @@ html.selecting .card { cursor: pointer; }
 .fu-job.run::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: currentColor; animation: breathe 1.2s infinite; }
 .fu-insess { justify-self: start; min-height: 32px; margin: 2px 0 0 4px; padding: 4px 0; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
 .fu-insess:hover { color: var(--text); }
-.proj-multi { margin: -4px 0 10px; color: var(--idle); font-size: 12px; }
+.proj-multi { display: block; width: fit-content; margin: -4px 0 10px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--idle); text-align: left;
+  cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.proj-multi[hidden] { display: none; }
+.proj-multi:hover { text-decoration-style: solid; }
+@media (pointer: coarse) { .proj-multi { min-height: 32px; } }
 [data-theme="light"] .proj-multi { color: #9A6400; }
 .fu-row { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
 .fu-main { display: grid; gap: 3px; min-width: 0; flex: 1; }

@@ -125,7 +125,7 @@ window.PanelActions = function (d) {
   // ---- Açılır menü (body'e eklenir; atasının transform'una hapsolmaz) ----
   let menuEl = null;
   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
-  function openMenu(anchor, list) {
+  function openMenu(anchor, list, { alignStart = false } = {}) { // alignStart: menü anchor'ın sol kenarından açılır
     closeMenu();
     if (!list.length) return;
     const m = document.createElement("div");
@@ -144,7 +144,7 @@ window.PanelActions = function (d) {
     document.body.appendChild(m);
     menuEl = m;
     const r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
-    const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8));
+    const left = Math.max(8, Math.min(alignStart ? r.left : r.right - w, innerWidth - w - 8));
     const top = r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6;
     m.style.left = left + "px";
     m.style.top = top + "px";

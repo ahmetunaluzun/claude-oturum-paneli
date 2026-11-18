@@ -217,6 +217,32 @@ await ev(`document.getElementById("dClose").click()`);
 await sleep(2700);
 check("kartlarda 'Bu projede 2 oturum açık'", await ev(`[...document.querySelectorAll(".card .proj-multi")].filter(p => !p.hidden).map(p => p.textContent)`), ["Bu projede 2 oturum açık", "Bu projede 2 oturum açık"]);
 check("tek oturumlu projede rozet yok", await ev(`[...document.querySelectorAll(".card")].find(c => c.querySelector(".name").textContent === "Stok Sayım").querySelector(".proj-multi").hidden`), true);
+// Rozete dokununca: projedeki oturumlar için kaydet-kapat ve konuşmayı aç (kart çekmecesi açılmaz).
+await click(`[...document.querySelectorAll(".card .proj-multi")].find(p => !p.hidden)`);
+check("rozet menüsü: 2 oturum için kaydet-kapat + konuşmayı aç, çekmece kapalı", await ev(`(() => { const m = [...document.querySelectorAll(".pop-menu button")].map(b => b.textContent);
+  return [m.filter(x => /^(İş bitince kaydet ve kapat|Kaydet ve kapat): /.test(x)).length, m.filter(x => x.startsWith("Konuşmayı aç: ")).length, document.body.classList.contains("drawer-open") || !!document.querySelector("#drawer.open")]; })()`), [2, 2, false]);
+await shot("1280_rozet_menu");
+await ev(`document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); document.body.click()`); await sleep(300);
+
+// Çakışma penceresinden "Panele al ve gönder": terminal oturumu sunucuda taklit edilemiyor (gerçek claude süreci ister),
+// bu yüzden istemci yolu fetch taklidiyle sınanır: 409 (terminal, boşta) → /api/adopt/<pid> → /api/hosted/<anahtar>/send.
+await ev(`(() => { window.__calls = []; window.__realFetch = window.fetch;
+  const J = (o, s = 200) => Promise.resolve(new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } }));
+  window.fetch = (u, o) => { const p = String(u), b = o?.body ? JSON.parse(o.body) : null;
+    if (p === "/api/hosted" && b && !b.mode) return J({ error: "conflict", sessions: [{ kind: "terminal", pid: 4242, name: "Terminal İş", status: "idle" }], options: ["force"] }, 409);
+    if (p === "/api/adopt/4242") { __calls.push("adopt"); return J({ key: "kk1", sessionId: "x" }); }
+    if (p === "/api/hosted/kk1/send") { __calls.push("send:" + b.text); return J({}); }
+    return window.__realFetch(u, o); }; })()`);
+await newSession(P("Stok Sayım"), "terminale gönder");
+b = await box();
+check("terminal oturumunda 'Panele al ve gönder' ilk ve odakta", [b?.buttons, b?.focus, await ev(`document.getElementById("askText").textContent.includes("panele alıp")`)],
+  [["Vazgeç|cancel", "Panele al ve gönder|adopt", "Yine de aç|force"], "adopt", true]);
+await press("adopt");
+await sleep(500);
+check("'Panele al ve gönder': önce panele alındı, sonra mesaj ona yazıldı; yeni oturum yok", [await ev(`window.__calls`), await ev(`document.getElementById("dlgNew").open`),
+  await ev(`[...document.querySelectorAll(".toast")].some(x => x.textContent === "Terminal İş panele alındı, mesaj ona gönderildi")`)], [["adopt", "send:terminale gönder"], false, true]);
+await ev(`window.fetch = window.__realFetch; document.getElementById("dClose").click()`);
+await sleep(400);
 await ev(`document.querySelector('#nav button[data-view="follow"]').click()`);
 await until(`document.querySelector("#fu-conflicts")`);
 check("Takip'te 'Çakışma riski' bölümü açık gelir", (await secs())[1], "conflicts:açık");

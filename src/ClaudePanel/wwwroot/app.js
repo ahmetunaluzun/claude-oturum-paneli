@@ -55,17 +55,38 @@
     if (opts.includes("send")) buttons.push({ value: "send", label: t("pcSend"), cls: "primary" });
     if (opts.includes("later")) buttons.push({ value: "later", label: t("pcLater"), cls: buttons.length ? "" : "primary" });
     if (opts.includes("worktree")) buttons.push({ value: "worktree", label: t("pcWorktree"), cls: "" });
+    // Terminalde boşta oturum varsa onu panele alıp (istem varsa) mesajı ona yazmak: ikinci oturum açılmaz.
+    const hasJob = sessions.some(s => s.kind === "job");
+    const term = !REMOTE && !hasJob ? sessions.find(s => s.kind === "terminal" && s.status === "idle" && s.pid) : null;
+    if (term) buttons.unshift({ value: "adopt", label: t(body.prompt?.trim() ? "pcAdoptSend" : "pcAdopt"), cls: "primary" });
+    if (term && buttons[1]?.cls) buttons[1].cls = "";
     buttons.push({ value: "force", label: t("pcForce"), cls: "" });
-    const text = sessions.some(s => s.kind === "job") ? "pcTextJob" : sessions.some(s => s.kind === "terminal") && !REMOTE ? "pcTextTerm" : "pcText";
+    const text = hasJob ? "pcTextJob" : term ? "pcTextAdopt" : sessions.some(s => s.kind === "terminal") && !REMOTE ? "pcTextTerm" : "pcText";
     // Odak en güvenli seçenekte: gönder / iş bitince varsa o, yoksa Vazgeç ("Yine de aç" Enter ile seçilmesin).
     const v = await ask(t("pcTitle"), t(text), list, buttons, { cbox: true, focus: buttons[0].cls ? buttons[0].value : "cancel" });
     if (v === "cancel") return { ok: false, status: 409, data: { error: "cancelled" }, cancelled: true };
+    if (v === "adopt") return adoptAndSend(term, body.prompt);
     let r2;
     try { r2 = await api(v === "force" ? path : "/api/hosted", { ...body, mode: v }); } catch { return { ok: false, status: 0, data: null }; }
     if (r2.ok && r2.data?.sent) toast(t("pcSent"));
     else if (r2.ok && r2.data?.queued) toast(t("pcQueued"));
     else if (r2.ok && r2.data?.worktree) toast(t("pcWorktreeOk", folderName(r2.data.worktree)));
     return r2;
+  }
+  // Çakışma penceresinden "Panele al (ve gönder)": terminal oturumu panele taşınır, istem varsa ona yazılır.
+  // Dönen değer startHosted ile aynı biçimde (data.key = panele alınan oturum).
+  async function adoptAndSend(term, prompt) {
+    let r;
+    try { r = await api(`/api/adopt/${term.pid}`); } catch { return { ok: false, status: 0, data: null }; }
+    if (!r.ok || !r.data?.key) return r.ok ? { ok: false, status: 409, data: { error: "generic" } } : r;
+    const key = r.data.key;
+    if (prompt?.trim()) {
+      let s;
+      try { s = await api(`/api/hosted/${key}/send`, { text: prompt }); } catch { s = { ok: false }; }
+      if (!s.ok) { toast(t("adopted", term.name)); return { ok: false, status: s.status || 0, data: s.data || { error: "generic" } }; }
+      toast(t("pcAdoptSent", term.name));
+    } else toast(t("adopted", term.name));
+    return { ok: true, status: 200, data: { key, adopted: true, sent: !!prompt?.trim() } };
   }
   const getJson = async (path) => { const r = await fetch(path, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); };
 
@@ -222,7 +243,7 @@
     el.innerHTML = `
       <div class="card-top"><span class="status-dot"></span><span class="sel-box" aria-hidden="true"></span><h3 class="name"></h3><span class="model-slot"></span><span class="badge night-badge" hidden></span><span class="badge kind-badge"></span></div>
       <p class="path"></p>
-      <p class="proj-multi" hidden></p>
+      <button type="button" class="proj-multi" hidden></button>
       <div class="meta"><span class="state-time"></span><span class="reason"></span><span class="age"></span></div>
       <p class="last" hidden></p>
       <p class="tool" hidden></p>
@@ -241,6 +262,7 @@
       if (e.key === " " && A.selecting()) { e.preventDefault(); A.toggle(cur()); }
     });
     el.querySelector(".task-cancel").addEventListener("click", (e) => { e.stopPropagation(); A.cancelTask(cur()); });
+    el.querySelector(".proj-multi").addEventListener("click", (e) => { e.stopPropagation(); projectMenu(e.currentTarget, cur()); });
     // Onay kutusu (fare kartın üstündeyken görünür) seçim kipini açar.
     el.querySelector(".sel-box").addEventListener("click", (e) => { e.stopPropagation(); A.toggle(cur()); });
     // Dokunmatikte uzun basma seçer; ardından gelen tık konuşmayı açmasın.
@@ -283,6 +305,24 @@
     nb.dataset.night = s.night || "";
     nb.title = s.night === "decision" ? t("nightDecisionHint") : "";
     updateCardDetails(card, s);
+  }
+
+  // "Bu projede N oturum açık" rozeti: aynı projedeki oturumlardan birini kaydedip kapatma / panele alma kısayolu.
+  function projectMenu(anchor, s) {
+    if (!s?.root) return;
+    const L = [];
+    for (const x of items.filter(x => x.root === s.root && x.status !== "ended")) {
+      if (x.kind === "panel" && x.key && !x.task)
+        L.push({ label: t(x.lane === "busy" ? "pmLaterClose" : "pmSaveClose", x.name), run: async () => {
+          const r = await api(`/api/hosted/${x.key}/wrap`, { close: true });
+          r.ok ? toast(t(x.lane === "busy" ? "laterSet" : "closeSaving")) : toast(t(`err_${r.data?.error || "generic"}`), "warn");
+        } });
+      else if (x.kind === "terminal" && x.lane === "idle" && !REMOTE) L.push({ label: t("pmAdopt", x.name), run: () => adopt(x) });
+    }
+    if (L.length) L.push(null);
+    for (const x of items.filter(x => x.root === s.root && x.status !== "ended"))
+      L.push({ label: t("pmOpen", x.name), run: () => openDrawer(x) });
+    A.openMenu(anchor, L, { alignStart: true });
   }
 
   // Model rozeti, son mesaj / son araç, bağlam çubuğu, bekleyen iş, eylemler, seçim.
