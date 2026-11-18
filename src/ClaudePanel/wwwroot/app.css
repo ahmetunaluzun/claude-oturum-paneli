@@ -459,6 +459,19 @@ dialog { max-height: 90vh; overflow-y: auto; }
 /* Seçenekli soru penceresi ve bekleyenler başlığındaki toplu düğme */
 .ask-list { margin: 4px 0 14px 20px; padding: 0; max-height: 40vh; overflow-y: auto; }
 .ask-list li { margin: 3px 0; }
+/* Onay penceresi (confirmBox): dar kart, her genişlikte ekranın ortasında; tehlikeli işlemin düğmesi dolu kırmızı */
+dialog.cbox { width: min(440px, calc(100vw - 32px)); }
+dialog.cbox .hint { margin: 0; color: var(--text); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+dialog.cbox .ask-list { margin: 0 0 0 20px; max-height: 30vh; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+dialog.cbox .row.end { flex-wrap: wrap; margin-top: 4px; }
+dialog.cbox .btn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.cbox-danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+.btn.cbox-danger:hover { border-color: var(--danger); filter: brightness(1.08); }
+@media (max-width: 640px) {
+  dialog.cbox { margin: auto; border-radius: 18px; max-height: calc(100dvh - 32px); }
+  dialog.cbox form { padding: 20px 18px; }
+  dialog.cbox .row.end .btn { flex: 1 1 120px; min-height: 44px; }
+}
 #askButtons { gap: 8px; flex-wrap: wrap; }
 .lane h2 .lane-action { margin-left: auto; font-weight: 500; }
 .lane h2 .lane-action + .lane-action { margin-left: 6px; }

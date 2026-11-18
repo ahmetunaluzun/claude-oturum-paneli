@@ -126,7 +126,7 @@
   const matches = (q, ...vals) => !q || vals.some(v => norm(v).includes(norm(q)));
 
   // Kart ve konuşma ekranı eylemleri, toplu seçim (actions.js)
-  const A = window.PanelActions({ t, api, toast, ask, adopt, goTo, openFolder, openDrawer, REMOTE,
+  const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
   // Takip sekmesi (followup.js)
   const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, items: () => items,
@@ -405,8 +405,9 @@
   // Terminaldeki oturumu panele taşır (terminaldeki claude kapanır, konuşma panelde sürer).
   const adopting = new Set(); // sürmekte olan "Panele al" istekleri
   async function adopt(s) {
-    if (!s || s.kind !== "terminal" || adopting.has(s.pid) || !confirm(t("adoptConfirm", s.name))) return;
-    adopting.add(s.pid);
+    if (!s || s.kind !== "terminal" || adopting.has(s.pid)) return;
+    adopting.add(s.pid); // soru açıkken ikinci tıklama ikinci soruyu sıraya koymasın
+    if (!await confirmBox({ title: t("adoptTitle"), text: t("adoptConfirm", s.name), okText: t("adopt") })) { adopting.delete(s.pid); return; }
     let r;
     try { r = await api(`/api/adopt/${s.pid}`); }
     catch { r = { ok: false, data: null }; }
@@ -616,9 +617,13 @@
   function canWrap(s) { return !!s && s.kind === "panel" && s.status !== "ended" && !s.task; }
 
   // Seçenekli soru penceresi. buttons: [{ value, label, cls }] → seçilen value; Vazgeç/Esc → "cancel".
-  function ask(title, text, list, buttons) {
-    return new Promise(resolve => {
+  // opts: { cancelLabel, focus: odaklanacak düğmenin value'su, cbox: onay penceresi görünümü }.
+  // Sorular sıraya girer: biri açıkken gelen ikincisi öncekinin kapanmasını bekler (showModal açık pencerede hata verir).
+  let askQueue = Promise.resolve();
+  function ask(title, text, list, buttons, opts = {}) {
+    const p = askQueue.then(() => new Promise(resolve => {
       const d = $("dlgAsk");
+      d.classList.toggle("cbox", !!opts.cbox);
       $("askTitle").textContent = title;
       $("askText").textContent = text;
       const ul = $("askList");
@@ -628,7 +633,7 @@
       const row = $("askButtons");
       row.innerHTML = "";
       // Yalnız "Tamam" olan bilgi penceresinde Vazgeç gösterilmez (Esc yine kapatır).
-      const base = buttons.some(b => b.value === "ok") ? [] : [{ value: "cancel", label: t("cancel"), cls: "" }];
+      const base = buttons.some(b => b.value === "ok") ? [] : [{ value: "cancel", label: opts.cancelLabel || t("cancel"), cls: "" }];
       [...base, ...buttons].forEach(b => {
         const el = document.createElement("button");
         el.className = `btn ${b.cls}`; el.value = b.value; el.textContent = b.label;
@@ -637,7 +642,17 @@
       d.returnValue = "";
       d.addEventListener("close", () => resolve(d.returnValue || "cancel"), { once: true });
       d.showModal();
-    });
+      if (opts.focus) [...row.children].find(b => b.value === opts.focus)?.focus();
+    }));
+    askQueue = p.catch(() => {});
+    return p;
+  }
+  // Evet/hayır onayı (tarayıcının yerleşik onay penceresi yerine; Mac uygulama penceresinde o hiç görünmüyor).
+  // → true/false. Enter odaktaki düğmeyi çalıştırır: olağan işlemde odak onay düğmesinde, tehlikeli işlemde Vazgeç'te.
+  async function confirmBox({ title, text, list, okText, cancelText, danger }) {
+    const v = await ask(title, text || "", list, [{ value: "yes", label: okText, cls: danger ? "cbox-danger" : "primary" }],
+      { cancelLabel: cancelText, focus: danger ? "cancel" : "yes", cbox: true });
+    return v === "yes";
   }
 
   async function wrapAllIdle() {
@@ -981,7 +996,7 @@
   let projects = [];
   // Klasör gezgini: yol çubuğu + alt klasörler. Tık = seç, ›/çift tık = içine gir. Son gezilen klasör hatırlanır.
   const dirView = { tab: "recent", path: null, data: null };
-  // Aramaya yazıp listeden seçmeden göndermek eski klasörde oturum açıyordu (DWH yerine MemoryPulse, 18.11.2026).
+  // Aramaya yazıp listeden seçmeden göndermek eski klasörde oturum açıyordu (bir proje yerine önceki projenin klasörü, 18.11.2026).
   let searchPending = false;
   function pickCwd(p) { $("fCwd").value = p; searchPending = false; renderProjects(); }
   // pick: kullanıcı klasörün içine girdiyse (›, çift tık, Enter) o klasör seçilmiş olur.
@@ -1513,7 +1528,7 @@
     if (on) {
       let st = null;
       try { st = await getJson("/api/terminal-quota"); } catch { /* aşağıda sunucu hatası gösterilir */ }
-      if (st?.currentStatusLine && !confirm(t("tqReplace", st.currentStatusLine))) { e.target.checked = false; return; }
+      if (st?.currentStatusLine && !await confirmBox({ title: t("tqReplaceTitle"), text: t("tqReplace"), list: [st.currentStatusLine], okText: t("tqReplaceGo") })) { e.target.checked = false; return; }
     }
     const r = await api("/api/terminal-quota", { enabled: on, lang: settings.lang });
     if (r.ok) fillTermQuota(r.data);
@@ -1600,7 +1615,7 @@
       const b = document.createElement("button");
       b.type = "button"; b.className = "btn small danger"; b.textContent = t("rRemove");
       b.addEventListener("click", async () => {
-        if (!confirm(t("rRemoveConfirm", d.name))) return;
+        if (!await confirmBox({ title: t("rRemoveTitle", d.name), text: t("rRemoveConfirm"), okText: t("rRemove"), danger: true })) return;
         const r = await api(`/api/remote/revoke/${encodeURIComponent(d.id)}`);
         if (r.ok) renderRemote(r.data);
       });
@@ -1679,7 +1694,7 @@
   });
   syncInstall();
   $("btnForget").addEventListener("click", async () => {
-    if (!confirm(t("rForgetConfirm"))) return;
+    if (!await confirmBox({ title: t("rForgetTitle"), text: t("rForgetConfirm"), okText: t("rForget"), danger: true })) return;
     await api("/api/remote/forget");
     location.replace("/pair");
   });
@@ -1704,9 +1719,9 @@
   $("btnRecentClear").addEventListener("click", () => { picked.clear(); renderRecent(); });
   $("btnResetTabs").addEventListener("click", () => { settings.tabMap = {}; save(); render(); toast(t("tabsReset")); });
   $("btnQuit").addEventListener("click", async () => {
-    if (items.some(s => s.kind === "panel") && !confirm(t("quitWarn"))) return;
+    if (items.some(s => s.kind === "panel") && !await confirmBox({ title: t("quitTitle"), text: t("quitWarn"), okText: t("quit"), danger: true })) return;
     let r = await api("/api/quit");
-    if (r.status === 409 && confirm(t("quitBusy"))) r = await api("/api/quit?force=1");
+    if (r.status === 409 && await confirmBox({ title: t("quitBusyTitle"), text: t("quitBusy"), okText: t("quitBusyGo"), danger: true })) r = await api("/api/quit?force=1");
     if (r.ok) window.close();
   });
 

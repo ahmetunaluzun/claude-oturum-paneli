@@ -2,7 +2,7 @@
 // seçerek toplu işlem, model rozeti ve bağlam/token özeti. app.js bağımlılıklarını verir.
 window.PanelActions = function (d) {
   "use strict";
-  const { t, api, toast, ask, adopt, goTo, openFolder, openDrawer, REMOTE } = d;
+  const { t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE } = d;
 
   // ---- Bilgi ----
   const FAMILIES = ["opus", "fable", "sonnet", "haiku"];
@@ -215,7 +215,7 @@ window.PanelActions = function (d) {
     const all = chosen();
     const list = all.filter(s => applies(kind, s));
     if (!list.length) return;
-    if (kind === "adopt" && !confirm(t("adoptConfirmMany", list.length))) return;
+    if (kind === "adopt" && !await confirmBox({ title: t("adoptManyTitle", list.length), text: t("adoptConfirmMany"), list: list.map(s => s.name), okText: t("adopt") })) return;
     let ok = 0;
     for (const s of list) {
       const r = kind === "adopt" ? await api(`/api/adopt/${s.pid}`)

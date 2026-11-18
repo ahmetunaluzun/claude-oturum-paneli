@@ -59,7 +59,8 @@ check "özet: başka satır yoksa numaralı madde" "$(q "n['Stok Sayım']['summa
 check "5 günlük plan 3 günden eski" "$(q "(d['checkedAt']-n['Stok Sayım']['updatedAt'])/86400000 > 3")" True
 
 check "panel: yeni sürüm bildirilir" "$(q "d['updates']['panel']['state'], d['updates']['panel']['newer'], d['updates']['panel']['latest']")" "ok True 99.1.0"
-check "panel: kurulu sürüm 0.11.0" "$(q "d['updates']['panel']['current']")" 0.11.0
+VER=$(grep -o '<Version>[^<]*' src/ClaudePanel/ClaudePanel.csproj | cut -d'>' -f2) # sürüm sabit yazılmaz: tek kaynak csproj
+check "panel: kurulu sürüm = csproj ($VER)" "$(q "d['updates']['panel']['current']")" "$VER"
 check "panel: sürüm sayfası kendi depomuz" "$(q "d['updates']['panel']['url']")" "https://github.com/ahmetunaluzun/claude-oturum-paneli/releases/tag/v99.1.0"
 # Kurulu claude sürümü bu bilgisayara bağlı: okunabildiyse yeni sürüm bildirilir, okunamadıysa "denetlenemedi".
 check "Claude Code: son sürüm önbellekten, durum tutarlı" "$(q "d['updates']['claude']['latest'], d['updates']['claude']['newer'] == (d['updates']['claude']['state']=='ok')")" "99.0.0 True"

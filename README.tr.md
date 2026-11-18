@@ -172,10 +172,17 @@ Intel Mac için `osx-x64`. Ardından `runtimes/` altında yalnız `macos-arm64` 
 - `idle` durumu "işini bitirdi" ile "izin bekliyor"u ayırmaz.
 - `sessions/*.json` biçimi Claude Code'un iç dosyasıdır; sürüm değişince uyarlama gerekebilir.
 
+## Lisans
+
+MIT — bkz. [LICENSE](LICENSE). Bağımsız bir projedir; Anthropic tarafından yapılmamış ya da onaylanmamıştır.
+
 ## Sürüm geçmişi
 
 | Sürüm | Tarih | Değişen alan | Eski değer | Yeni değer | Neden |
 |---|---|---|---|---|---|
+| 0.11.1 | 2026-11-18 | Lisans | Lisans dosyası yoktu | MIT lisansı (LICENSE) ve bu bölüm | Depo herkese açık; kullanım koşulları yazılı olmalı |
+| 0.11.1 | 2026-11-18 | Onay pencereleri | Tarayıcının yerleşik onay kutusu (Mac uygulama penceresinde görünmüyordu) | Panelin kendi penceresi: başlık, eylemi söyleyen düğme, tehlikeli işlemde kırmızı | Onaylar Mac'te görünmüyordu |
+| 0.11.1 | 2026-11-18 | Sürüm geçmişi | 0.8.12 satırında proje adları | Genel ifade | Kişisel proje adları herkese açık metinden çıkarıldı |
 | 0.11.0 | 2026-11-18 | README | Tek dil (Türkçe), ekran görüntüsü yok | README.md İngilizce, README.tr.md Türkçe; uydurma veriyle ekran görüntüleri; kurulum bölümü | Kullanıcı isteği: depo herkese açık, iki dilli ve görselli tanıtım |
 | 0.11.0 | 2026-11-18 | Takip sekmesi | Bekleyen commit/gönderim, yarım planlar ve güncellemeler tek yerde görünmüyordu | Takip sekmesi: Git, Sıradaki işler, Karar bekleyenler, Güncellemeler; satırdan panel oturumu başlatma | Kullanıcı isteği: günlük takip edilecekler için ayrı sekme |
 | 0.11.0 | 2026-11-18 | Oturum başlatma | Yanıt gecikince Başlat'a art arda basılırsa aynı oturum birkaç kez açılıyordu | İstek sürerken düğme kilitli; sunucu aynı isteği 20 sn içinde ikinci kez başlatmaz; başlatma süresi loga yazılır | Canlıda aynı oturum 5 kez açıldı |
@@ -192,7 +199,7 @@ Intel Mac için `osx-x64`. Ardından `runtimes/` altında yalnız `macos-arm64` 
 | 0.9.0 | 2026-11-18 | Gece koruması | `~/.claude/hooks/gece-modu-koruma.py` (yalnız bu bilgisayarda) | Panelin içinde, oturumlara `--settings` ile verilir | Mac'te betik yoktu, koruma çalışmazdı |
 | 0.8.13 | 2026-11-18 | Yazma alanı | Yalnız klavye | 🎤 ile sesle yazma; ses bu bilgisayarda Whisper ile yazıya çevrilir | Kullanıcı isteği: dikte, her cihazda aynı ve kesin çözüm |
 | 0.8.13 | 2026-11-18 | Kota kutusu | Kalan yüzde ve yenilenme | + bu hızla bitiş zamanı | Kullanıcı isteği: ortalama kullanımla ne zaman biter |
-| 0.8.12 | 2026-11-18 | Yeni oturum klasör seçimi | Aramaya yazıp seçmeden başlatınca önceki klasörde açılıyordu; klasörün içine girmek seçmiyordu | Seçilmemiş aramada başlatma durur ve uyarır; içine girilen klasör seçilir | Kullanıcı DWH için açtığı oturumu MemoryPulse'ta buldu |
+| 0.8.12 | 2026-11-18 | Yeni oturum klasör seçimi | Aramaya yazıp seçmeden başlatınca önceki klasörde açılıyordu; klasörün içine girmek seçmiyordu | Seçilmemiş aramada başlatma durur ve uyarır; içine girilen klasör seçilir | Kullanıcı bir proje için açtığı oturumu başka bir projede buldu |
 | 0.8.11 | 2026-11-18 | Konuşmadaki yollar | Düz metin | Var olan yol bağlantı olur; klasör Gezgin'de açılır, dosya seçili gösterilir | Kullanıcı isteği: proje klasörüne tıklayıp gitmek |
 | 0.8.10 | 2026-11-18 | Konuşma mesajları | Saat yok | Mesaj altında saat (bugün değilse gün.ay) | Kullanıcı isteği |
 | 0.8.10 | 2026-11-18 | 📎 düğmesi (masaüstü) | Panodaki yolu yapıştırıyordu; telefonda yalnız resim | Dosya seçici, her tür, çoklu, 20 MB; özgün adla `pastes`'e kopyalanır | Kullanıcı isteği: gerçek ekleme |

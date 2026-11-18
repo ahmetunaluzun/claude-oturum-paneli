@@ -172,12 +172,18 @@ Use `osx-x64` for Intel Macs. Then keep only `macos-arm64` (or `macos-x64`) unde
 - The `idle` status doesn't distinguish "finished" from "waiting for permission".
 - The `sessions/*.json` format is an internal Claude Code file; it may need adjusting when Claude Code changes.
 
+## License
+
+MIT — see [LICENSE](LICENSE). This is an independent project; it is not made or endorsed by Anthropic.
+
 ## Version history
 
 The detailed changelog is in Turkish: [CHANGELOG.md](CHANGELOG.md).
 
 | Version | Date | Area | Before | After | Why |
 |---|---|---|---|---|---|
+| 0.11.1 | 2026-11-18 | License | No license file | MIT license (LICENSE) and this section | The repository is public; terms of use had to be stated |
+| 0.11.1 | 2026-11-18 | Confirmation dialogs | Browser's built-in confirm box (not shown in the macOS app window) | The panel's own dialog: title, clear action button, red for destructive actions | Confirmations were invisible on macOS |
 | 0.11.0 | 2026-11-18 | README | Turkish only, no screenshots | README.md in English, README.tr.md in Turkish; screenshots with made-up data; installation section | User request: the repository is public, it needs a bilingual introduction with images |
 | 0.11.0 | 2026-11-18 | Follow-up tab | Pending commits/pushes, unfinished plans and updates weren't visible in one place | Follow-up tab: Git, Up next, Waiting for a decision, Updates; start a panel session from a row | User request: a separate tab for the daily to-dos |
 | 0.11.0 | 2026-11-18 | Starting sessions | When the response was slow, pressing Start repeatedly opened the same session several times | The button is locked while the request runs; the server won't start the same request twice within 20 s; start-up time is logged | The same session was opened 5 times in real use |
