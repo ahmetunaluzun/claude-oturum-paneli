@@ -1,10 +1,13 @@
 # README görselleri (docs/img/*.png): uydurma ortam + test kopyası (--no-window, boş port) + başsız Chrome (kendi profili, boş port).
 # Gerçek ~/.claude'a dokunmaz, gerçek claude çalıştırmaz (`claude --version` yerine fake-claude.cmd). İş bitince süreçleri kapatır,
-# geçici klasörü siler. Kullanım: pwsh -File tools\readme_gorsel_uret.ps1   (önce: dotnet publish ... -o dist)
+# geçici klasörü siler. Kullanım: pwsh -File tools\readme_gorsel_uret.ps1 [-Exe <ClaudePanel.exe>]   (varsayılan dist; önce: dotnet publish ... -o dist)
+# -Exe: yayına almadan derleme çıktısıyla üretmek için (ör. src\ClaudePanel\bin\Release\net10.0-windows\win-x64\ClaudePanel.exe).
+param([string]$Exe)
 $ErrorActionPreference = 'Stop'
 $proj = Split-Path $PSScriptRoot -Parent
-$exe = "$proj\dist\ClaudePanel.exe"
-if (-not (Test-Path $exe)) { "dist\ClaudePanel.exe yok; önce README'deki derleme komutunu çalıştırın"; exit 2 }
+$exe = if ($Exe) { (Resolve-Path $Exe -ErrorAction SilentlyContinue).Path } else { "$proj\dist\ClaudePanel.exe" }
+if (-not $exe -or -not (Test-Path $exe)) { "$(if ($Exe) { $Exe } else { 'dist\ClaudePanel.exe' }) yok; önce README'deki derleme komutunu çalıştırın"; exit 2 }
+"Kullanılan exe: $exe ($((Get-Item $exe).VersionInfo.ProductVersion))"
 $free = [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB, 1)
 "Boş RAM: $free GB"
 if ($free -lt 4) { "Boş RAM 4 GB altında, başlatılmadı"; exit 3 }
