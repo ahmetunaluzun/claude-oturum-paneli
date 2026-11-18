@@ -38,6 +38,10 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         public string? LastResult;
         /// <summary>Gece modu durumu: "decision" (karar bekliyor) | "done" (iş kalmadı) | null. Kullanıcı yazınca silinir.</summary>
         public string? Night;
+        /// <summary>Takip sekmesinin arka plan işi: kart olarak görünmez, açılışta geri getirilmez (FollowJobs.cs).</summary>
+        public bool Hidden;
+        /// <summary>Son yanıt hata ile bitti.</summary>
+        public bool LastFailed;
     }
 
     /// <summary>Panel ya da Windows yeniden başlarken çalışmakta olan oturuma, geri bağlanınca gönderilir.</summary>
@@ -54,7 +58,12 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     public IReadOnlyList<string>? CommandsOf(string key) =>
         _sessions.TryGetValue(key, out var h) ? h.Commands : null;
 
-    public IReadOnlyList<HostedInfo> List() => _sessions.Values
+    /// <summary>Görünen oturumlar (arka plan işleri hariç).</summary>
+    public IReadOnlyList<HostedInfo> List() => ListAll(includeHidden: false);
+
+    /// <summary>Arka plan işleri dahil: aynı projede çalışan oturum denetimi için (ProjectGuard).</summary>
+    public IReadOnlyList<HostedInfo> ListAll(bool includeHidden = true) => _sessions.Values
+        .Where(h => includeHidden || !h.Hidden)
         .Select(h => new HostedInfo(h.Key, h.SessionId, h.Cwd, h.Name, h.Status, h.StartedAt, h.StatusSince,
             h.Model, h.LastError, h.Cost, h.Task, h.Night))
         .OrderBy(h => h.StartedAt).ToList();
@@ -68,7 +77,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     }
 
     /// <summary>Yeni oturum açar; resumeId verilirse o oturumu kaldığı yerden sürdürür.</summary>
-    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId)
+    /// <param name="hidden">Arka plan işi: oturum listesinde görünmez, diske yazılmaz.</param>
+    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false)
     {
         if (string.IsNullOrWhiteSpace(prompt)) prompt = null;
         var psi = new ProcessStartInfo(Launcher.ClaudeExe())
@@ -100,7 +110,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         var h = new Hosted
         {
             Key = Guid.NewGuid().ToString("N")[..12], Proc = proc, Cwd = cwd, Name = name, Model = model,
-            SessionId = resumeId, StartedAt = now, StatusSince = now, Status = "idle"
+            SessionId = resumeId, StartedAt = now, StatusSince = now, Status = "idle", Hidden = hidden
         };
         _sessions[h.Key] = h;
         Persist();
@@ -289,11 +299,13 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
                     h.LastResult = text.GetString() is { Length: > 4000 } lr ? lr[..4000] : text.GetString();
                 // Kullanıcının durdurduğu iş hata sayılmaz.
                 var failed = false;
+                h.LastFailed = false;
                 if (h.Interrupting) h.Interrupting = false;
                 else if (r.TryGetProperty("is_error", out var err) && err.ValueKind == JsonValueKind.True)
                 {
                     h.LastError = r.TryGetProperty("result", out var res) ? res.ToString() : "error";
                     failed = true;
+                    h.LastFailed = true;
                 }
                 SetStatus(h, "idle");
                 // Kayıt başarısızsa oturum kapatılmaz/temizlenmez; hata kartta görünür.
@@ -319,6 +331,21 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
 
     /// <summary>Oturum hâlâ listede mi (kapatılmadı).</summary>
     public bool Has(string key) => _sessions.ContainsKey(key);
+
+    public bool IsHidden(string key) => _sessions.TryGetValue(key, out var h) && h.Hidden;
+
+    /// <summary>Arka plan işinin izlediği durum: oturum yoksa null.</summary>
+    public (string Status, string? LastResult, bool Failed, string? LastError)? Peek(string key) =>
+        _sessions.TryGetValue(key, out var h) ? (h.Status, h.LastResult, h.LastFailed, h.LastError) : null;
+
+    /// <summary>Arka plan işini görünen oturuma çevirir (kullanıcının kararı gerekiyor); bundan sonra açılışta da geri gelir.</summary>
+    public bool Unhide(string key)
+    {
+        if (!_sessions.TryGetValue(key, out var h)) return false;
+        h.Hidden = false;
+        Persist();
+        return true;
+    }
 
     /// <summary>Gece modunun okuduğu son yanıt metni.</summary>
     public string? LastResultOf(string key) => _sessions.TryGetValue(key, out var h) ? h.LastResult : null;
@@ -346,7 +373,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     void Persist()
     {
         if (_closing) return;
-        var list = _sessions.Values.Where(h => h.SessionId is not null)
+        var list = _sessions.Values.Where(h => h.SessionId is not null && !h.Hidden)
             .Select(h => new Saved(h.SessionId!, h.Cwd, h.Name, h.Model, h.Status == "busy"))
             .Concat(_pending) // henüz bağlanamamış olanlar da listede kalır
             .GroupBy(s => s.SessionId).Select(g => g.First()).ToList();

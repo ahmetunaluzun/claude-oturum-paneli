@@ -8,15 +8,15 @@ set -u
 cd "$(dirname "$0")/.."
 EXE="${1:-src/ClaudePanel/bin/Release/net10.0-windows/win-x64/ClaudePanel.exe}"
 T="$(mktemp -d)"; TW=$(cygpath -w "$T")
-mkdir -p "$T/claude" "$T/data" "$T/projeler/Demo Mağaza" "$T/tmp"
+mkdir -p "$T/claude" "$T/data" "$T/projeler/Demo Mağaza" "$T/projeler/Tarayıcı Demo" "$T/tmp"
 fail=0
 export PYTHONUTF8=1
 check() { if [ "$2" = "$3" ]; then echo "GEÇTİ  $1"; else echo "KALDI  $1 (beklenen $3, gelen $2)"; fail=1; fi; }
 freeport() { pwsh -NoProfile -c '$l=[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback,0);$l.Start();$l.LocalEndpoint.Port;$l.Stop()'; }
 printf '@echo off\r\necho x>>"%%~dp0baslatma.log"\r\n"%%SystemRoot%%\\System32\\sort.exe" >nul\r\n' > "$T/sahte-claude.cmd"
 # Panel, oturuma --settings ile satır içi JSON verir; .cmd betiği o argümanı (tırnak, |) ayrıştıramaz. Test ayar dosyasında
-# iki koruma "zaten kayıtlı" göründüğü için panel --settings eklemez (NightGuard.SettingsArg).
-printf '{"_test":"gece-modu-koruma quota-guard"}' > "$T/claude/settings.json"
+# üç koruma "zaten kayıtlı" göründüğü için panel --settings eklemez (NightGuard.SettingsArg).
+printf '{"_test":"gece-modu-koruma quota-guard project-guard"}' > "$T/claude/settings.json"
 starts() { [ -f "$T/baslatma.log" ] && grep -c x "$T/baslatma.log" || echo 0; }
 
 PORT=$(freeport); B="http://127.0.0.1:$PORT"
@@ -29,7 +29,9 @@ CWD=$(cygpath -w "$T/projeler/Demo Mağaza" | sed 's/\\/\\\\/g')
 # Gövde dosyadan gönderilir: Windows'ta curl'e argümanla verilen Türkçe karakter UTF-8 gitmez (sunucu 400 verir).
 post() { local f="$T/govde.$BASHPID.json"; printf '%s' "$2" > "$f"; curl -s -X POST "$B$1" -H "X-Panel-Token: $TOK" -H "Origin: $B" -H "Content-Type: application/json" --data-binary @"$f"; }
 hosted() { curl -s "$B/api/state" | py -3.13 -c "import json,sys;print(len(json.load(sys.stdin)['hosted']))"; }
-BODY="{\"cwd\":\"$CWD\",\"prompt\":\"aynı görev\"}"
+# 0.12.0'dan beri aynı projeye FARKLI istek 409 verir (tools/proje_engeli_test.sh). Bu test yinelenen isteği ölçer;
+# aynı klasörde birden çok oturum gereken adımlarda istek bilerek mode=force ile gönderilir.
+BODY="{\"cwd\":\"$CWD\",\"prompt\":\"aynı görev\",\"mode\":\"force\"}"
 
 # ---- panel oturumu: eşzamanlı 5 istek ----
 pids=(); for i in 1 2 3 4 5; do post /api/hosted "$BODY" > "$T/r$i.json" & pids+=($!); done; wait "${pids[@]}"
@@ -41,19 +43,21 @@ sleep 1; check "tek süreç açıldı" "$(starts)" 1
 T0=$(date +%s)
 post /api/hosted "$BODY" >/dev/null
 check "art arda aynı istek: yine tek oturum" "$(hosted)" 1
-post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"başka görev\"}" >/dev/null
-check "farklı istem: ikinci oturum açılır" "$(hosted)" 2
+post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"başka görev\"}" | grep -q '"error":"conflict"' && check "farklı istem, aynı proje: çakışma yanıtı" 1 1 || check "farklı istem, aynı proje: çakışma yanıtı" 0 1
+check "farklı istem ikinci oturumu açmadı" "$(hosted)" 1
+post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"başka görev\",\"mode\":\"force\"}" >/dev/null
+check "farklı istem, 'yine de aç': ikinci oturum açılır" "$(hosted)" 2
 
 # ---- arka plan oturumu (/api/sessions): eşzamanlı 5 istek ----
 before=$(starts)
-pids=(); for i in 1 2 3 4 5; do post /api/sessions "{\"cwd\":\"$CWD\",\"prompt\":\"arka plan görevi\"}" >/dev/null & pids+=($!); done; wait "${pids[@]}"
+pids=(); for i in 1 2 3 4 5; do post /api/sessions "{\"cwd\":\"$CWD\",\"prompt\":\"arka plan görevi\",\"mode\":\"force\"}" >/dev/null & pids+=($!); done; wait "${pids[@]}"
 for _ in $(seq 1 20); do [ "$(starts)" != "$before" ] && break; sleep 0.5; done
 sleep 1; check "arka plan: 5 istekte tek süreç" "$(( $(starts) - before ))" 1
 
 # ---- kapatılan oturum yeniden açılabilir (pencere içinde olsa da) ----
-K=$(post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"kapat aç\"}" | grep -o '"key":"[0-9a-f]*"' | cut -d'"' -f4)
+K=$(post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"kapat aç\",\"mode\":\"force\"}" | grep -o '"key":"[0-9a-f]*"' | cut -d'"' -f4)
 post "/api/hosted/$K/stop" "" >/dev/null
-K2=$(post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"kapat aç\"}" | grep -o '"key":"[0-9a-f]*"' | cut -d'"' -f4)
+K2=$(post /api/hosted "{\"cwd\":\"$CWD\",\"prompt\":\"kapat aç\",\"mode\":\"force\"}" | grep -o '"key":"[0-9a-f]*"' | cut -d'"' -f4)
 [ -n "$K2" ] && [ "$K" != "$K2" ] && check "kapatılan oturumun isteği yeniden başlatır" 1 1 || check "kapatılan oturumun isteği yeniden başlatır" 0 1
 
 # ---- başlatma süresi dosya logunda ----
@@ -71,7 +75,7 @@ if [ -x "$CHROME" ] && command -v node >/dev/null; then
   OWN=$(pwsh -NoProfile -c "\$o=(Get-NetTCPConnection -LocalPort $DBG -State Listen | Select-Object -First 1).OwningProcess; ((Get-CimInstance Win32_Process -Filter \"ProcessId=\$o\").CommandLine -like '*$TW\\chrome*')")
   if [ "$(echo "$OWN" | tr -d '\r')" = "True" ]; then
     before=$(hosted)
-    OUT=$(node tools/cift_tik_test.mjs "$DBG" "$B/" "$(cygpath -w "$T/projeler/Demo Mağaza")")
+    OUT=$(node tools/cift_tik_test.mjs "$DBG" "$B/" "$(cygpath -w "$T/projeler/Tarayıcı Demo")") # oturumu olmayan proje: çakışma sorusu çıkmaz
     echo "  tarayıcı: $OUT"
     j() { echo "$OUT" | py -3.13 -c "import json,sys;d=json.load(sys.stdin);print($1)"; }
     check "3 tık: sunucuya tek istek" "$(j "d['sonra']['istek']")" 1

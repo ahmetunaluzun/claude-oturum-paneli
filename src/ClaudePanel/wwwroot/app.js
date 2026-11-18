@@ -42,6 +42,31 @@
     try { data = await res.json(); } catch { /* gövde yok */ }
     return { ok: res.ok, status: res.status, data };
   }
+  // Oturum başlatmanın ortak yolu (Yeni oturum, Takip, Son oturumlar, kapalı oturuma yazma). Projede zaten oturum varsa
+  // sunucu 409 "conflict" döner; kullanıcıya ne yapılacağı sorulur ve istek seçilen kiple yinelenir.
+  // Dönen değer api() ile aynı biçimde; kullanıcı vazgeçtiyse { ok: false, cancelled: true }.
+  async function startHosted(body, path = "/api/hosted") {
+    let r;
+    try { r = await api(path, body); } catch { return { ok: false, status: 0, data: null }; }
+    if (r.status !== 409 || r.data?.error !== "conflict") return r;
+    const c = r.data, opts = c.options || [], sessions = c.sessions || [];
+    const list = sessions.map(s => `${s.name} — ${t(s.kind === "job" ? "pcJob" : s.status === "busy" ? "pcBusy" : "pcIdle")}${s.kind === "terminal" ? ` (${t("terminal")})` : ""}`);
+    const buttons = [];
+    if (opts.includes("send")) buttons.push({ value: "send", label: t("pcSend"), cls: "primary" });
+    if (opts.includes("later")) buttons.push({ value: "later", label: t("pcLater"), cls: buttons.length ? "" : "primary" });
+    if (opts.includes("worktree")) buttons.push({ value: "worktree", label: t("pcWorktree"), cls: "" });
+    buttons.push({ value: "force", label: t("pcForce"), cls: "" });
+    const text = sessions.some(s => s.kind === "job") ? "pcTextJob" : sessions.some(s => s.kind === "terminal") && !REMOTE ? "pcTextTerm" : "pcText";
+    // Odak en güvenli seçenekte: gönder / iş bitince varsa o, yoksa Vazgeç ("Yine de aç" Enter ile seçilmesin).
+    const v = await ask(t("pcTitle"), t(text), list, buttons, { cbox: true, focus: buttons[0].cls ? buttons[0].value : "cancel" });
+    if (v === "cancel") return { ok: false, status: 409, data: { error: "cancelled" }, cancelled: true };
+    let r2;
+    try { r2 = await api(v === "force" ? path : "/api/hosted", { ...body, mode: v }); } catch { return { ok: false, status: 0, data: null }; }
+    if (r2.ok && r2.data?.sent) toast(t("pcSent"));
+    else if (r2.ok && r2.data?.queued) toast(t("pcQueued"));
+    else if (r2.ok && r2.data?.worktree) toast(t("pcWorktreeOk", folderName(r2.data.worktree)));
+    return r2;
+  }
   const getJson = async (path) => { const r = await fetch(path, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); };
 
   function dur(ms) {
@@ -64,6 +89,8 @@
   let view = "sessions";
 
   function normalize(st) {
+    // Proje kökü (git kökü; yoksa klasör) sunucudan gelir: aynı projedeki oturumları eşlemek için. root küçük harf anahtardır.
+    const rootOf = (list) => list.map(s => { const p = st.roots?.[s.cwd] || s.cwd || ""; return Object.assign(s, { rootPath: p, root: p.toLowerCase() }); });
     const hosted = (st.hosted || []).map(h => ({
       id: "h:" + h.key, kind: "panel", key: h.key, sessionId: h.sessionId, name: h.name || folderName(h.cwd),
       cwd: h.cwd, status: h.status, lane: h.status === "busy" || h.status === "starting" ? "busy" : "idle",
@@ -77,7 +104,7 @@
       lane: s.status === "idle" ? "idle" : "busy", since: s.statusSince, started: s.startedAt,
       stats: st.stats?.[s.sessionId]
     }));
-    return [...term, ...hosted];
+    return rootOf([...term, ...hosted]);
   }
 
   async function poll() {
@@ -129,7 +156,8 @@
   const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
   // Takip sekmesi (followup.js)
-  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, items: () => items,
+  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask,
+    lang: () => settings.lang, items: () => items,
     now: () => Date.now() + serverOffset, isOpen: () => view === "follow" });
 
   function render() {
@@ -194,6 +222,7 @@
     el.innerHTML = `
       <div class="card-top"><span class="status-dot"></span><span class="sel-box" aria-hidden="true"></span><h3 class="name"></h3><span class="model-slot"></span><span class="badge night-badge" hidden></span><span class="badge kind-badge"></span></div>
       <p class="path"></p>
+      <p class="proj-multi" hidden></p>
       <div class="meta"><span class="state-time"></span><span class="reason"></span><span class="age"></span></div>
       <p class="last" hidden></p>
       <p class="tool" hidden></p>
@@ -242,6 +271,12 @@
     badge.textContent = s.kind === "panel" ? "" : s.kind === "bg" ? t("bg") : (settings.tabMap[s.sessionId] ? t("tabLabel", settings.tabMap[s.sessionId]) : t("terminal"));
     badge.hidden = !badge.textContent;
     badge.dataset.kind = s.kind;
+    // Aynı projede (git kökü) birden çok oturum: çakışma riski kartta görünür.
+    const same = s.root ? items.filter(x => x.root === s.root && x.status !== "ended").length : 1;
+    const pm = card.querySelector(".proj-multi");
+    pm.hidden = same < 2;
+    pm.textContent = same < 2 ? "" : t("projMulti", same);
+    pm.title = t("projMultiHint");
     const nb = card.querySelector(".night-badge");
     nb.textContent = s.night ? t("night_" + s.night) : "";
     nb.hidden = !s.night;
@@ -711,8 +746,10 @@
       } else {
         // Kapalı ya da sona ermiş oturumu panelde sürdür.
         if (live?.kind === "panel") await api(`/api/hosted/${live.key}/stop`);
-        r = await api("/api/hosted", { cwd: tg.cwd, prompt: text, resumeId: tg.sessionId, name: null, model: null });
-        if (r.ok) { tg.id = "h:" + r.data.key; tg.kind = "panel"; tg.key = r.data.key; }
+        r = await startHosted({ cwd: tg.cwd, prompt: text, resumeId: tg.sessionId, name: null, model: null });
+        if (r.ok && !r.data.sent && !r.data.queued) { tg.id = "h:" + r.data.key; tg.kind = "panel"; tg.key = r.data.key; }
+        // Mesaj projedeki öteki oturuma gittiyse o oturumun konuşması açılır.
+        else if (r.ok) { $("dInput").value = ""; syncComposer(); openDrawer(items.find(s => s.key === r.data.key) || tg); return; }
       }
       if (r.ok) {
         $("dInput").value = "";
@@ -721,7 +758,7 @@
         echo.classList.add("pending");
         $("dMessages").appendChild(echo);
         $("dMessages").scrollTo({ top: $("dMessages").scrollHeight, behavior: "smooth" });
-      } else toast(t(`err_${r.data?.error || "generic"}`), "warn");
+      } else if (!r.cancelled) toast(t(`err_${r.data?.error || "generic"}`), "warn");
     } finally {
       drawer.sending = false;
     }
@@ -759,7 +796,7 @@
     let ok = 0;
     const failed = [];
     for (const r of sel) {
-      const res = await api("/api/hosted", { cwd: r.cwd, prompt: null, resumeId: r.sessionId, name: null, model: null });
+      const res = await startHosted({ cwd: r.cwd, prompt: null, resumeId: r.sessionId, name: null, model: null });
       if (res.ok) ok++; else failed.push(`${r.title} — ${t(`err_${res.data?.error || "generic"}`)} (${r.cwd})`);
     }
     picked.clear();
@@ -1176,17 +1213,18 @@
     $("btnStart").disabled = true;
     $("btnStart").textContent = t("starting");
     let r;
-    try { r = where === "panel" ? await api("/api/hosted", body) : await api("/api/sessions", body); }
-    catch { r = { ok: false, data: null }; }
+    try { r = await startHosted(body, where === "panel" ? "/api/hosted" : "/api/sessions"); }
     finally { startingNew = false; $("btnStart").disabled = false; $("btnStart").textContent = t("start"); }
-    if (!r.ok) { $("newErr").textContent = t(`err_${r.data?.error || "generic"}`); return; }
+    if (!r.ok) { $("newErr").textContent = r.cancelled ? "" : t(`err_${r.data?.error || "generic"}`); return; }
     $("dlgNew").close();
     $("fPrompt").value = ""; $("fName").value = "";
     rememberFolders([body.cwd]);
-    toast(t("started_ok"));
-    if (where === "panel") {
+    const reused = r.data?.sent || r.data?.queued; // mesaj projedeki mevcut oturuma gitti
+    if (!reused) toast(t("started_ok"));
+    if (r.data?.key) { // panel oturumu (terminal seçilmişken mevcut panel oturumuna gönderme dahil)
       setView("sessions");
-      openDrawer({ id: "h:" + r.data.key, kind: "panel", key: r.data.key, cwd: body.cwd, name: body.name || folderName(body.cwd), lane: "busy", status: "busy" });
+      openDrawer(items.find(s => s.key === r.data.key)
+        || { id: "h:" + r.data.key, kind: "panel", key: r.data.key, cwd: r.data.worktree || body.cwd, name: body.name || folderName(body.cwd), lane: "busy", status: "busy" });
     }
   });
 

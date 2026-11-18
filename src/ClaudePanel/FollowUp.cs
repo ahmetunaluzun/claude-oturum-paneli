@@ -11,7 +11,8 @@ public sealed record FollowRepo(string Name, string Path, string Branch, int Dir
 /// <param name="State">"ok" | "nogit" (git bulunamadı).</param>
 public sealed record FollowGit(string State, IReadOnlyList<FollowRepo> Repos, int Clean, int Failed);
 
-public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string Summary);
+/// <param name="Root">Proje kökü (git kökü; yoksa klasör): oturumdaki projeyi tanımak için.</param>
+public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string Summary, string Root);
 
 public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates);
 
@@ -90,20 +91,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
         return new FollowGit("ok", repos.OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToList(), clean, failed);
     }
 
-    /// <summary>Klasörün içinde bulunduğu git deposunun kökü (.git klasörü ya da dosyası olan ilk üst klasör).</summary>
-    static string? GitRoot(string cwd)
-    {
-        try
-        {
-            for (var d = new DirectoryInfo(cwd); d is not null; d = d.Parent)
-            {
-                var dot = Path.Combine(d.FullName, ".git");
-                if (Directory.Exists(dot) || File.Exists(dot)) return d.FullName.TrimEnd('\\', '/');
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
-        return null;
-    }
+    static string? GitRoot(string cwd) => ProjectRoots.GitRoot(cwd);
 
     /// <summary>`git status --porcelain=v2 --branch` çıktısı: başlık satırları (# branch.*) + dosya satırları.</summary>
     static FollowRepo ParseStatus(string root, string status)
@@ -176,7 +164,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
                 var f = new FileInfo(Path.Combine(dir, NextFile));
                 if (!f.Exists) continue;
                 list.Add(new FollowNext(Path.GetFileName(dir) is { Length: > 0 } n ? n : dir, dir,
-                    new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeMilliseconds(), Summary(f.FullName)));
+                    new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeMilliseconds(), Summary(f.FullName), ProjectRoots.Of(dir)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* kayıt başına: sonraki proje */ }
         }

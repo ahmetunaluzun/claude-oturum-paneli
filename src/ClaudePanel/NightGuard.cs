@@ -113,6 +113,18 @@ public static class NightGuard
             });
         if (!text.Contains("quota-guard", StringComparison.OrdinalIgnoreCase))
             pre.Add(QuotaSetup.GuardEntry($"\"{exe}\" {QuotaCli.GuardArg}"));
+        // Aynı projede başka oturum çalışırken dosya yazma / git commit-push bekletilir (ProjectGuard.cs).
+        if (!text.Contains("project-guard", StringComparison.OrdinalIgnoreCase))
+            pre.Add(new JsonObject
+            {
+                ["matcher"] = "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+                ["hooks"] = new JsonArray(new JsonObject
+                {
+                    ["type"] = "command",
+                    ["command"] = $"\"{exe}\" {ProjectGuard.Arg}",
+                    ["timeout"] = 15
+                })
+            });
         if (pre.Count == 0) return null;
         return new JsonObject { ["hooks"] = new JsonObject { ["PreToolUse"] = pre } }.ToJsonString();
     }

@@ -8,6 +8,8 @@ using ClaudePanel;
 
 // Gece modu koruması: panelin başlattığı claude oturumları paneli hook olarak çağırır (NightGuard.cs).
 if (args.Length > 0 && args[0] == NightGuard.Arg) Environment.Exit(NightGuard.RunHook());
+// Aynı projede başka oturum çalışırken yazmayı bekleten hook (ProjectGuard.cs).
+if (args.Length > 0 && args[0] == ProjectGuard.Arg) Environment.Exit(ProjectGuard.RunHook());
 // Terminal durum satırı ve kota koruması (QuotaCli.cs): ~/.claude/settings.json'dan çağrılır.
 if (args.Length > 0 && args[0] == QuotaCli.StatusLineArg) Environment.Exit(QuotaCli.RunStatusLine(args));
 if (args.Length > 0 && args[0] == QuotaCli.GuardArg) Environment.Exit(QuotaCli.RunGuard(args));
@@ -39,6 +41,8 @@ builder.Services.AddSingleton<HostedSessions>();
 builder.Services.AddSingleton<Skills>();
 builder.Services.AddSingleton<UpdateCheck>();
 builder.Services.AddSingleton<FollowUp>();
+builder.Services.AddSingleton<ProjectGuard>();
+builder.Services.AddSingleton<FollowJobs>();
 builder.Services.AddSingleton<NightMode>();
 builder.Services.AddSingleton<RemoteAccess>();
 builder.Services.AddSingleton<Dictation>();
@@ -195,6 +199,9 @@ app.MapGet("/api/state", (SessionStore store, HostedSessions hosted, Tray tray, 
     hosted = hostedList,
     stats = SessionStatsOf(sessions, hostedList, transcripts, windows),
     usage = store.Usage(night.RefreshUsageSoon),
+    // Oturum klasörü → proje kökü (git kökü; yoksa klasör): "bu projede N oturum açık" ve Takip'te oturumdaki projeler.
+    roots = sessions.Select(s => s.Cwd).Concat(hostedList.Select(h => h.Cwd)).Where(c => !string.IsNullOrEmpty(c))
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(c => c, ProjectRoots.Of),
     home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
     });
 });
@@ -238,15 +245,23 @@ app.MapPost("/api/reveal", async (HttpContext ctx) =>
     return body?.Path is { } p && PathLinks.Reveal(p) ? Results.Ok() : Results.NotFound();
 });
 
-app.MapPost("/api/sessions", async (HttpContext ctx) =>
+app.MapPost("/api/sessions", async (HttpContext ctx, ProjectGuard guard) =>
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
     var req = await ctx.Request.ReadFromJsonAsync<NewSessionRequest>();
     var error = Launcher.Validate(req);
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
     // Yinelenen istek (düğmeye art arda basma) ikinci oturumu açmaz (StartOnce.cs).
-    StartOnce.Run("bg", req!.Cwd, req.Prompt, req.Name, () => { Launcher.StartSession(req); return null; });
-    return Results.Ok();
+    // Aynı projede oturum varsa açılmaz (409 + seçenekler); kullanıcı "yine de aç" derse mode=force ile gelir.
+    object? conflict = null;
+    StartOnce.Run("bg:" + req!.Mode, req.Cwd, req.Prompt, req.Name, () =>
+    {
+        var others = guard.SessionsIn(ProjectRoots.Of(req.Cwd!));
+        if (others.Count > 0 && req.Mode != "force") { conflict = FollowEndpoints.Conflict(others, true, req.Cwd!, null, worktree: false); return null; }
+        Launcher.StartSession(req);
+        return "ok";
+    }, k => k is not null);
+    return conflict is null ? Results.Ok() : Results.Json(conflict, statusCode: 409);
 });
 
 app.MapGet("/api/recent", (Transcripts tr) => Results.Json(tr.Recent()));
@@ -257,7 +272,7 @@ app.MapGet("/api/transcript/{id}", (string id, int? limit, Transcripts tr) =>
     return Results.Json(new { items, title, cwd });
 });
 
-app.MapPost("/api/hosted", async (HttpContext ctx, HostedSessions hosted) =>
+app.MapPost("/api/hosted", async (HttpContext ctx, HostedSessions hosted, ProjectGuard guard) =>
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
     var req = await ctx.Request.ReadFromJsonAsync<HostedRequest>();
@@ -266,9 +281,8 @@ app.MapPost("/api/hosted", async (HttpContext ctx, HostedSessions hosted) =>
     if (error is null && string.IsNullOrWhiteSpace(req!.Prompt) && req.ResumeId is null) error = "prompt";
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
     // Yinelenen istek ilk oturumun anahtarını alır; o oturum kapatıldıysa yeniden başlatılır.
-    var (key, repeated) = StartOnce.Run("hosted", req!.Cwd, req.Prompt, req.ResumeId,
-        () => hosted.Start(req.Cwd!, req.Prompt, model, req.Name, req.ResumeId), k => k is not null && hosted.Has(k));
-    return Results.Json(new { key, repeated });
+    // Aynı projede başka oturum varsa 409 + seçenekler (FollowEndpoints.StartHosted).
+    return FollowEndpoints.StartHosted(req!, model, hosted, guard);
 });
 app.MapPost("/api/hosted/{key}/send", async (string key, HttpContext ctx, HostedSessions hosted) =>
 {
@@ -512,6 +526,7 @@ app.MapPost("/api/followup/refresh", (HttpContext ctx, FollowUp fu) =>
     fu.Refresh();
     return Results.Ok();
 });
+app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {
@@ -527,6 +542,7 @@ app.Lifetime.ApplicationStopping.Register(() => Handoff.DeleteToken(port));
 app.Services.GetRequiredService<HostedSessions>().Restore();
 app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();
+app.Services.GetRequiredService<ProjectGuard>().Start();
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl);
 await app.WaitForShutdownAsync();
 
@@ -545,9 +561,8 @@ static async Task<bool> PanelAlreadyRunning(string url)
 
 record PathRequest(string? Path);
 record FocusRequest(string? Tab);
-record HostedRequest(string? Cwd, string? Prompt, string? Model, string? Name, string? ResumeId);
 record SendRequest(string? Text);
-public record NewSessionRequest(string? Cwd, string? Prompt, string? Name);
+public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null);
 public record DirsRequest(string? Path, string? Q = null);
 public record DirEntry(string Name, string Path, bool Known);
 public record WrapRequest(bool Close);

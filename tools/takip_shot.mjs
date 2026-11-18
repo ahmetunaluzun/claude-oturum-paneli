@@ -40,7 +40,7 @@ const measure = () => ev(`JSON.stringify((() => {
   const nav = document.getElementById("nav").getBoundingClientRect();
   const navOver = [...document.querySelectorAll("#nav button")].filter(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > nav.right + 1).length;
   return { yatayTasma: de.scrollWidth - de.clientWidth, satir: rows.length, tasanSatir: over, tasanSekme: navOver,
-    rozet: document.getElementById("navFollow").textContent, bolum: [...document.querySelectorAll(".fu-sec h2")].map(h => h.textContent),
+    rozet: document.getElementById("navFollow").textContent, bolum: [...document.querySelectorAll(".fu-fold .fu-name")].map(h => h.textContent),
     dugme: [...document.querySelectorAll(".fu-row .btn")].map(b => b.textContent), temiz: [...document.querySelectorAll(".fu-clean")].map(p => p.textContent) };
 })())`);
 for (const [name, width, light] of [["1280_koyu", 1280, false], ["1280_acik", 1280, true], ["390_telefon", 390, false]]) {

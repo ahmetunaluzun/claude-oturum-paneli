@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ClaudePanel</AssemblyName>
     <RootNamespace>ClaudePanel</RootNamespace>
-    <Version>0.11.1</Version>
+    <Version>0.12.0</Version>
     <Product>Claude Oturum Paneli</Product>
     <InvariantGlobalization>false</InvariantGlobalization>
     <PublishSingleFile>true</PublishSingleFile>
