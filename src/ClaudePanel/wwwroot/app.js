@@ -177,7 +177,7 @@
   const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
   // Takip sekmesi (followup.js)
-  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask,
+  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask, REMOTE, openMenu: A.openMenu,
     lang: () => settings.lang, items: () => items,
     now: () => Date.now() + serverOffset, isOpen: () => view === "follow" });
 

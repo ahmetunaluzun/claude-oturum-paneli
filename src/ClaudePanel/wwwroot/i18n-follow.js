@@ -1,4 +1,4 @@
-// Takip 2. aşama (0.12.0) ve "aynı projede tek oturum" metinleri. i18n.js'ten sonra yüklenir, aynı sözlüğe eklenir.
+// Takip 2. ve 3. aşama (0.12.0, 0.13.0) ve "aynı projede tek oturum" metinleri. i18n.js'ten sonra yüklenir, aynı sözlüğe eklenir.
 (() => {
   "use strict";
   Object.assign(window.I18N.tr, {
@@ -41,7 +41,32 @@
     fuSec_claudeLocal: "Claude Code izin dosyası", fuSec_env: ".env dosyası", fuSec_keyfile: "anahtar/sertifika dosyası", fuSec_sshkey: "SSH özel anahtarı",
     fuSec_credentials: "kimlik bilgisi dosyası", fuSec_github: "GitHub belirteci", fuSec_anthropic: "Anthropic API anahtarı", fuSec_sk: "API anahtarı",
     fuSec_aws: "AWS erişim anahtarı", fuSec_google: "Google API anahtarı", fuSec_slack: "Slack belirteci", fuSec_privatekey: "özel anahtar",
-    fuSec_urlcreds: "adres içinde kullanıcı:parola", fuSec_assign: "parola/anahtar ataması"
+    fuSec_urlcreds: "adres içinde kullanıcı:parola", fuSec_assign: "parola/anahtar ataması",
+    // Takip 3. aşama (0.13.0): Drive / güncelleme kütüğü
+    fuDrive: "Drive'a yüklenecekler", fuWaiting: "{0} bekliyor", fuUnreadable: "Okunamayan satır", fuUnreadableTag: "okunamadı", fuLine: "satır {0}",
+    fuExtras: "+{0} dosya", fuMissing: "dosya yok", fuLedgerTag: "kütük",
+    fuLedgerWhat: "{0} dosya yüklendi olarak işaretli; kütükte hâlâ açık duruyor",
+    fuUploaded: "Yükledim", fuUploadedToast: "{0} yüklendi olarak işaretlendi; dosya yeniden üretilirse satır geri gelir",
+    fuLedgerClose: "Kütüğü kapat", fuLedgerTitle: "{0}: kütük güncellensin mi?",
+    fuLedgerText: "Arka planda bir oturum bu dosyaları kütükte \"Drive'a yüklendi\" olarak işler. Panel kütüğe kendisi yazmaz; sonuç bu satırda görünür.",
+    fuLedgerGo: "Kütüğü güncelle", fuShowLedger: "Kütüğü göster", fuReveal: "Klasörde göster",
+    fuLedgerDone: "✓ Kütük güncellendi", fuLedgerSummary: "{0}: kütük özeti", fuJob_closing: "Kütük güncelleniyor…",
+    fuFail_unchanged: "Kütük güncellenmedi: oturum tamam dedi ama dosya değişmedi", err_noledger: "Kütük ya da dosya listede yok; Yenile'ye basın",
+    // Liste: süzgeç, görünüm, ertele/gizle, yeni işareti
+    fuFilterLabel: "Süzgeç", fuFilter_all: "Tümü", fuFilter_git: "Git", fuFilter_next: "Planlar", fuFilter_drive: "Drive", fuFilter_decisions: "Kararlar",
+    fuModeLabel: "Görünüm", fuMode_project: "Projeye göre", fuMode_type: "Türe göre",
+    fuKind_git: "Git", fuKind_next: "Plan", fuKind_drive: "Drive", fuKind_decision: "Karar", fuKind_conflict: "Çakışma",
+    fuNothingAll: "Bekleyen bir şey yok", fuNothingFilter: "Bu süzgeçte bekleyen bir şey yok",
+    fuAside: "{0} öğe gizli ya da ertelendi — göster", fuAside_hidden: "gizli", fuAside_snoozed: "yarına ertelendi", fuAside_uploaded: "yüklendi",
+    fuRestore: "Geri getir", fuSnooze: "Ertele (yarına)", fuSnoozed: "{0} yarına ertelendi", fuHide: "Gizle",
+    fuHidden: "{0} gizlendi; durumu değişirse geri gelir", fuNew: "yeni", fuDetails: "Ayrıntı",
+    // Toplu işlemler
+    fuBulkBtn: "Toplu", fuBulkAllGit: "Tüm bekleyen depoları commit et ve gönder ({0})", fuBulkPick: "Öğe seç…",
+    fuBulkEmpty: "Toplu işlem yapılacak öğe yok", fuBulkCount: "{0} öğe seçili", fuBulkNone: "Önce öğe seçin",
+    fuBulk_commit: "Commit et ve gönder", fuBulk_snooze: "Ertele (yarına)", fuBulk_hide: "Gizle", fuBulk_upload: "Yükledim",
+    fuBulkSkipped: "{0} öğe atlandı: {1}", fuBulkWhy_commit: "yalnız Git satırları commit edilir", fuBulkWhy_upload: "yalnız Drive dosyaları işaretlenir",
+    fuBulkWhy_snooze: "bu öğe ertelenemez", fuBulkWhy_hide: "bu öğe gizlenemez",
+    fuBulkDone_snooze: "{0} öğe yarına ertelendi", fuBulkDone_hide: "{0} öğe gizlendi", fuBulkDone_upload: "{0} dosya yüklendi olarak işaretlendi"
   });
   Object.assign(window.I18N.en, {
     pcTitle: "A session is already open in this project",
@@ -80,6 +105,28 @@
     fuSec_claudeLocal: "Claude Code permissions file", fuSec_env: ".env file", fuSec_keyfile: "key/certificate file", fuSec_sshkey: "SSH private key",
     fuSec_credentials: "credentials file", fuSec_github: "GitHub token", fuSec_anthropic: "Anthropic API key", fuSec_sk: "API key",
     fuSec_aws: "AWS access key", fuSec_google: "Google API key", fuSec_slack: "Slack token", fuSec_privatekey: "private key",
-    fuSec_urlcreds: "user:password inside a URL", fuSec_assign: "password/key assignment"
+    fuSec_urlcreds: "user:password inside a URL", fuSec_assign: "password/key assignment",
+    fuDrive: "To upload to Drive", fuWaiting: "waiting {0}", fuUnreadable: "Unreadable line", fuUnreadableTag: "unreadable", fuLine: "line {0}",
+    fuExtras: "+{0} files", fuMissing: "file missing", fuLedgerTag: "ledger",
+    fuLedgerWhat: "{0} file(s) marked as uploaded; still open in the ledger",
+    fuUploaded: "Uploaded", fuUploadedToast: "{0} marked as uploaded; the row comes back if the file is regenerated",
+    fuLedgerClose: "Close in ledger", fuLedgerTitle: "{0}: update the ledger?",
+    fuLedgerText: "A background session records these files as uploaded to Drive in the ledger. The panel never writes to the ledger itself; the result shows on this row.",
+    fuLedgerGo: "Update ledger", fuShowLedger: "Show ledger", fuReveal: "Show in folder",
+    fuLedgerDone: "✓ Ledger updated", fuLedgerSummary: "{0}: ledger summary", fuJob_closing: "Updating the ledger…",
+    fuFail_unchanged: "Ledger not updated: the session said done but the file did not change", err_noledger: "Ledger or file not in the list; press Refresh",
+    fuFilterLabel: "Filter", fuFilter_all: "All", fuFilter_git: "Git", fuFilter_next: "Plans", fuFilter_drive: "Drive", fuFilter_decisions: "Decisions",
+    fuModeLabel: "View", fuMode_project: "By project", fuMode_type: "By type",
+    fuKind_git: "Git", fuKind_next: "Plan", fuKind_drive: "Drive", fuKind_decision: "Decision", fuKind_conflict: "Conflict",
+    fuNothingAll: "Nothing pending", fuNothingFilter: "Nothing pending in this filter",
+    fuAside: "{0} item(s) hidden or snoozed — show", fuAside_hidden: "hidden", fuAside_snoozed: "snoozed until tomorrow", fuAside_uploaded: "uploaded",
+    fuRestore: "Bring back", fuSnooze: "Snooze (tomorrow)", fuSnoozed: "{0} snoozed until tomorrow", fuHide: "Hide",
+    fuHidden: "{0} hidden; it comes back if its state changes", fuNew: "new", fuDetails: "Details",
+    fuBulkBtn: "Bulk", fuBulkAllGit: "Commit and push all pending repositories ({0})", fuBulkPick: "Select items…",
+    fuBulkEmpty: "Nothing to act on in bulk", fuBulkCount: "{0} selected", fuBulkNone: "Select items first",
+    fuBulk_commit: "Commit and push", fuBulk_snooze: "Snooze (tomorrow)", fuBulk_hide: "Hide", fuBulk_upload: "Uploaded",
+    fuBulkSkipped: "{0} item(s) skipped: {1}", fuBulkWhy_commit: "only Git rows can be committed", fuBulkWhy_upload: "only Drive files can be marked",
+    fuBulkWhy_snooze: "this item can't be snoozed", fuBulkWhy_hide: "this item can't be hidden",
+    fuBulkDone_snooze: "{0} item(s) snoozed until tomorrow", fuBulkDone_hide: "{0} item(s) hidden", fuBulkDone_upload: "{0} file(s) marked as uploaded"
   });
 })();

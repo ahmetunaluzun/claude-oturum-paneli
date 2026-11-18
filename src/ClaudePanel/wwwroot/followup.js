@@ -1,32 +1,28 @@
-// Takip sekmesi: günlük takip edilecekler. Her kaynak bir bölümdür; bölüm, öğe listesi üretir ({ id, type, root, prio, sig, … })
-// ve çizim tek yerden yapılır. Bölümler açılır-kapanır (durum localStorage["panel.follow"]). Kaynaklar kota harcamaz:
-// git durumu, NEXT_SESSION.md, karar bekleyenler, aynı projede birden çok oturum, güncellemeler.
-// Commit / gönder düğmeleri oturum AÇMAZ: sunucudaki arka plan işini başlatır (/api/follow/*), sonuç satırda görünür.
+// Takip sekmesi: günlük takip edilecekler. Her kaynak bir bölümdür; bölüm, öğe listesi üretir ({ id, type, root, rank, sig, … })
+// ve çizim tek yerden yapılır. Kaynaklar kota harcamaz: git durumu, NEXT_SESSION.md, karar bekleyenler, aynı projede birden
+// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), güncellemeler.
+// Görünüm (süzgeç çipleri, projeye / türe göre gruplama, gizle-ertele, toplu seçim) followup-view.js'te, kalıcı durum
+// followup-state.js'te (localStorage["panel.follow"]).
+// Commit / gönder / kütüğü kapat düğmeleri oturum AÇMAZ: sunucudaki arka plan işini başlatır (/api/follow/*), sonuç satırda görünür.
 // Projesinde açık oturum olan depo ve planlar gizlenir (oturum zaten o işi yapıyor); karar bekleyenler her zaman görünür.
 window.PanelFollowUp = function (d) {
   "use strict";
-  const { t, api, getJson, toast, esc, dur, openDrawer, items, setView, now, isOpen, startHosted, confirmBox, ask, lang } = d;
+  const { t, api, getJson, toast, esc, dur, openDrawer, items, setView, now, isOpen, startHosted, confirmBox, ask, lang, openMenu, REMOTE } = d;
   const $ = (id) => document.getElementById(id);
-  const SCAN_POLL_MS = 1500, OPEN_POLL_MS = 60_000, BACKGROUND_POLL_MS = 300_000, REOPEN_FRESH_MS = 30_000, JOB_POLL_MS = 1200;
-  const STALE_PLAN_MS = 3 * 86_400_000, STORE = "panel.follow", ACTIVE = ["queued", "committing", "checking", "pushing"];
-  const OPEN_BY_DEFAULT = new Set(["decisions", "conflicts"]);
-  let snap = null, jobs = [], timer = null, jobTimer = null, itemSig = "", jobsWereActive = false;
+  const SCAN_POLL_MS = 1500, OPEN_POLL_MS = 60_000, BACKGROUND_POLL_MS = 300_000, REOPEN_FRESH_MS = 30_000, JOB_POLL_MS = 1200, LONG_PRESS_MS = 500;
+  const STALE_PLAN_MS = 3 * 86_400_000, ACTIVE = ["queued", "committing", "checking", "pushing", "closing"];
+  let snap = null, jobs = [], timer = null, jobTimer = null, itemSig = "", jobsWereActive = false, model = null;
   const started = new Set(); // bu sayfada "Devam et" ile oturum başlatılan planlar
-  const revealed = new Set(); // "oturumda açık" projeleri gösterilen bölümler (kalıcı değil)
-
-  // ---- Kalıcı görünüm durumu ----
-  const state = Object.assign({ collapsed: {}, dismissed: [] }, (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })());
-  const saveState = () => localStorage.setItem(STORE, JSON.stringify(state));
-  const isCollapsed = (id) => state.collapsed[id] ?? !OPEN_BY_DEFAULT.has(id);
+  const opened = new Set(); // ayrıntısı açık satırlar (kalıcı değil)
+  const S = window.PanelFollowState({ now });
+  const state = S.state;
 
   const low = (s) => String(s || "").toLowerCase();
   const folder = (p) => String(p || "").split(/[\\/]/).filter(Boolean).pop() || p;
-  /** Açık oturumu olan proje kökleri (küçük harf). */
-  const activeRoots = () => new Set(items().map(s => s.root).filter(Boolean));
 
   // ---- İşler ----
   const isActive = (i) => ACTIVE.includes(i.state);
-  /** Depo kökü → o deponun en son iş kaydı. */
+  /** Depo kökü (ya da kütük yolu) → onun en son iş kaydı. */
   function jobOf(root) {
     let best = null;
     for (const j of jobs) for (const i of j.items) if (low(i.root) === low(root) && (!best || i.updatedAt >= best.updatedAt)) best = { ...i, jobId: j.id };
@@ -38,12 +34,13 @@ window.PanelFollowUp = function (d) {
     if (isActive(i)) return t("fuJob_" + i.state);
     if (i.state === "decision") return t("fuNeedDecision");
     if (i.state === "done") {
+      if (i.kind === "ledger") return t("fuLedgerDone");
       if (i.committed && i.pushed) return t("fuDoneBoth", i.committed, i.pushed);
       if (i.pushed) return t("fuDonePush", i.pushed);
       if (i.committed) return t("fuDoneCommit", i.committed);
       return t(i.code === "nothing" ? "fuDoneNothing" : "fuDoneNoChange");
     }
-    let s = t("fuFail_" + (["secret", "rejected", "auth", "timeout", "noremote", "nogit", "insession", "busy"].includes(i.code) ? i.code : "failed"));
+    let s = t("fuFail_" + (["secret", "rejected", "auth", "timeout", "noremote", "nogit", "insession", "busy", "unchanged"].includes(i.code) ? i.code : "failed"));
     if (i.code === "secret" && i.findings?.length)
       s += ": " + i.findings.map(f => `${f.file || "?"} (${t("fuSec_" + f.what)})`).join("; ");
     else if (i.detail && i.code !== "secret") s += ` (${i.detail})`;
@@ -61,14 +58,23 @@ window.PanelFollowUp = function (d) {
     jobsWereActive = active;
   }
 
+  /** btn: yeniden çizimle yenilenen satır düğmesi (iş başlayınca kapalı kalır); kalıcı düğmede null verilir. */
   async function runJob(btn, path, body) {
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     let r;
     try { r = await api(path, { ...body, lang: lang() }); } catch { r = { ok: false, data: null }; }
-    if (!r.ok) { btn.disabled = false; toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
+    if (!r.ok) { if (btn) btn.disabled = false; toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
     toast(t("fuJobStarted"));
     jobsWereActive = true;
     loadJobs();
+  }
+
+  /** "Commit et ve gönder" toplu işi: onay listesi → tek arka plan işi. → başlatıldı mı. */
+  async function commitAll(list, btn) {
+    const ok = await confirmBox({ title: t("fuAllTitle", list.length), text: t("fuAllText"), okText: t("fuAllGo"),
+      list: list.map(i => `${i.title} — ${i.plan.plan}`) });
+    if (ok) runJob(btn, "/api/follow/all", { paths: list.map(i => i.repo.path) });
+    return ok;
   }
 
   // ---- Öğeler ----
@@ -87,9 +93,9 @@ window.PanelFollowUp = function (d) {
     const out = [], seen = new Set();
     for (const r of snap.git.repos) {
       seen.add(low(r.path));
-      const job = jobOf(r.path), plan = repoPlan(r);
+      const job = jobOf(r.path), plan = repoPlan(r), failed = job && !isActive(job) && job.state !== "done";
       const what = [r.dirty ? t("fuDirty", r.dirty) : "", r.ahead ? t("fuAhead", r.ahead) : ""].filter(Boolean).join(" · ");
-      const it = { id: "git:" + low(r.path), type: "git", root: low(r.path), prio: job && !isActive(job) && job.state !== "done" ? 1 : 2,
+      const it = { id: "git:" + low(r.path), type: "git", root: low(r.path), rootPath: r.path, prio: failed ? 1 : 2, rank: failed ? 1 : 3,
         title: r.name, tags: (r.branch ? tag(r.branch) : "") + (r.noUpstream ? tag(t("fuNoUpstream"), "warn") : ""), what, sub: r.path, repo: r, plan, job,
         sig: [r.dirty, r.ahead, r.noUpstream, job?.state, job?.updatedAt].join() };
       out.push(it);
@@ -97,12 +103,12 @@ window.PanelFollowUp = function (d) {
     // Biten işin deposu artık temizse satırı kalmaz: sonuç ayrı satırda görünür, "Tamam" ile kapanır.
     for (const j of jobs) for (const i of j.items) {
       const key = low(i.root);
-      if (seen.has(key)) continue;
+      if (i.kind === "ledger" || seen.has(key)) continue; // kütük işleri Drive bölümünde
       const latest = jobOf(i.root);
       if (!latest || latest.jobId !== j.id) continue;
       seen.add(key);
-      out.push({ id: "job:" + j.id + "|" + key, type: "job", root: key, prio: latest.state === "done" ? 3 : 1, title: i.name, sub: i.root, job: latest,
-        result: true, sig: [latest.state, latest.updatedAt].join() });
+      out.push({ id: "job:" + j.id + "|" + key, type: "job", root: key, rootPath: i.root, prio: latest.state === "done" ? 3 : 1, rank: latest.state === "done" ? 4 : 1,
+        title: i.name, sub: i.root, job: latest, result: true, sig: [latest.state, latest.updatedAt].join() });
     }
     return out.sort((a, b) => a.prio - b.prio);
   }
@@ -110,20 +116,21 @@ window.PanelFollowUp = function (d) {
   function nextItems() {
     return snap.next.map(n => {
       const age = now() - n.updatedAt, stale = age >= STALE_PLAN_MS;
-      return { id: "next:" + low(n.cwd), type: "next", root: low(n.root || n.cwd), prio: stale ? 2 : 1, title: n.name, tags: stale ? tag(t("fuStale"), "warn") : "",
-        what: n.summary, sub: n.cwd, side: t("since", dur(age)), cls: stale ? "fu-stale" : "", next: n, stale, sig: [n.updatedAt, stale].join() };
+      return { id: "next:" + low(n.cwd), type: "next", root: low(n.root || n.cwd), rootPath: n.root || n.cwd, rank: stale ? 2 : 3, title: n.name,
+        tags: stale ? tag(t("fuStale"), "warn") : "", what: n.summary, sub: n.cwd, side: t("since", dur(age)), cls: stale ? "fu-stale" : "", next: n, stale,
+        sig: [n.updatedAt, stale].join() };
     });
   }
 
   function decisionItems() {
-    const list = decisions().map(s => ({ id: "dec:" + s.id, type: "decision", root: s.root, prio: 0, title: s.name, tags: tag(t("night_decision"), "warn"),
-      sub: s.cwd, side: t("since", dur(now() - s.since)), session: s, sig: s.id }));
+    const list = decisions().map(s => ({ id: "dec:" + s.id, type: "decision", root: s.root, rootPath: s.rootPath || s.cwd, rank: 0, title: s.name,
+      tags: tag(t("night_decision"), "warn"), sub: s.cwd, side: t("since", dur(now() - s.since)), session: s, sig: s.id }));
     // Arka plan işi karar isteyip görünür oturuma dönmüşse (oturum hâlâ açıksa) burada da durur.
     for (const j of jobs) for (const i of j.items) {
       const s = i.state === "decision" && i.sessionKey && items().find(x => x.key === i.sessionKey);
       if (s && !list.some(x => x.session.id === s.id))
-        list.push({ id: "dec:" + s.id, type: "decision", root: low(i.root), prio: 0, title: i.name, tags: tag(t("fuNeedDecision"), "warn"), what: i.summary || "",
-          sub: i.root, session: s, sig: s.id });
+        list.push({ id: "dec:" + s.id, type: "decision", root: s.root || low(i.root), rootPath: s.rootPath || s.cwd || i.root, rank: 0, title: i.name,
+          tags: tag(t("fuNeedDecision"), "warn"), what: i.summary || "", sub: i.root, session: s, sig: s.id });
     }
     return list;
   }
@@ -132,23 +139,21 @@ window.PanelFollowUp = function (d) {
   function conflictItems() {
     const groups = new Map();
     for (const s of items()) if (s.root && s.status !== "ended") groups.set(s.root, [...(groups.get(s.root) || []), s]);
-    return [...groups].filter(([, list]) => list.length > 1).map(([root, list]) => ({ id: "conf:" + root, type: "conflict", root, prio: 1,
-      title: folder(list[0].rootPath || list[0].cwd), tags: tag(t("projMulti", list.length), "warn"),
+    return [...groups].filter(([, list]) => list.length > 1).map(([root, list]) => ({ id: "conf:" + root, type: "conflict", root, rank: 1,
+      rootPath: list[0].rootPath || list[0].cwd, title: folder(list[0].rootPath || list[0].cwd), tags: tag(t("projMulti", list.length), "warn"),
       what: t("fuConflictWhat", list.length, list.map(s => s.name + (s.kind === "terminal" ? ` (${t("terminal")})` : "")).join(", ")),
       sub: list[0].rootPath || list[0].cwd, sig: list.map(s => s.id).join() }));
   }
 
   function updateItems() {
     const { panel, claude } = snap.updates, out = [];
-    if (panel.newer) out.push({ id: "upd:panel", type: "update", prio: 1, title: t("fuPanelNew", panel.latest), what: t("fuInstalled", panel.current), link: panel.url, sig: panel.latest });
-    if (claude.newer) out.push({ id: "upd:claude", type: "update", prio: 1, title: t("fuClaudeNew", claude.latest), what: `${t("fuInstalled", claude.current)} · ${t("fuClaudeHow")}`, sig: claude.latest });
+    if (panel.newer) out.push({ id: "upd:panel", type: "update", rank: 4, title: t("fuPanelNew", panel.latest), what: t("fuInstalled", panel.current), link: panel.url, sig: panel.latest });
+    if (claude.newer) out.push({ id: "upd:claude", type: "update", rank: 4, title: t("fuClaudeNew", claude.latest), what: `${t("fuInstalled", claude.current)} · ${t("fuClaudeHow")}`, sig: claude.latest });
     return out;
   }
 
-  /** Bölümler: öğeler + oturumda açık olduğu için gizlenenler + alttaki bilgi satırları. */
+  /** Bölümler: ham öğeler (all) + alttaki bilgi satırları. hideable: projesinde oturum açık olan öğe gizlenir. */
   function build() {
-    const act = activeRoots();
-    const split = (list) => ({ items: list.filter(i => !act.has(i.root)), inSession: list.filter(i => act.has(i.root)) });
     const g = snap.git, { panel, claude } = snap.updates;
     const gitNotes = [];
     if (g.state === "nogit") gitNotes.push([t("fuNoGit"), true]);
@@ -161,13 +166,14 @@ window.PanelFollowUp = function (d) {
       if (u.state !== "ok") updNotes.push([t("fuUnknown", name), true]);
       else if (!u.newer) updNotes.push([t("fuUpToDate", name, u.current), false]);
     }
-    const conflicts = conflictItems();
+    const conflicts = conflictItems(), drive = D.items(snap, jobs);
     return [
-      { id: "decisions", title: "fuDecisions", items: decisionItems(), inSession: [], notes: [], empty: t("fuNoDecisions") },
-      ...(conflicts.length ? [{ id: "conflicts", title: "fuConflicts", items: conflicts, inSession: [], notes: [] }] : []),
-      { id: "git", title: "fuGit", ...split(g.state === "nogit" ? [] : gitItems()), notes: gitNotes },
-      { id: "next", title: "fuNext", ...split(nextItems()), notes: [], empty: t("fuNoNext") },
-      { id: "updates", title: "fuUpdates", items: updateItems(), inSession: [], notes: updNotes }
+      { id: "decisions", title: "fuDecisions", all: decisionItems(), notes: [], empty: t("fuNoDecisions") },
+      ...(conflicts.length ? [{ id: "conflicts", title: "fuConflicts", all: conflicts, notes: [] }] : []),
+      { id: "git", title: "fuGit", all: g.state === "nogit" ? [] : gitItems(), notes: gitNotes, hideable: true },
+      { id: "next", title: "fuNext", all: nextItems(), notes: [], empty: t("fuNoNext"), hideable: true },
+      ...(drive.length ? [{ id: "drive", title: "fuDrive", all: drive, notes: [] }] : []),
+      { id: "updates", title: "fuUpdates", all: updateItems(), notes: updNotes }
     ];
   }
 
@@ -182,7 +188,7 @@ window.PanelFollowUp = function (d) {
     const b = el("button", "btn small" + (primary ? " primary" : ""));
     b.type = "button";
     b.textContent = label;
-    b.addEventListener("click", () => fn(b));
+    b.addEventListener("click", (e) => { e.stopPropagation(); fn(b); });
     return b;
   }
   const note = (text, unknown) => el("p", "fu-clean" + (unknown ? " unk" : ""), esc(text));
@@ -203,11 +209,13 @@ window.PanelFollowUp = function (d) {
     return b;
   }
 
-  function sideOf(it, hidden) {
+  /** mode: undefined (olağan) | "session" (oturumda açık proje: yalnız bilgi) | "aside" (gizli/ertelenmiş: yalnız "Geri getir"). */
+  function sideOf(it, mode) {
     const side = el("div", "fu-side", it.side ? `<small>${esc(it.side)}</small>` : "");
-    if (hidden) return side; // oturumda açık proje: yalnız bilgi, düğme yok
+    if (mode === "session") return side;
+    if (mode === "aside") { side.appendChild(button(t("fuRestore"), () => { S.restore(it); render(); })); return side; }
     const job = it.job;
-    if (job?.summary) side.appendChild(button(t("fuSummary"), () => ask(t("fuSummaryTitle", it.title), job.summary, null, [{ value: "ok", label: t("ok"), cls: "primary" }])));
+    if (job?.summary) side.appendChild(button(t("fuSummary"), () => ask(t(job.kind === "ledger" ? "fuLedgerSummary" : "fuSummaryTitle", it.title), job.summary, null, [{ value: "ok", label: t("ok"), cls: "primary" }])));
     if (job?.state === "decision") {
       const s = items().find(x => x.key === job.sessionKey);
       if (s) side.appendChild(button(t("fuOpenChat"), () => openDrawer(s), true));
@@ -217,98 +225,145 @@ window.PanelFollowUp = function (d) {
     if (it.type === "git" && !(job && isActive(job)) && !stale)
       side.appendChild(button(it.plan.label, (b) => runJob(b, it.plan.path, it.plan.body), !job || job.state === "done"));
     if (it.type === "job" && !isActive(job))
-      side.appendChild(button(t("fuDismiss"), () => { state.dismissed = [...state.dismissed.slice(-49), job.jobId + "|" + it.root]; saveState(); render(); }));
+      side.appendChild(button(t("fuDismiss"), () => { state.dismissed = [...state.dismissed.slice(-49), job.jobId + "|" + it.root]; S.save(); render(); }));
     if (it.type === "next") side.appendChild(continueButton(it));
     if (it.type === "decision") side.appendChild(button(t("fuOpenChat"), () => openDrawer(it.session), true));
     if (it.type === "conflict") side.appendChild(button(t("fuShowSessions"), () => setView("sessions")));
+    D.side(it, side, snap);
     if (it.link) {
       const a = el("a", "btn small primary", esc(t("fuReleasePage")));
       a.href = it.link; a.target = "_blank"; a.rel = "noopener";
+      a.addEventListener("click", (e) => e.stopPropagation());
       side.appendChild(a);
     }
     return side;
   }
 
-  /** Satır: başlık + etiketler, açıklama, iş durumu, soluk alt satır; sağda süre ve (tek) düğme. */
-  function row(it, hidden) {
-    const r = el("div", "fu-row " + (it.cls || ""));
+  /** Açık satırın alt çubuğu: Klasörde göster (Drive), Ertele (yarına), Gizle. */
+  function moreOf(it) {
+    const box = el("div", "fu-more");
+    D.more(it, box);
+    if (S.canDefer(it)) {
+      box.appendChild(button(t("fuSnooze"), () => { S.snooze(it); toast(t("fuSnoozed", it.title)); render(); }));
+      box.appendChild(button(t("fuHide"), () => { S.hide(it); toast(t("fuHidden", it.title)); render(); }));
+    }
+    return box.children.length ? box : null;
+  }
+
+  /** Sıkı satır: başlık + etiketler, tek satır açıklama, iş durumu; sağda süre ve (tek) düğme. Tıklayınca ayrıntı açılır. */
+  function row(it, mode) {
+    const open = opened.has(it.id), pick = !mode && V.selecting() && V.selectable(it);
+    const r = el("div", "fu-row " + (it.cls || "") + (open ? " fu-open" : "") + (pick && V.isPicked(it.id) ? " fu-picked" : ""));
     r.dataset.id = it.id;
+    r.dataset.type = it.type;
+    if (pick) r.appendChild(el("span", "fu-pick" + (V.isPicked(it.id) ? " on" : "")));
     const job = it.job;
     const jobLine = job ? `<span class="fu-job ${isActive(job) ? "run" : job.state === "done" ? "ok" : "warn"}">${esc(jobText(job))}</span>` : "";
-    r.appendChild(el("div", "fu-main", `<span class="fu-title"><b>${esc(it.title)}</b>${it.tags || ""}${hidden ? tag(t("fuInSessionTag")) : ""}</span>`
+    const marks = (it.kind ? `<span class="fu-kind">${esc(it.kind)}</span>` : "") + (it.tags || "") + (mode === "session" ? tag(t("fuInSessionTag")) : "")
+      + (mode === "aside" ? tag(t("fuAside_" + it.aside)) : "") + (!mode && S.isNew(it.id) ? `<span class="fu-new">${esc(t("fuNew"))}</span>` : "");
+    r.appendChild(el("div", "fu-main", `<span class="fu-title"><b>${esc(it.title)}</b>${marks}</span>`
       + (it.what ? `<span class="fu-what">${esc(it.what)}</span>` : "") + jobLine + (it.sub ? `<small title="${esc(it.sub)}">${esc(it.sub)}</small>` : "")));
-    r.appendChild(sideOf(it, hidden));
+    const tog = r.appendChild(el("button", "fu-tog", `<span class="fu-chev" aria-hidden="true"></span>`));
+    tog.type = "button";
+    tog.setAttribute("aria-expanded", String(open));
+    tog.setAttribute("aria-label", t("fuDetails"));
+    r.appendChild(sideOf(it, mode));
+    const more = open && !mode ? moreOf(it) : null;
+    if (more) r.appendChild(more);
+    // Satıra tıkla: seçim kipinde seçer, değilse ayrıntıyı açar/kapatır. Uzun basma (telefon) seçim kipini açar.
+    let pressTimer = 0, longPressed = false;
+    r.addEventListener("click", (e) => {
+      if (longPressed) { longPressed = false; return; }
+      if (e.target.closest(".fu-side, .fu-more")) return;
+      if (V.selecting() && !mode) { V.toggle(it); return; }
+      opened.has(it.id) ? opened.delete(it.id) : opened.add(it.id);
+      render();
+    });
+    if (!mode && V.selectable(it)) {
+      r.addEventListener("pointerdown", (e) => {
+        if (e.pointerType !== "touch" || e.target.closest("button, a")) return;
+        longPressed = false;
+        pressTimer = setTimeout(() => { longPressed = true; navigator.vibrate?.(15); V.toggle(it); }, LONG_PRESS_MS);
+      });
+      for (const ev of ["pointerup", "pointerleave", "pointercancel", "pointermove"]) r.addEventListener(ev, () => clearTimeout(pressTimer));
+      r.addEventListener("contextmenu", (e) => { if (longPressed) e.preventDefault(); });
+    }
     return r;
   }
 
-  /** "Tümünü commit et ve gönder": onay listesi → tek arka plan işi. */
+  /** "Tümünü commit et ve gönder": açık Git bölümünün başında (bölüm kapalıyken üstteki Toplu menüsünden). */
   function allBar(sec) {
     const list = sec.items.filter(i => i.type === "git" && !(i.job && isActive(i.job)));
     if (list.length < 2) return null;
     const bar = el("div", "fu-allbar");
-    bar.appendChild(button(t("fuAllBtn"), async (b) => {
-      const ok = await confirmBox({ title: t("fuAllTitle", list.length), text: t("fuAllText"), okText: t("fuAllGo"),
-        list: list.map(i => `${i.title} — ${i.plan.plan}`) });
-      if (ok) runJob(b, "/api/follow/all", { paths: list.map(i => i.repo.path) });
-    }));
+    bar.appendChild(button(t("fuAllBtn"), (b) => commitAll(list, b)));
     return bar;
   }
 
+  /** Açılır-kapanır kap: türe göre görünümde bölüm, projeye göre görünümde proje grubu (sec.group). */
   function drawSection(sec) {
-    const box = el("section", "fu-sec");
-    box.id = "fu-" + sec.id;
-    const n = sec.items.length, collapsed = isCollapsed(sec.id);
+    const box = el("section", "fu-sec" + (sec.group ? " fu-group" : ""));
+    box.id = sec.dom || "fu-" + sec.id;
+    const n = sec.items.length, collapsed = S.isCollapsed(sec.id, sec.openDefault);
     const head = el("button", "fu-fold");
     head.type = "button";
     head.setAttribute("aria-expanded", String(!collapsed));
-    const names = sec.items.map(i => i.title).join(", ") || (sec.inSession.length ? t("fuInSession", sec.inSession.length) : t("fuNothing"));
-    head.innerHTML = `<span class="fu-chev" aria-hidden="true"></span><span class="fu-name">${esc(t(sec.title))}</span>`
+    const names = sec.group ? sec.sum : sec.items.map(i => i.title).join(", ") || (sec.inSession.length ? t("fuInSession", sec.inSession.length) : t("fuNothing"));
+    head.innerHTML = `<span class="fu-chev" aria-hidden="true"></span><span class="fu-name">${esc(sec.name ?? t(sec.title))}</span>`
       + `<span class="count${n ? " fu-on" : ""}">${n}</span><span class="fu-sum">${esc(names)}</span>`;
-    head.addEventListener("click", () => { state.collapsed[sec.id] = !isCollapsed(sec.id); saveState(); render(); });
+    head.addEventListener("click", () => { state.collapsed[sec.id] = !collapsed; S.save(); render(); });
     box.appendChild(head);
     if (collapsed) return box;
     const body = box.appendChild(el("div", "list fu-body"));
     if (sec.id === "git") { const bar = allBar(sec); if (bar) body.appendChild(bar); }
-    for (const it of sec.items) body.appendChild(row(it, false));
+    for (const it of sec.items) body.appendChild(row(it));
     if (!n && sec.empty && !sec.inSession.length) body.appendChild(note(sec.empty));
     for (const [text, unknown] of sec.notes) body.appendChild(note(text, unknown));
     if (sec.inSession.length) {
       const more = el("button", "fu-insess");
       more.type = "button";
-      more.setAttribute("aria-expanded", String(revealed.has(sec.id)));
+      more.setAttribute("aria-expanded", String(V.isRevealed(sec.id)));
       more.textContent = t("fuInSession", sec.inSession.length);
-      more.addEventListener("click", () => { revealed.has(sec.id) ? revealed.delete(sec.id) : revealed.add(sec.id); render(); });
+      more.addEventListener("click", () => { V.flip(sec.id); render(); });
       body.appendChild(more);
-      if (revealed.has(sec.id)) for (const it of sec.inSession) body.appendChild(row(it, true));
+      if (V.isRevealed(sec.id)) for (const it of sec.inSession) body.appendChild(row(it, "session"));
     }
     return box;
   }
 
-  const count = (secs) => secs.reduce((sum, s) => sum + s.items.filter(i => !(i.result && i.job?.state === "done")).length, 0);
+  const D = window.PanelFollowDrive({ t, api, toast, dur, now, low, tag, jobOf, isActive, runJob, confirmBox, button, S, REMOTE, rerender: () => render() });
+  const V = window.PanelFollowView({ t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, folder,
+    sessions: () => items(), rerender: () => render() });
 
-  function badge(secs) {
-    const n = snap?.checkedAt ? count(secs || build()) : decisions().length;
+  /** Sekme rozeti: görünen (gizlenmemiş, ertelenmemiş, oturumda olmayan) öğe sayısı; süzgeçten bağımsız. */
+  function badge() {
+    const n = model ? model.total : decisions().length;
     $("navFollow").hidden = !n;
     $("navFollow").textContent = n;
   }
 
   function render() {
-    const secs = snap?.checkedAt ? build() : null;
-    badge(secs);
+    model = snap?.checkedAt ? V.model(build()) : null;
+    badge();
     if (!isOpen() || !snap) return;
     $("fuChecked").textContent = snap.scanning ? t("fuScanning") : snap.checkedAt ? t("fuChecked", dur(now() - snap.checkedAt)) : "";
     $("btnFuRefresh").disabled = snap.scanning;
     const body = $("fuBody");
-    if (!secs) { body.innerHTML = `<p class="muted">${esc(t("loading"))}</p>`; $("btnFuFold").hidden = true; return; }
-    const anyCollapsed = secs.some(s => isCollapsed(s.id));
+    $("btnFuBulk").hidden = !model;
+    if (!model) { body.innerHTML = `<p class="muted">${esc(t("loading"))}</p>`; $("btnFuFold").hidden = true; return; }
+    S.prune(model.ids);
+    S.track(new Set([...model.ids].filter(id => !/^(job|led):/.test(id)))); // iş sonucu ve kütük satırı kullanıcının kendi işleminin sonucudur
+    const anyCollapsed = model.folds.some(s => S.isCollapsed(s.id, s.openDefault));
     const fold = $("btnFuFold");
     fold.hidden = false;
     fold.textContent = t(anyCollapsed ? "fuOpenAll" : "fuCloseAll");
     fold.dataset.open = anyCollapsed ? "1" : "0";
-    // Odak yeniden çizimde kaybolmasın: odaktaki başlık/düğme kimliğiyle geri verilir.
-    const focusSec = document.activeElement?.closest?.(".fu-sec")?.id, wasFold = document.activeElement?.classList?.contains("fu-fold");
-    body.replaceChildren(...secs.map(drawSection));
+    // Odak yeniden çizimde kaybolmasın: odaktaki başlık/çip kimliğiyle geri verilir.
+    const act = document.activeElement, focusSec = act?.closest?.(".fu-sec")?.id, wasFold = act?.classList?.contains("fu-fold");
+    const chip = act?.dataset?.filter ? `[data-filter="${act.dataset.filter}"]` : act?.dataset?.mode ? `.fu-mode[data-mode="${act.dataset.mode}"]` : null;
+    body.replaceChildren(...V.draw(model));
     if (focusSec && wasFold) document.getElementById(focusSec)?.querySelector(".fu-fold")?.focus();
+    else if (chip) body.querySelector(chip)?.focus();
     itemSig = liveSig();
   }
 
@@ -324,23 +379,25 @@ window.PanelFollowUp = function (d) {
     timer = setTimeout(() => load(false), wait);
   }
 
-  // Sekme açılınca: eldeki görüntü hemen çizilir, yarım dakikadan eskiyse yeniden taranır.
+  // Sekme açılınca: eldeki görüntü hemen çizilir, yarım dakikadan eskiyse yeniden taranır. Her açılış yeni bir "bakış"tır.
   function open() {
+    S.newLook();
     if (snap) render();
     load(!snap || now() - snap.checkedAt > REOPEN_FRESH_MS);
   }
 
   /** Oturum listesi her yenilendiğinde: rozet güncellenir; oturuma bağlı kısımlar değiştiyse yeniden çizilir. */
   function onItems() {
-    if (!isOpen() || !snap?.checkedAt) { badge(); return; }
+    if (!isOpen() || !snap?.checkedAt) { model = snap?.checkedAt ? V.model(build()) : null; badge(); return; }
     if (liveSig() !== itemSig) render(); else badge();
   }
 
   $("btnFuRefresh").addEventListener("click", () => load(true));
+  $("btnFuBulk").addEventListener("click", (e) => { e.stopPropagation(); V.menu(e.currentTarget); });
   $("btnFuFold").addEventListener("click", () => {
     const openAll = $("btnFuFold").dataset.open === "1";
-    for (const s of build()) state.collapsed[s.id] = !openAll;
-    saveState();
+    for (const s of model?.folds || []) state.collapsed[s.id] = !openAll;
+    S.save();
     render();
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && isOpen()) load(false); });

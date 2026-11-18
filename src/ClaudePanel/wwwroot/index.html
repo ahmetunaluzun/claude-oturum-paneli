@@ -74,10 +74,13 @@
       <div class="fu-head">
         <p class="hint wide" data-i18n="fuHint"></p>
         <small class="muted" id="fuChecked"></small>
+        <button type="button" class="btn small" id="btnFuBulk" aria-haspopup="menu" data-i18n="fuBulkBtn" hidden></button>
         <button type="button" class="btn small" id="btnFuFold" hidden></button>
         <button type="button" class="btn small" id="btnFuRefresh" data-i18n="fuRefresh"></button>
       </div>
       <div id="fuBody"></div>
+      <!-- Takip: seçerek toplu işlem çubuğu (followup-view.js) -->
+      <div class="bulk-bar fu-bulk" id="fuBulkBar" hidden></div>
     </div>
 
     <div class="view" id="viewSkills" hidden>
@@ -310,6 +313,9 @@
   <script src="/assets/i18n-follow.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
+  <script src="/assets/followup-state.js"></script>
+  <script src="/assets/followup-drive.js"></script>
+  <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>
 </body>

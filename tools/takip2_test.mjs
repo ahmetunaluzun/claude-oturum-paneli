@@ -93,7 +93,7 @@ const P = (name) => showRoot + "\\" + name;
 
 // ================= 1280 px, koyu, Türkçe =================
 await open(1280);
-await ev(`localStorage.removeItem("panel.follow")`);
+await ev(`localStorage.setItem("panel.follow", JSON.stringify({ mode: "type" }))`); // bu test "Türe göre" görünümü sınar (varsayılan artık projeye göre; o görünüm takip3_test.mjs'te)
 await open(1280);
 check("varsayılan: karar bekleyenler açık, ötekiler kapalı", await secs(), ["decisions:açık", "git:kapalı", "next:kapalı", "updates:kapalı"]);
 check("kapalı bölümde satır çizilmez", await ev(`document.querySelectorAll("#fu-git .fu-row, #fu-next .fu-row").length`), 0);
