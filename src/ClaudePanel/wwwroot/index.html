@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="panel-token" content="{{TOKEN}}">
+  <meta name="panel-remote" content="{{REMOTE}}">
+  <meta name="theme-color" content="#121214">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icon-192.png">
+  <title>Claude Oturum Paneli</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="top">
+    <div class="brand">
+      <img src="/assets/logo.svg" alt="" class="logo">
+      <div>
+        <h1 data-i18n="title"></h1>
+        <p class="sub" id="summary"></p>
+        <span class="night-pill" id="nightPill" hidden></span>
+      </div>
+    </div>
+    <nav class="tabs" id="nav">
+      <button data-view="sessions" class="active"><span data-i18n="navSessions"></span><span class="pill" id="navCount">0</span></button>
+      <button data-view="recent" data-i18n="navRecent"></button>
+      <button data-view="skills" data-i18n="navSkills"></button>
+    </nav>
+    <div class="usage" id="usage" hidden></div>
+    <div class="actions">
+      <input type="search" id="search" data-i18n-ph="search" autocomplete="off">
+      <button class="btn primary" id="btnNew"><span class="plus">+</span> <span data-i18n="newSession"></span></button>
+      <button class="btn icon" id="btnSettings" data-i18n-title="settings">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="view" id="viewSessions">
+      <p class="filter-note" id="filterNote" hidden><span id="filterText"></span> <button type="button" class="btn small" id="filterClear" data-i18n="clearSearch"></button></p>
+      <section class="lane" data-lane="idle">
+        <h2><span class="dot idle"></span><span data-i18n="laneIdle"></span><span class="count" id="countIdle">0</span>
+          <button type="button" class="btn small lane-action" id="btnResumeAll" data-i18n="resumeAll" data-i18n-title="resumeAllHint" hidden></button>
+          <button type="button" class="btn small lane-action" id="btnBulk" aria-haspopup="menu" hidden><span class="lbl" data-i18n="bulkMenu"></span><span class="lbl-short" aria-hidden="true">⋯</span></button></h2>
+        <p class="hint" data-i18n="laneIdleHint"></p>
+        <div class="cards" id="cardsIdle"></div>
+      </section>
+      <section class="lane" data-lane="busy">
+        <h2><span class="dot busy"></span><span data-i18n="laneBusy"></span><span class="count" id="countBusy">0</span></h2>
+        <p class="hint" data-i18n="laneBusyHint"></p>
+        <div class="cards" id="cardsBusy"></div>
+      </section>
+      <div class="empty" id="empty" hidden>
+        <div class="pulse-ring"><img src="/assets/logo.svg" alt=""></div>
+        <h3 data-i18n="emptyTitle"></h3>
+        <p data-i18n="emptyText"></p>
+      </div>
+    </div>
+
+    <div class="view" id="viewRecent" hidden>
+      <p class="hint wide" data-i18n="recentHint"></p>
+      <div class="recent-bar" id="recentBar" hidden>
+        <b id="recentCount"></b>
+        <button type="button" class="btn small primary" id="btnRecentOpen" data-i18n="recentOpen" data-i18n-title="recentOpenHint"></button>
+        <button type="button" class="btn small" id="btnRecentClear" data-i18n="recentClear"></button>
+      </div>
+      <div class="list" id="recentList"></div>
+    </div>
+
+    <div class="view" id="viewSkills" hidden>
+      <div class="skills-layout">
+        <aside class="cat-list" id="catList"></aside>
+        <div class="skills-main">
+          <div class="skill-search-row">
+            <input type="search" id="skillSearch" class="big-search" data-i18n-ph="skillSearchPh" autocomplete="off">
+            <div class="chips" id="skillChips">
+              <button data-f="all" class="active" data-i18n="fAll"></button>
+              <button data-f="active" data-i18n="fActive"></button>
+              <button data-f="pool" data-i18n="fPool"></button>
+            </div>
+          </div>
+          <p class="hint wide" id="skillCount"></p>
+          <section class="guide" id="skillGuide"></section>
+          <div class="skill-grid" id="skillGrid"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Oturum ayrıntısı (sağdan açılan çekmece) -->
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div class="dh-title">
+        <span class="status-dot" id="dDot"></span>
+        <div>
+          <h3 id="dTitle"></h3>
+          <p id="dPath"></p>
+        </div>
+      </div>
+      <div class="dh-actions" id="dActions"></div>
+      <button class="btn icon" id="dClose" aria-label="Kapat">✕</button>
+    </div>
+    <p class="dh-meta"><span id="dModel"></span><span id="dMeta"></span></p>
+    <p class="dh-task" id="dTask" hidden><span id="dTaskText"></span> <button type="button" class="link" id="dTaskCancel" data-i18n="cancel"></button></p>
+    <div class="messages" id="dMessages"></div>
+    <form class="composer" id="dComposer">
+      <p class="composer-note" id="dNote"></p>
+      <div class="slash-pop" id="slashPop" hidden></div>
+      <div class="composer-row">
+        <div class="composer-pill">
+          <button type="button" class="btn icon" id="dPastePath" data-i18n-title="pastePath">📎</button>
+          <input type="file" id="dFile" multiple hidden>
+          <textarea id="dInput" rows="2" data-i18n-ph="typeMessage"></textarea>
+          <button type="button" class="btn icon" id="dMic" data-i18n-title="mic">🎤</button>
+        </div>
+        <button class="btn primary" id="dSend" data-i18n="send"></button>
+      </div>
+    </form>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <footer class="bottom">
+    <span id="conn" class="conn ok"></span>
+    <span data-i18n="footer" id="footText"></span>
+    <span class="ver" id="ver"></span>
+  </footer>
+
+  <!-- Yeni oturum -->
+  <dialog id="dlgNew">
+    <form method="dialog" id="formNew">
+      <h3 data-i18n="newSession"></h3>
+      <div class="proj-pick">
+        <div class="row between"><span class="lbl" data-i18n="folder"></span><button type="button" class="btn small local-only" id="btnBrowse" data-i18n="browse"></button></div>
+        <div class="proj-tabs" id="projTabs">
+          <button type="button" class="active" data-tab="recent" data-i18n="projRecent"></button>
+          <button type="button" data-tab="browse" data-i18n="projBrowse"></button>
+        </div>
+        <input type="search" id="projSearch" data-i18n-ph="projSearchPh" autocomplete="off">
+        <div class="dir-bar" id="dirBar" hidden>
+          <button type="button" class="btn small" id="dirUp" data-i18n-title="dirUp">↑</button>
+          <div class="dir-crumbs" id="dirCrumbs"></div>
+        </div>
+        <div class="dir-roots" id="dirRoots" hidden></div>
+        <div class="proj-list" id="projList"></div>
+        <input id="fCwd" required autocomplete="off" class="cwd-input" data-i18n-ph="folderPh">
+      </div>
+      <div class="row two">
+        <label><span data-i18n="sessionName"></span>
+          <input id="fName" maxlength="60" autocomplete="off" data-i18n-ph="optional">
+        </label>
+        <label><span data-i18n="model"></span>
+          <select id="fModel">
+            <option value="" data-i18n="modelDefault"></option>
+            <option value="opus">Opus</option>
+            <option value="sonnet">Sonnet</option>
+            <option value="haiku">Haiku</option>
+            <option value="fable">Fable</option>
+          </select>
+        </label>
+      </div>
+      <label><span data-i18n="task"></span>
+        <textarea id="fPrompt" rows="5" required data-i18n-ph="taskPh"></textarea>
+      </label>
+      <div class="seg local-only" id="fWhere">
+        <button type="button" data-where="panel" class="active"><b data-i18n="wherePanel"></b><small data-i18n="wherePanelHint"></small></button>
+        <button type="button" data-where="bg"><b data-i18n="whereBg"></b><small data-i18n="whereBgHint"></small></button>
+      </div>
+      <p class="err" id="newErr"></p>
+      <div class="row end">
+        <button type="button" class="btn" id="btnCancel" data-i18n="cancel"></button>
+        <button type="submit" class="btn primary" data-i18n="start"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Sekme seçimi -->
+  <dialog id="dlgTab">
+    <form method="dialog">
+      <h3 data-i18n="pickTab"></h3>
+      <p class="hint" data-i18n="pickTabHint"></p>
+      <div class="tab-list" id="tabList"></div>
+      <div class="row end"><button class="btn" data-i18n="cancel"></button></div>
+    </form>
+  </dialog>
+
+  <!-- Seçenekli soru (oturum kapatma, toplu kaydet ve temizle) -->
+  <dialog id="dlgAsk">
+    <form method="dialog">
+      <h3 id="askTitle"></h3>
+      <p class="hint" id="askText"></p>
+      <ul class="ask-list" id="askList" hidden></ul>
+      <div class="row end" id="askButtons"></div>
+    </form>
+  </dialog>
+
+  <!-- Skill ayrıntısı -->
+  <dialog id="dlgSkill">
+    <form method="dialog">
+      <h3 id="skTitle"></h3>
+      <p class="sk-meta" id="skMeta"></p>
+      <p class="sk-desc" id="skDesc"></p>
+      <p class="sk-path" id="skPath"></p>
+      <div class="row end">
+        <button type="button" class="btn" id="skCopy" data-i18n="copyCmd"></button>
+        <button class="btn primary" data-i18n="ok"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Ayarlar -->  <dialog id="dlgSettings">
+    <form method="dialog">
+      <h3 data-i18n="settings"></h3>
+      <label class="check"><input type="checkbox" id="sNotify"> <span data-i18n="sNotify"></span></label>
+      <label class="check"><input type="checkbox" id="sSound"> <span data-i18n="sSound"></span></label>
+      <label class="check"><input type="checkbox" id="sLight"> <span data-i18n="sLight"></span></label>
+      <label><span data-i18n="sLang"></span>
+        <select id="sLang"><option value="tr">Türkçe</option><option value="en">English</option></select>
+      </label>
+      <fieldset class="night">
+        <legend data-i18n="nightTitle"></legend>
+        <label class="check"><input type="checkbox" id="nEnabled"> <span data-i18n="nEnabled"></span></label>
+        <div class="row two">
+          <label><span data-i18n="nStart"></span><input type="time" id="nStart" required></label>
+          <label><span data-i18n="nEnd"></span><input type="time" id="nEnd" required></label>
+        </div>
+        <label class="check" id="nAutoRow"><input type="checkbox" id="nAutostart"> <span data-i18n="nAutostart"></span></label>
+        <p class="hint wide" data-i18n="nHint"></p>
+        <p class="hint wide night-wait" id="nWaiting" hidden></p>
+        <button type="button" class="btn small" id="btnNightLog" data-i18n="nLog"></button>
+      </fieldset>
+      <fieldset class="remote local-only" id="remoteBox">
+        <legend data-i18n="rTitle"></legend>
+        <ol class="steps" id="rSteps"></ol>
+        <label class="check"><input type="checkbox" id="rEnabled"> <span data-i18n="rEnabled"></span></label>
+        <p class="hint wide" id="rState"></p>
+        <div class="remote-pair" id="rPair" hidden>
+          <div class="qr" id="rQr"></div>
+          <div><p class="hint" data-i18n="rPairHint"></p><p class="pair-code" id="rCode"></p><p class="hint" id="rExpire"></p></div>
+        </div>
+        <button type="button" class="btn small" id="btnPair" data-i18n="rAdd"></button>
+        <ul class="devices" id="rDevices"></ul>
+        <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
+      </fieldset>
+      <fieldset class="remote remote-only">
+        <legend data-i18n="rTitle"></legend>
+        <p class="hint wide" id="rmState"></p>
+        <ul class="devices" id="rmDevices"></ul>
+        <p class="hint wide" data-i18n="rOnPhone"></p>
+        <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
+        <button type="button" class="btn small primary" id="btnInstall" data-i18n="rInstall"></button>
+        <p class="hint wide" id="installHint" hidden></p>
+        <button type="button" class="btn small danger" id="btnForget" data-i18n="rForget"></button>
+      </fieldset>
+      <button type="button" class="btn small local-only" id="btnResetTabs" data-i18n="resetTabs"></button>
+      <div class="row between">
+        <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
+        <button class="btn primary" data-i18n="ok"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Telefondan erişim rehberi -->
+  <dialog id="dlgPhoneHelp" class="wide">
+    <form method="dialog">
+      <h3 data-i18n="rHelpTitle"></h3>
+      <div class="guide-text" id="phoneGuide"></div>
+      <div class="row end"><button class="btn primary" data-i18n="ok"></button></div>
+    </form>
+  </dialog>
+
+  <!-- Gece raporu -->
+  <dialog id="dlgNight" class="wide">
+    <form method="dialog">
+      <h3 data-i18n="nLogTitle"></h3>
+      <div class="night-log" id="nightLog"></div>
+      <div class="row end"><button class="btn primary" data-i18n="ok"></button></div>
+    </form>
+  </dialog>
+
+  <!-- Seçerek toplu işlem çubuğu -->
+  <div class="bulk-bar" id="bulkBar" hidden>
+    <b id="bulkCount"></b>
+    <button type="button" class="btn small ghost" id="bulkAll"></button>
+    <button type="button" class="btn small primary" data-bulk="resume" data-i18n="resume"></button>
+    <button type="button" class="btn small" data-bulk="adopt" data-i18n="adopt" hidden></button>
+    <button type="button" class="btn small" data-bulk="clear" data-i18n="saveClear"></button>
+    <button type="button" class="btn small" data-bulk="close" data-i18n="saveClose"></button>
+    <button type="button" class="btn small ghost" id="bulkCancel" data-i18n="selectExit"></button>
+  </div>
+  <div class="toasts" id="toasts"></div>
+  <script src="/assets/i18n.js"></script>
+  <script src="/assets/md.js"></script>
+  <script src="/assets/actions.js"></script>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

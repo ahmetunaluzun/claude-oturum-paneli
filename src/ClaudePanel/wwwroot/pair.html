@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#121214">
+  <title>Claude Oturum Paneli</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icon-192.png">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body class="pair-page">
+  <main class="pair-card">
+    <img src="/assets/logo.svg" alt="" class="logo">
+    <h1 id="pTitle">Telefonu eşleştir</h1>
+    <p class="hint" id="pHint">Bilgisayardaki panelde Ayarlar → Telefondan erişim → "Telefon ekle"ye bas, ekranda çıkan 6 haneli kodu buraya yaz.</p>
+    <form id="pForm" autocomplete="off">
+      <label><span id="pCodeLabel">Kod</span>
+        <input id="pCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+      </label>
+      <label><span id="pNameLabel">Bu cihazın adı</span>
+        <input id="pName" maxlength="40">
+      </label>
+      <button class="btn primary big" id="pBtn">Eşleştir</button>
+    </form>
+    <p class="pair-msg" id="pMsg" role="status"></p>
+  </main>
+  <script src="/assets/pair.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+// Başsız Chrome'da paneli açar, Yeni oturum → Klasörler sekmesine tıklar, ekran görüntüsü alır.
+// Kullanım: node cdp_shot.mjs <debugPort> <url> <out.png>
+import { writeFileSync } from "node:fs";
+const [port, url, out] = process.argv.slice(2);
+const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+const page = targets.find(t => t.type === "page");
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+let id = 0; const wait = new Map();
+ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && wait.has(d.id)) { wait.get(d.id)(d); wait.delete(d.id); } };
+await new Promise(r => ws.onopen = r);
+const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const ev = async (expr) => (await send("Runtime.evaluate", { expression: expr, awaitPromise: true })).result?.result?.value;
+await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
+await send("Page.navigate", { url });
+await sleep(3000);
+await ev(`document.getElementById("btnNew").click()`);
+await sleep(1200);
+await ev(`document.querySelector('#projTabs [data-tab="browse"]').click()`);
+await sleep(1200);
+console.log("satir:", await ev(`document.querySelectorAll("#projList .dir-row").length`), "yol:", await ev(`[...document.querySelectorAll("#dirCrumbs button")].map(b=>b.textContent).join(" > ")`));
+await ev(`document.querySelector('#projList .dir-row:not(.self) .dir-in')?.click()`);
+await sleep(1200);
+console.log("icine girince yol:", await ev(`[...document.querySelectorAll("#dirCrumbs button")].map(b=>b.textContent).join(" > ")`));
+await ev(`document.querySelector('#projList .dir-row:not(.self) .dir-pick')?.click()`);
+await sleep(400);
+console.log("secili:", await ev(`document.getElementById("fCwd").value`));
+const shot = await send("Page.captureScreenshot", { format: "png" });
+writeFileSync(out, Buffer.from(shot.result.data, "base64"));
+ws.close();

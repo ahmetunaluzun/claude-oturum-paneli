@@ -1,0 +1,8 @@
+bin/
+obj/
+dist/
+dist-mac/
+*.user
+.vs/
+**/.claude/settings.local.json
+_onizleme/

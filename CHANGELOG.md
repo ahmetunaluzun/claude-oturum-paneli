@@ -1,0 +1,163 @@
+# Değişiklik Günlüğü — Claude Oturum Paneli
+
+Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
+
+## 0.9.2 — 2026-11-18
+- **Ayarlar → Telefondan erişim boş görünmüyor.** Canlı panelde (0.8.13) kutu işaretsiz, kurulum adımları ve eşleşmiş telefon görünmüyordu; ayar ve cihaz kaydı diskte duruyordu (`remote.json`), yalnız `/api/remote` 500 veriyordu. Bellek dökümünden: `FileNotFoundException: QRCoder`. Panel tek dosyalık exe; kitaplıklar ilk kullanıldıkları an exe'nin yolundan okunuyor. Güncellemede çalışan exe yeniden adlandırılıp yerine yenisi yazılırken kare kod kitaplığı ilk kez yüklenmiş, bulunamamış; `Lazy` hatayı önbelleğe aldığı için her istek 500. Düzeltme: açılışta tüm kitaplıklar yüklenir (`Preload.cs`); kare kod üretilemezse hata önbelleğe alınmaz, durum ve cihazlar yine gelir. Test: eski sürümde exe yeniden adlandırılınca iki istek de 500 (yeniden üretildi), yeni sürümde 200 + kare kod + cihaz.
+- **Bildirime / tepsi simgesine tıklayınca ikinci panel penceresi açılmıyor.** Panel penceresi açıksa öne getirilir (küçültülmüşse geri açılır), yoksa yeni açılır. Exe'ye ikinci kez tıklamak da aynı. Windows'ta panel tarayıcı profili artık panelin veri klasöründe (canlıda yol aynı: `%LOCALAPPDATA%\ClaudePanelrowser`).
+- **Aynı sürüme "Yeni sürüm hazır" sorulmuyor.** Derleme sürümü 4 parçalı (0.9.1.0), açık panelin bildirdiği 3 parçalı (0.9.1) okunuyordu; 0.9.1 < 0.9.1.0 sayıldığı için aynı sürüm eski görünüp soruluyordu. İkisi de 3 parçaya indirgenir.
+
+## 0.9.1 — 2026-11-18
+- **Telefonda uygulama olarak açınca eşleştirme istemiyor.** Cihaz çerezi `SameSite=Strict` idi; Android'de ana ekrana yüklenen uygulama (ve başka uygulamadan açılan bağlantı) sayfayı "dışarıdan" açar, Strict çerez o ilk istekte gönderilmez, panel `/pair`'e yönlendiriyordu (log 18.11 12:35: "İstek reddedildi (çerez yok): /"). Çerez artık `Lax`. CSRF koruması değişmedi: değişiklik isteklerinde X-Panel-Token + Origin denetimi. Telefondaki eski Strict çerez, tarayıcı sekmesinde ilk geçerli açılışta Lax olarak yenilenir.
+- **Telefonda Ayarlar → Telefondan erişim artık durumu gösteriyor:** erişim açık mı, telefon adresi, eşleşmiş cihazlar ve son görülme; bu telefon "bu cihaz" diye işaretli. Salt okunur (`/api/remote/view`: cihaz kimliği ve kare kod yok); cihaz ekleme/kaldırma yine yalnız bilgisayardan. Güvenlik testine 6 kontrol eklendi (Lax çerez, görünüm 200 / çerezsiz 401, kimlik yok, bu cihaz işaretli, ana sayfada çerez yenileme), exit 0.
+
+## 0.9.0 — 2026-11-18
+- **Mac: açılışta başlatma.** Gece modu ayarındaki "Bilgisayar açılınca paneli penceresiz başlat" kutusu Mac'te de çalışır: `~/Library/LaunchAgents/com.claudepanel.panel.plist` yazılır/silinir (`--no-window`). launchd'nin kısa PATH'i yüzünden claude/node bulunamasın diye PATH plist'e yazılır (`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, sistem dizinleri). Önceden Mac'te kutu gizliydi. Etiket Windows'ta da "Bilgisayar açılınca…" oldu.
+- **Gece modunda bilgisayar uyumuyor (Windows + Mac).** Gece penceresi boyunca boşta uyku engellenir, pencere bitince bırakılır: Windows'ta `SetThreadExecutionState` (ayrı iş parçacığı), Mac'te `caffeinate -i -w <panel pid>` (panel ölürse kendiliğinden biter). Ekran kapanabilir; kapak kapatma engellenmez. Önceden iki platformda da yoktu; bilgisayar gece uyursa iş duruyordu.
+- **Gece koruması panelle birlikte geliyor.** Push/yayın/mail/kredi harcayan işlemleri gece engelleyen koruma artık panelin içinde (`NightGuard.cs`): panelin başlattığı her claude oturumuna `--settings` ile PreToolUse hook'u verilir, hook panelin kendisidir (`ClaudePanel --night-guard`). Böylece `~/.claude/hooks/gece-modu-koruma.py` olmayan bilgisayarda (Mac) da çalışır; Python gerekmez. Desenler betikle aynı. Bilgisayarda eski betik `settings.json`'da kayıtlıysa iki kez çalışmasın diye eklenmez. Test: 9 durum (gece oturumu + push = engel, başka oturum / süresi geçmiş / bozuk dosya / zararsız komut / MCP okuma = serbest, MCP yazma ve publish = engel) ve gerçek claude oturumuyla uçtan uca (`--settings`, `--setting-sources local`) — engellendi.
+- Mac paketleri 0.9.0 ile yeniden üretildi (`dist-mac`); `MAC_TEST.md` 0.9.0'a göre güncellendi (M5, sesle yazma, yol bağlantıları, dosya ekleme, açılışta başlatma, uyumama, koruma).
+
+## 0.8.13 — 2026-11-18
+- **Sesle yazma (🎤):** konuşma çekmecesindeki yazma alanında, telefonda hap kutusunun içinde sağda. Basınca kayıt başlar (düğme kırmızı ⏹), yeniden basınca ses yazıya çevrilir ve imlecin olduğu yere yazılır; gönderme yine elle. Çeviri tarayıcıda değil **bu bilgisayarda** yapılır (Whisper large-v3-turbo, whisper.cpp / Whisper.net 1.9.1): ses dışarı gitmez, masaüstü, Android ve iOS'ta aynı motor çalışır. Model ilk kullanımda bir kez indirilir (~550 MB, `%LOCALAPPDATA%\ClaudePanel\models`). Ekran kartı Vulkan ile kullanılır, yoksa işlemci. Ölçüm (i7-11390H, 8,5 sn Türkçe cümle): işlemcide 57 sn, Vulkan'la 6–9 sn; metin birebir doğru. Kayıt başlarken model arka planda ısıtılır. Aynı anda tek çeviri; model 5 dk kullanılmazsa bellekten atılır (yüklüyken panel ~870 MB). En uzun kayıt 5 dk. Yeni uçlar `/api/dictation` (+`/model`, `/warm`) telefondan eşleşmiş cihaz + belirteç ister (güvenlik testine eklendi, exit 0).
+- **Kota kutusunda "bu hızla":** pencerenin başından bu yana ortalama kullanım sürerse kotanın ne zaman biteceği ("Bu hızla bitiş: 22/11 18:43") ya da "Bu hızla yenilenmeye yeter". Pencerenin ilk 15 dakikasında yazılmaz.
+
+## 0.8.12 — 2026-11-18
+- **Yeni oturum yanlış klasörde açılmıyor:** pencerede klasör kutusu son kullanılan projeyle dolu gelir; arama kutusuna yazmak (ör. "dwh") listeyi süzüyor ama klasörü seçmiyordu. Listeden tıklanmadan Başlat'a basılınca oturum eski klasörde (MemoryPulse) açılıyordu. Şimdi: aramaya yazıp listeden seçmeden Başlat'a basılırsa oturum açılmaz, "Aradığınız klasörü listeden seçin. Şu an seçili: …" yazar. Klasörler sekmesinde bir klasörün içine girmek (›, çift tık, aramada Enter) o klasörü de seçer; önceden yalnız içine giriyordu.
+
+## 0.8.11 — 2026-11-18
+- **Konuşmadaki yollar tıklanabilir:** mesajlarda ve araç satırlarında geçen yollar (`C:\…`, `%LOCALAPPDATA%\…`, `~/…`, macOS `/Users/…`) bu bilgisayarda varsa noktalı altı çizili bağlantı olur. Tıklayınca klasör Gezgin'de/Finder'da açılır; dosya seçili gösterilir, açılmaz/çalıştırılmaz. Yolun nerede bittiğini sunucu belirler: var olan en uzun ön ek ("…\Claude Oturum Paneli klasörüne yazdım." → yalnız klasör yolu). Joker ya da henüz olmayan dosyada üst klasöre bağlanır (en az 3 parçalı klasörse). Ağ yolları (`\\sunucu`) hiç denenmez. Yeni uçlar `/api/path-links`, `/api/reveal` telefondan kapalı (güvenlik testine eklendi, exit 0); telefonda bağlantı çıkmaz.
+
+## 0.8.10 — 2026-11-18
+- **Mesajlarda saat:** konuşmadaki kullanıcı ve Claude mesajlarının altında gönderilme saati (bugünse saat:dakika, değilse gün.ay saat:dakika; üzerine gelince tam tarih). Araç satırlarında yok.
+- **📎 gerçek dosya ekleme:** masaüstünde de telefonda da dosya seçici açar (birden çok dosya, her tür, dosya başına en fazla 20 MB). Seçilen dosyalar panel veri klasörüne (`pastes`) özgün adıyla kopyalanır (`yapistir-<zaman>-<ad>`), yolları mesaja yazılır. Önceden masaüstünde 📎 yalnız panodaki yolu yapıştırıyordu; bu artık Ctrl+V ile.
+- **Konuşmada mesajlar arasındaki boşluklar giderildi:** konuşma kutuyu taşınca sütun düzeni araç satırlarını (Bash, Edit…) 4 px'e eziyordu; satır görünmüyor, yalnız aralığı kalıyordu. Satırlar artık küçülmüyor (`.msg { flex-shrink: 0 }`); taşan 94 araç satırlı konuşmada hepsi 23 px ölçüldü.
+
+## 0.8.9 — 2026-11-18
+- **Eşleşmiş telefonlar okunamayan `remote.json` yüzünden silinmiyor:** dosya açılışta okunamazsa panel önceden boş kayıtla açılıyor, ilk yazımda (erişimi aç/kapat, eşleştirme, 10 dakikalık "son görülme") cihaz listesini siliyordu. Şimdi: dosya kilitliyse (ör. eski panel o an yazıyor) 3 sn boyunca yeniden denenir; içerik bozuksa `remote.json.okunamadi-<tarih>` kopyası alınır; kopya da alınamazsa o açılışta dosyaya hiç yazılmaz (panel yeniden açılınca tekrar okunur). Her durum `logs\remote-*.log`'a yazılır. Telefonun yenileyince yeniden eşleşme istemesinin olası nedenlerinden biri; asıl neden log ile ölçülecek. Test: bozuk dosya, kısa kilit, uzun kilit, sağlam dosya (4 senaryo) + telefondan erişim güvenlik testi geçti.
+
+## 0.8.8 — 2026-11-18
+- **Telefonda "Uygulama olarak yükle":** Ayarlar → Telefondan erişim. Chrome/Edge yükleme olayını verdiyse tarayıcının kendi yükleme penceresi açılır; vermediyse (iOS Safari, ya da olay henüz gelmedi) menü yolu yazılır (iOS: Paylaş → Ana Ekrana Ekle; diğerleri: ⋮ → Ana ekrana ekle / Uygulamayı yükle). Panel zaten uygulama olarak açıksa düğme yerine "Panel uygulama olarak açık." yazar. Manifest Chrome'un yükleme ölçütlerini karşılıyor (web.dev *install criteria*: ad, 192 ve 512 px simge, `start_url`, `display: standalone`, HTTPS); başsız Chrome'da yükleme olayı geldiği ölçüldü.
+- Araç: `tools/mobil_shot.mjs` `PRELOAD` ortam değişkeni (sayfa betiklerinden önce çalışan JS).
+
+## 0.8.7 — 2026-11-18
+- **Telefonda yazma alanı WhatsApp düzeninde:** hap biçimli kutu, 📎 kutunun içinde solda; sağda ayrı yuvarlak turuncu gönder düğmesi (ok simgesi, boşken soluk); kutu tek satırla başlar, yazdıkça 5 satıra kadar büyür, sonra kendi içinde kayar. Telefonda (dokunmatik) Enter yeni satır açar, gönderme düğmeyle; ipucu metni "Mesaj". Masaüstü düzeni ve Enter ile gönderme değişmedi (1280 px'te ölçüler eski sürümle aynı). 360/390/430 px'te ve klavye açıkken (500 px yükseklik) ölçüldü.
+- Düğmenin boş hâli için önce `.empty` sınıfı kullanılmıştı; boş liste görünümünün sınıfıyla çakışıp masaüstünde gönder düğmesini 139 px'e uzattı. Ad `send-empty` oldu (yayından önce yakalandı).
+
+## 0.8.6 — 2026-11-17
+- **Telefondan erişim logu:** `%LOCALAPPDATA%\ClaudePanel\logs\remote-YYYYMMDD.log` (14 gün saklanır). Açılışta yüklenen cihaz sayısı, erişimin açılıp kapanması, eşleşme, yanlış kod, cihaz silme ve nedeni (bilgisayardan kaldırıldı / 30 gün kullanılmadı), `remote.json`'un her yazılışında cihaz sayısı ve süreç numarası, reddedilen istekler ("çerez yok" / "tanınmayan çerez", aynı neden+yol dakikada bir), telefonda "Bu cihazı unut". Çerez ve kod değeri yazılmaz. Amaç: telefonun yenileyince yeniden eşleşme istemesinin nedenini bulmak.
+
+## 0.8.5 — 2026-11-17
+- **Telefonda yüzen + düğmesi içeriğin üstünde kalmıyor:** aşağı kaydırırken aşağı çekilip kaybolur; yukarı kaydırınca, sayfanın en üstünde ve en sonunda yeniden görünür. Alt bilgi metninin sağına düğme kadar boşluk verildi ("…Tailscale bağlı olmalı" düğmenin altında kalıyordu). Kaydıran öğe `body` olduğu için dinleyici belge düzeyinde (capture). 360/390/430 px'te ölçüldü (`tools/fab_olc.mjs`).
+
+## 0.8.4 — 2026-11-17
+- **Kota yenilenmesine kalan süre:** üstteki kota kutusunda sıfırlanma anının altında "4 sa 44 dk kaldı" yazar; her saniye sunucu saatine göre güncellenir (1 saatten az: "53 dk", 1 günden fazla: "2 g 4 sa").
+- **Arama büyük/küçük harf ve Türkçe harf farkı gözetmez:** Türkçe küçültme "I"yı "ı" yaptığı için "ic" yazınca "Ic-Isler" bulunmuyordu. Tüm aramalar (oturumlar, son kullanılanlar, klasörler, skill) ortak `norm` ile karşılaştırır: I/İ/ı = i, ş = s, ğ = g ...
+- **Klasörler aramasında alt klasörler:** bulunulan klasörün altında 4 düzeye kadar arar (en çok 50 sonuç, 1,5 sn sınırı; `node_modules`, `bin`, `obj`, `dist`, gizli klasörler atlanır). Sonuçta üst klasör yolu görünür; Claude kullanılmış klasörler ve kelime başında eşleşenler önce gelir. "Bu bilgisayar" düzeyinde derin arama yapılmaz. Yeni uç `/api/dirs/search`.
+- Araç: `tools/arama_shot.mjs` (klasör araması + kota kutusu ölçümü).
+
+## 0.8.3 — 2026-11-17
+- **Telefondan bilgisayarın masaüstüne bağlanma rehberi:** Ayarlar → Telefondan erişim → *Nasıl kurulur?* penceresine "Bilgisayarın masaüstüne bağlanma (isteğe bağlı)" bölümü eklendi (TR+EN): Windows'ta Uzak Masaüstü + Windows App, Mac'te Ekran Paylaşma + VNC uygulaması. Görselli ayrıntı ve kaynakça: `docs/uzak-masaustu.md`. Bu panelin özelliği değil; aynı Tailscale bağlantısı üzerinden işletim sisteminin kendi hizmeti.
+- `MAC_TEST.md`: Mac Ekran Paylaşma deneme maddeleri (6 madde, ekran görüntüsü istenir).
+- Araçlar: `tools/pencere_goruntu.ps1` (ön plandaki pencerenin görüntüsü), `tools/goruntu_maskele.py` (görselde kişisel bilgiyi kapatma), `tools/kart_shot.mjs --phonehelp`.
+
+## 0.8.2 — 2026-11-17
+- **Ayarlar penceresi bozulmuştu (0.8.0 hatası):** kartlara eklenen onay kutusu sınıfı (`.check`, 18 px genişlik) Ayarlar'daki onay kutulu satırlarla (`label.check`) aynı adı taşıyordu; satırlar 18 px'e sıkışıp metinler üst üste biniyordu. Kartınki `.sel-box` oldu. Ayarlar 360/390/768/1024/1280/1920 px'te ölçüldü: sıkışan satır, çakışan öğe, yatay kaydırma yok.
+- **Seçim tüm oturumlarda:** terminaldeki oturumlar da seçilebilir (üzerine gelince kutu, uzun basma, Tümünü seç). Toplu çubuğa **Panele al** eklendi (terminalde bekleyenler, tek onayla). Diğer düğmeler yalnız uygulanabildiği oturumlara gider; üzerine gelince "Seçili 7 oturumun 1 tanesine uygulanır", bitince atlanan sayısı yazılır. Telefondan uzak bağlantıda Panele al görünmez.
+
+## 0.8.1 — 2026-11-17
+- **Arama kutusunda kalan yazı** listeyi sessizce süzüyordu (6 oturumdan 1'i görünüyor, sayaçlar 0). Artık listenin üstünde "“loyal” araması açık: 6 oturum gizli · Aramayı temizle" uyarısı çıkar; arama kutusunda Esc yazıyı siler.
+- **Tek tek seçim:** fare kartın üstündeyken sol üstte onay kutusu çıkar, tıklayınca seçim kipi açılır. Seçim kipinde karta tıklamak seçer/bırakır. Telefonda karta **uzun basmak** seçer. Ctrl/⌘ + tık sürer.
+- **Seçimi kaldır:** alt çubukta "Tümünü seç" düğmesi hepsi seçiliyken "Seçimi kaldır" olur; seçim boşalınca kip kapanmaz. Seçim kipindeyken Toplu menüsü: Tümünü seç, Seçimi kaldır, Seçimden çık. Çubuktaki "Vazgeç" → "Seçimden çık".
+
+## 0.8.0 — 2026-11-17
+- **Kartta eylemler:** her kartta duruma göre birincil düğme — bekleyen panel oturumunda *Devam et*; oturum `/clear` önerdiyse ya da bağlam %90'ı geçtiyse *Kaydet ve temizle*; terminaldeki bekleyen oturumda *Panele al*; çalışanda *İşi durdur* / *Sekmeye git*. **⋯ menüsü:** Devam et, Kaydet ve temizle, Kaydet ve kapat, Konuşma, Klasörü aç, Hemen kapat. Klasör düğmesi menüye indi.
+- **İş bitince:** çalışan oturumda ⋯ → İş bitince devam et / kaydet ve temizle / kaydet ve kapat. Seçim kartta ve konuşma başlığında etiketle görünür, *Vazgeç* ile iptal edilir.
+- **Seçerek toplu işlem:** başlıktaki *Toplu ▾* → Seç… (ya da Ctrl/⌘ + tık). Altta çubuk: seçilenlere Devam et / Kaydet ve temizle / Kaydet ve kapat (çalışanlara iş bitince). Terminaldeki oturum seçilemez, soluk görünür. Esc seçimi bırakır. "Hepsini kaydet ve temizle/kapat" Toplu menüsüne girdi.
+- **Model rozeti** proje adının yanında, aileye göre renkli (Opus, Fable, Sonnet, Haiku); üzerine gelince tam kimlik. Terminal oturumunda da görünür (konuşma kaydındaki son yanıttan).
+- **Bağlam çubuğu:** karttaki anlamsız sarı çubuğun yerine bağlam doluluğu (%75 sarı, %90 kırmızı). Pencere boyutu sabit yazılmaz: panel oturumunun sonuç kaydından (`modelUsage.contextWindow`) ve statusline'dan (`~/.claude/context-window-cache.json`) öğrenilir; bilinmiyorsa yalnız token sayısı gösterilir.
+- **Kartta son mesaj** (son 2 satır; `/clear` önerisi turuncu çizgiyle), çalışan kartta **son araç** ("Bash: npm test"), soruyla biten mesajda "soru sordu".
+- **Konuşma ekranı** kartla aynı eylem kümesini kullanır; başlıkta model rozeti + bağlam, girdi/çıktı token, mesaj sayısı, sıkıştırma sayısı, maliyet.
+- **Uyumluluk:** şeritler arası ayraç; kartlar en az 340 px (980 px'te iki sütun, süre satırı bölünmüyor); telefonda yol ve başlangıç gizli, model kısa adla, toplu düğmeler tek ⋯; telefonda kart düğmeleri yeniden görünür.
+- **Düzeltme:** konuşmada numaralı liste araya alt madde girince 1-1-1 diye yeniden başlıyordu; numara kaynaktan sürer, alt maddeler içeride.
+
+## 0.7.1 — 2026-11-17
+- **Dik telefon düzeni** (kullanıcının telefondan çektiği videoya göre): sayfa artık yana kaymıyor (arama + Yeni oturum + ⚙ satırı dar ekrana sığmıyordu, ⚙ ekran dışındaydı, Ayarlar soldan kesik açılıyordu). Başlık iki satır (marka + ⚙, arama), kota halkaları küçük; ilk karta kadar başlık ~485 px'ten ~160 px'e indi. Oturumlar / Son oturumlar / Skill sekmeleri **altta sabit çubuk**; **Yeni oturum sağ altta yuvarlak düğme**. Telefonda kartın tek düğmesi ("Konuşma") kalktı, karta dokunmak açıyor. Konuşma ekranında başlık + ✕ tek satır, eylemler tek satır. Klavye açılınca yazma kutusu görünür kalır (`interactive-widget=resizes-content`, Android Chrome).
+- Kök neden notu: başlığın `backdrop-filter`'ı sabit konumlu alt çubuğu ve + düğmesini başlığın içine hapsediyordu (regression §AR); telefonda başlık düz arka plan.
+- **Kurulum sihirbazı** (Ayarlar → Telefondan erişim): adımlar ✓/bekliyor olarak görünür ve 3 sn'de bir yenilenir — Tailscale'i kur (Windows'ta winget penceresi, yönetici onayı; winget yoksa ve Mac'te indirme sayfası), Giriş yap (Tailscale giriş sayfasını açar), erişimi aç, telefona uygulama (indirme sayfası kare kodu), telefon ekle. Özellik varsayılan kapalı; kimseye kendiliğinden kurulmaz.
+- **Nasıl kurulur? rehberi** (TR+EN): bilgisayar ve telefon adımları, iPhone/Android ana ekrana ekleme, telefonda neler yapılır, sorun giderme. Bilgisayarda ve telefonda açılır.
+- Telefonda alt bilgi "yalnız bu bilgisayardan erişilebilir" yerine doğru metni gösterir; terminaldeki oturumun notu telefonda "önce bilgisayarda Panele al" der.
+
+## 0.7.0 — 2026-11-17
+- **Telefondan erişim** (Ayarlar → Telefondan erişim): panel iPhone/Android tarayıcısından açılır; oturumları görme, konuşmayı okuma, mesaj yazma, durdurma, son projelerde yeni panel oturumu başlatma, gece modu. Panel ağa açılmaz (yine yalnız `127.0.0.1`); telefon, Tailscale'in kendi yönlendirmesiyle (`tailscale serve`) `https://<bilgisayar>.<ağ>.ts.net` adresinden gelir. Bu adrese yalnız aynı Tailscale hesabındaki cihazlar ulaşır; router'da port açılmaz. Kutu işaretlenince panel yönlendirmeyi kendisi kurar; Tailscale hesabında HTTPS kapalıysa açma bağlantısını gösterir.
+- **Eşleştirme:** "Telefon ekle" kare kod + 6 haneli kod verir; 5 dakika geçerli, tek kullanımlık, 5 yanlış denemede düşer. Telefon uzun süreli cihaz anahtarı alır (HttpOnly, Secure, SameSite=Strict çerez); diskte yalnız SHA-256 özeti tutulur, 30 gün kullanılmayan cihaz düşer, en fazla 10 cihaz. Cihazlar Ayarlar'da listelenir, tek tek kaldırılır; telefonda "Bu cihazı unut".
+- **Telefon adresinden gelen istek:** okuma dahil her istek cihaz anahtarı ister (yoksa eşleştirme sayfası). Bilgisayarın ekranında/panosunda iş yapan uçlar telefondan kapalı: sekmeye git, Panele al, klasörü aç, Gözat penceresi, pano, terminalde yeni oturum, paneli kapat, cihaz yönetimi. Yol karşılaştırması büyük/küçük harfe duyarsız (yönlendirme gibi). 41 maddelik güvenlik testi: `tools/remote_guvenlik_testi.sh`.
+- **Telefon görünümü:** ana ekrana eklenebilir (uygulama bilgisi + simge), dokunmatik hedefler büyük, giriş alanları 16 px (iOS yakınlaştırmaz), çentik payı. Telefonda 📎 telefondan fotoğraf/ekran görüntüsü seçtirir, bilgisayara kaydedip yolunu yazar.
+
+## 0.6.2 — 2026-11-17
+- **Hepsini kaydet ve kapat:** "Sizi bekliyor" başlığında. Paneldeki tüm oturumlar durumunu kaydeder ve kapanır; çalışan oturum işini bitirince kaydedip kapanır (onay penceresinde "çalışıyor, iş bitince" diye gösterilir). Terminaldekiler atlanır. Oturumun arka planda başlattığı işler (run_in_background komutları, alt ajanlar) oturumla birlikte kapanır; ölçüldü.
+- **Başlık üst üste binmiyor:** orta genişlikte (ör. 1164 px) "Claude Oturumları" başlığı ve özet satırı sekmelerin altına eziliyordu. Marka bloğu artık daralmıyor, sığmayan parça alt satıra iniyor. 420–1600 px arası on genişlikte çakışma/taşma ölçülerek denendi.
+
+## 0.6.1 — 2026-11-17
+- **Son oturumlar'dan toplu açma:** her satırın solunda onay kutusu; seçim olunca üstte "N oturum seçili · Panelde aç · Seçimi temizle" çubuğu çıkar. Panelde aç, seçilen kapalı oturumları kaldıkları konuşmayla (`--resume`) panelde açar; mesaj göndermez, kullanıcıyı bekler. Zaten açık olan oturumların kutusu pasiftir. Klasörü silinmiş/taşınmış oturum açılamaz; açılamayanlar adı, nedeni ve klasörüyle kalıcı bir pencerede listelenir.
+
+## 0.6.0 — 2026-11-16
+- **Gece modu** (Ayarlar → Gece modu): belirlenen saatlerde (varsayılan 00:30–07:30) "Sizi bekliyor"daki panel oturumlarına NEXT_SESSION.md'den devam mesajı gider; oturum test eder, hafızayı günceller, yerel commit atar. Bir oturuma bir gecede en çok 12 kez gönderilir.
+- **Karar kapısı:** dışarıya giden ya da para harcatan işlem, geri alınamaz silme, kullanıcının tercihine bağlı karar, cevapsız soru ya da iki denemede çözülemeyen hata çıkarsa oturum yanıtının ilk satırına `[KARAR-BEKLIYOR]` yazar ve bir daha dürtülmez; kartında **Karar bekliyor** rozeti çıkar, kullanıcı yazınca kalkar. İş kalmayınca `[GECE-BITTI]` → "Gece işi bitti".
+- **Gece koruması (hook):** `~\.claude\hooks\gece-modu-koruma.py` gece boyunca yalnız gece modunun sürdürdüğü oturumlarda push, gh ile yazma, paket yayını, deploy, Higgsfield, mail ve git geçmişini değiştiren komutları, MCP'de okuma dışı araçları engeller. Panel `night-guard.json` yazar (oturum kimlikleri + bitiş anı); panel ölürse koruma sabah kendiliğinden düşer.
+- **Kota:** 5 saatlik kota %95'e ulaşınca sıfırlanma beklenir (ekstra ücretli kullanıma kaymasın), haftalık kotadan %10'dan az kalınca gece modu durur. Gece terminal oturumu yokken statusline çalışmadığı için panel `usage-cache.json`'u 5 dakikada bir kendisi yeniler.
+- **Gece raporu:** başladı/devam/karar/bitti/kota olayları `night-events.jsonl`'da; Ayarlar → Gece raporu. Başlıkta "Gece modu açık / çalışıyor / kota bekleniyor" etiketi.
+- **Windows yeniden başlarsa:** Ayarlar'da "Windows açılışında başlat" (gece modu açılınca kendiliğinden açılır): panel `--no-window` ile tepside başlar, oturumları geri bağlar. Kapanış anında **çalışmakta olan** oturumlar artık kaydediliyor; açılışta onlara "yeniden başladı, son durumu kontrol et, devam et" mesajı gider (önceden yarıda kalan iş sessizce bekliyordu).
+- **Kota yenilenme anı:** başlıktaki 5 saat / Hafta halkalarının altında yenilenme tarihi ve saati yazar ("Yenilenme: 17.11 13:10"); an geçmişse "Yenilendi: …". Önbellek 5 dakikadan eskiyse panel arka planda kendisi yeniler (önceden terminal oturumu yokken sabah eski %0 değeri kalıyordu).
+- **Hepsine devam et:** "Sizi bekliyor" şeridinde, bekleyen tüm panel oturumlarına tek seferde "devam — NEXT_SESSION.md'den kaldığın yerden sürdür" mesajı gönderir. Terminaldekiler listede "atlanır" diye gösterilir.
+
+## 0.5.0 — 2026-11-16
+- **macOS desteği:** aynı uygulama Mac'te de çalışır (`net10.0`, `osx-arm64` / `osx-x64`). Sekmeye git iTerm2 ve Terminal'de, claude sürecinin tty'si sekmenin tty'siyle eşlenerek; Panele al boş kalan kabuğu kapatır; klasör seçme, pano, soru pencereleri ve bildirim AppleScript ile; pencere Chrome/Edge/Brave `--app`. Panel kapanınca başlattığı claude süreçleri kapanır, öldürülürse kalanlar sonraki açılışta sahipsiz sayılıp kapatılır. Mac sürümü henüz gerçek Mac'te denenmedi.
+- **Oturumu kapat sorar:** "Hemen kapat" ya da "Kaydet ve kapat". Kaydet ve kapat oturuma durumunu kaydettirir (`/smart-clear` varsa o, yoksa CLAUDE_MEMORY.md + NEXT_SESSION.md mesajı), bitince kapatır. Oturum çalışıyorsa önce işin bitmesini bekler.
+- **Kaydet ve temizle:** kaydet → `/clear` → `devam`; oturum temiz bağlamla NEXT_SESSION.md'den sürer. Her adım bir öncekinin bitmesini bekler; kayıt hata verirse zincir durur. İşi durdur zinciri de durdurur. Oturum son mesajında `/clear` önerdiyse düğme öne çıkar. "Sizi bekliyor" başlığında **Hepsini kaydet ve temizle**: bekleyen tüm panel oturumlarına uygular (terminaldekiler listede "önce Panele al" diye gösterilir, atlanır). `/clear` sonrası konuşma görünümü yeni konuşmaya geçer.
+- **📎 düğmesi:** panoda kopyalanmış dosya yoksa ekran görüntüsünü kaydedip yolunu ekler (önceden yalnız Gezgin'de kopyalanan dosyayla çalışıyordu, aksi halde yalnız uyarı veriyordu).
+- İç yapı: platforma özel kod `Platform/Windows`, `Platform/Mac`; bildirim yoklaması `SessionLanes` (iki platform ortak).
+
+## 0.4.5 — 2026-11-16
+- **Panel içi klasör gezgini:** Yeni oturumda "Son kullanılanlar / Klasörler" sekmeleri. Klasörler: yol çubuğu (her parçaya tıklanır), ↑ üst klasör, sık kullanılan kökler (ör. AI Projeleri), alt klasör listesi. Satıra tık = seç, › veya çift tık = içine gir, "Bu klasörü seç", arama kutusunda Enter = ilk eşleşenin içine gir. Claude ile kullanılmış klasörler işaretli; son gezilen klasör hatırlanır.
+- **Gözat penceresi panelin arkasında kalmıyor:** pencere her zaman öne gelir ve aynı anda yalnız bir tane açılır. Önceden arkada açılıyor, her tıklama yenisini açıyor, ekran kilitleniyordu.
+- **Sahipsiz claude süreci kalmaz:** panelin başlattığı claude süreçleri bir Windows iş nesnesinde; panel nasıl kapanırsa kapansın onlar da kapanır. Önceki panelden kalmış sahipsiz süreç varsa açılışta kapatılır ve oturum yeniden bağlanır (önceden "başka süreçte açık" diye sonsuza dek bekliyordu; oturum "çalışıyor" görünüyordu).
+- **Dar pencere:** pencere 1100 px'ten darsa (ekranın yarısına yaslanmış) konuşma paneli tüm genişliği alır; arkada yarım kalmış liste dilimi görünmez. 640 px altında Yeni oturum penceresi tam ekran.
+
+## 0.4.4 — 2026-11-16
+- **"/" listesinde hazır komutlar:** `/clear`, `/compact`, `/context`, `/init`, `/review` listede çıkmıyordu. Oturum komut listesini ancak ilk mesajdan sonra bildiriyor; panel o ana kadarki yedek listeyi (yalnız skill'ler ve kendi komutların) önbelleğe alıp sonra da onu gösteriyordu. Artık yedek listede hazır komutlar da var; oturumun kendi listesi gelince o kullanılır. `/clear` panel oturumunda çalışıyor (denendi).
+
+## 0.4.3 — 2026-11-16
+- **Sistem tepsisi ikonu:** panel tepside çalışır. Sol tık paneli açar; sağ tık menüsü: Paneli aç, Bildirimler (aç/kapa, `%LOCALAPPDATA%\ClaudePanel\tray.json`), sürüm, Paneli kapat (çalışan iş varsa uyarır).
+- **Bildirimler tepsiden:** bir oturum çalışıyordan bekliyora geçince Windows bildirimi gelir; pencere kapalıyken de. Bildirime tıklamak paneli açar. Tepsi bildirim gösterirken sayfa tarayıcı bildirimini tekrar etmez.
+- **Yeni sürüm eski paneli devralır:** kısayoldan yeni sürüm açılırken eski sürüm çalışıyorsa sorar; onaylanırsa eski panel kapatılır (çalışan iş varsa ikinci kez sorar), yeni sürüm açılır, oturumlar geri gelir. Eski panelin anahtarı `panel-<port>.token` dosyasında. 0.4.3'ten eski panellerde elle kapatma tarif edilir.
+
+## 0.4.2 — 2026-11-16
+- **Panele al terminal sekmesini de kapatır:** önceden yalnız terminaldeki claude kapanıyor, boş PowerShell/cmd sekmesi açık kalıyordu. Artık claude'u başlatan kabuk Windows Terminal'in ya da Gezgin'in doğrudan çocuğuysa ve içinde başka iş yoksa o da kapatılır (sekme/pencere kapanır). VS Code vb. içindeki terminallere ve iç içe kabuklara dokunulmaz.
+
+## 0.4.1 — 2026-11-16
+- **"/" komut listesi:** mesaj kutusunda `/` yazınca terminaldeki gibi komut + skill listesi açıklamalarıyla açılır; oklar, Enter/Tab tamamlar, Esc kapatır. Liste oturumun kendi bildirdiği komutlardan (`init.slash_commands`); yoksa etkin skill'ler.
+- Kullanıcının kendi komutları (`~/.claude/commands/*.md`) skill kütüphanesinde "komut" olarak.
+- `CLAUDE_PANEL_DATA`: test kopyası ayrı veri klasörü kullanır, canlı panelin oturum listesine dokunmaz.
+- Yayın yöntemi: çalışan `dist\ClaudePanel.exe` → `ClaudePanel.old.exe` adına alınır, yeni sürüm yanına yazılır; panel kesilmez, sonraki açılışta yeni sürüm.
+
+## 0.4.0 — 2026-11-16
+- **Panel yeniden açılınca oturumlar geri gelir:** panelde çalışan oturumların listesi `%LOCALAPPDATA%\ClaudePanel\hosted.json`'a yazılır; açılışta `--resume` ile bağlanır. Oturum başka bir süreçte hâlâ açıksa bitmesi beklenir (aynı konuşmaya iki süreç yazmaz). "Oturumu kapat" ile kapatılan geri gelmez.
+- **Kapatma koruması:** panelde çalışan iş varken "Paneli kapat" uyarır (`/api/quit` 409; `force=1` ile zorlanır).
+- **Skill kütüphanesi yenilendi:** büyük arama kutusu (Türkçe eş anlamlılar: sunum→pptx, excel→xlsx, güvenlik→security…), 17 kategori (sol liste, sayılarla), "hangi iş → hangi skill" rehberi (`rules/skill-yonlendirme.md`'den), ayrıntı penceresi + `/komut` kopyala. Eklentilerde yalnız kurulu sürüm sayılır (705 → 636).
+- **Yeni oturum – proje seçimi:** Claude'un çalıştığı tüm proje klasörleri aranabilir liste (en son kullanılan üstte) + Windows "Gözat…" penceresi.
+- **Mesaj kutusu:** Enter gönderir, Shift+Enter yeni satır. Gezgin'de kopyalanan dosya yapıştırılınca yolu yazılır (📎 düğmesi de var); ekran görüntüsü yapıştırılınca kaydedilir ve yolu yazılır.
+- Derleme: `StaticWebAssetsEnabled=false` (WPF geçici projesiyle önbellek kilidi çakışması).
+
+## 0.3.0 — 2026-11-16
+- **Panele al:** terminaldeki bekleyen oturum tek düğmeyle panele taşınır (terminaldeki claude kapanır, konuşma `--resume` ile panelde sürer). Çalışan oturum alınmaz.
+- **İşi durdur** canlı test edildi; durdurma sonrası yanlış "⚠ error" uyarısı düzeltildi.
+- Panel sürümü alt bilgide gösterilir (`/api/version`).
+
+## 0.2.0 — 2026-11-16
+- Konuşma paneli (karta tıkla): mesajlar ve araç adımları canlı.
+- Panelde oturum: `claude -p --input-format stream-json`; mesaj gönder, işi durdur, oturumu kapat; kapalı oturuma yazınca `--resume`.
+- Sekmeye git: Windows Terminal'de doğru sekme (ad eşleştirme, gerekirse sorar ve hatırlar).
+- Son oturumlar (14 gün) ve Skill kütüphanesi sekmeleri.
+
+## 0.1.0 — 2026-11-16
+- İlk sürüm: oturum kartları (Sizi bekliyor / Çalışıyor), pencereye git, bildirim + ses, yeni oturum (`claude --bg`), kota halkaları, açık/koyu tema, TR/EN.
