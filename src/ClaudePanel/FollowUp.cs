@@ -14,7 +14,8 @@ public sealed record FollowGit(string State, IReadOnlyList<FollowRepo> Repos, in
 /// <param name="Root">Proje kökü (git kökü; yoksa klasör): oturumdaki projeyi tanımak için.</param>
 public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string Summary, string Root);
 
-public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates);
+/// <param name="Drive">Güncelleme kütüklerindeki "Drive'a yüklenecek" satırları (DriveLedger.cs).</param>
+public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive);
 
 /// <summary>
 /// "Takip" sekmesinin kota harcamayan kaynakları: bilinen projelerin git durumu, NEXT_SESSION.md dosyaları ve
@@ -28,7 +29,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     const int SummaryMax = 140;
     const string NextFile = "NEXT_SESSION.md";
 
-    static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown);
+    static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown, []);
     volatile FollowSnapshot _snap = Empty;
     int _scanning;
 
@@ -60,8 +61,10 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
         var projects = transcripts.Projects();
         var git = ScanGit(projects);
         var next = ScanNext(projects);
+        // Kütükler proje klasörlerinde ve git köklerinde aranır (alt klasör taranmaz).
+        var drive = DriveLedger.Scan(projects.SelectMany(p => new[] { p.Cwd, ProjectRoots.Of(p.Cwd) }).Where(Directory.Exists));
         var upd = await updates.Check();
-        return new FollowSnapshot(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), false, git, next, upd);
+        return new FollowSnapshot(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), false, git, next, upd, drive);
     }
 
     // ---- Git ----

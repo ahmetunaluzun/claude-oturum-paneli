@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Takip sekmesi için uydurma test ortamı kurar (gerçek proje/oturum göstermeden test ve ekran görüntüsü).
-# Kullanım: tools/takip_ortam.sh <boş klasör>
+# Kullanım: tools/takip_ortam.sh <boş klasör> [kutuk]     (kutuk: üç uydurma güncelleme kütüğü de kurulur; betiğin sonu)
 #   <klasör>/claude   → CLAUDE_PANEL_CLAUDE_DIR (sahte projects/*.jsonl)
 #   <klasör>/data     → CLAUDE_PANEL_DATA (güncelleme önbelleği dolu: panel ağa çıkmaz)
 #   <klasör>/projeler → uydurma projeler: kirli depo, gönderilmemiş commit'li depo (uzak = yerel bare), uzak dalsız depo,
@@ -67,3 +67,74 @@ proje "Silinen Proje" silinen-proje; rmdir "$T/projeler/Silinen Proje"
 now=$(date +%s)
 printf '{"PanelAt":%s,"PanelOk":true,"PanelLatest":"v99.1.0","PanelUrl":"https://github.com/ahmetunaluzun/claude-oturum-paneli/releases/tag/v99.1.0","ClaudeAt":%s,"ClaudeOk":true,"ClaudeLatest":"99.0.0"}' \
   "$now" "$now" > "$T/data/update-check.json"
+
+# ---- isteğe bağlı: güncelleme kütükleri (ikinci argüman "kutuk") ----
+# Üç uydurma proje, üç kütük biçimi (DriveLedger.cs): (A) "- Ad vX — `yol` (not)", (B) "- `yol` + `ek` (sürüm)", (C) tablo.
+# Her birinde: okunamayan satır, KAPATILDI/KAPANDI bölümü (alınmaz), bölüm dışı satır (alınmaz), olmayan dosya.
+[ "${2:-}" = "kutuk" ] || exit 0
+kutuk() { # $1 = proje klasörü; kütük metni stdin'den, @K@ = klasörün Windows yolu
+  local w; w=$(cygpath -w "$T/projeler/$1"); local metin; metin=$(cat)
+  printf '%s\n' "${metin//@K@/$w}" > "$T/projeler/$1/GUNCELLEME_KUTUGU.md"
+}
+proje "Kılavuz Deposu" kilavuz-deposu
+mkdir -p "$T/projeler/Kılavuz Deposu/cikti/v1.3.0" "$T/projeler/Kılavuz Deposu/cikti/v2.0.1"
+echo a > "$T/projeler/Kılavuz Deposu/cikti/v1.3.0/Etiket_Kilavuzu.docx"; echo b > "$T/projeler/Kılavuz Deposu/cikti/v2.0.1/Fis_Kilavuzu.docx"
+kutuk "Kılavuz Deposu" <<'MD'
+# Güncelleme Kütüğü
+
+## 2026-11-10 — Etiket kılavuzu yenilendi
+
+- **Bilgi:** ayar dosyası `ayar\etiket.json` değişti (bölüm dışı: alınmaz)
+
+### AÇIK — DRIVE'A YÜKLENECEK
+- Etiket Kılavuzu v1.3.0 — `@K@\cikti\v1.3.0\Etiket_Kilavuzu.docx`
+- `@K@\cikti\v1.3.0\Label_Guide.docx` (v1.3.0; sürüm değişmedi, `0 - Yok` düzeltmesi)
+- Kapak görseli sonra eklenecek
+
+### KAPATILDI — DRIVE'A YÜKLENDİ (2026-11-01)
+- Etiket Kılavuzu v1.2.0 — `@K@\cikti\v1.2.0\Etiket_Kilavuzu.docx`
+
+### AÇIK — DRIVE'A YÜKLENECEK (2026-11-15 düzeltme turu)
+- Fiş Kılavuzu — `@K@\cikti\v2.0.1\Fis_Kilavuzu.docx`
+MD
+proje "Yardım Sitesi" yardim-sitesi
+mkdir -p "$T/projeler/Yardım Sitesi/yayin"
+for f in yardim.html egitim.html Egitim.pdf; do echo "$f" > "$T/projeler/Yardım Sitesi/yayin/$f"; done
+kutuk "Yardım Sitesi" <<'MD'
+# Güncelleme Kütüğü
+
+## AÇIK (Drive) — Yardım sayfaları 11.11 → 12.11 (12.11.2026)
+
+**Yeni bilgi:** kaynak rapor `kaynak\rapor.md` (paragraf: alınmaz)
+**Drive'a yüklenecek:**
+- `@K@\yayin\yardim.html` (2.4.0)
+- `@K@\yayin\egitim.html` + `Egitim.pdf` + `Training.pdf` (1.7.0)
+
+## KAPANDI (05.11.2026, "drive güncellendi") — DRIVE: önceki tur
+- `@K@\yayin\eski.html` (2.3.0)
+
+## AÇIK — Başvuru formu 1.2.0 (04.11.2026)
+- `@K@\form\basvuru.html` (Drive işi değil: alınmaz)
+MD
+proje "Mimari Belgesi" mimari-belgesi
+mkdir -p "$T/projeler/Mimari Belgesi/belgeler"
+echo d > "$T/projeler/Mimari Belgesi/belgeler/Mimari.docx"; echo p > "$T/projeler/Mimari Belgesi/belgeler/Mimari.pdf"
+kutuk "Mimari Belgesi" <<'MD'
+# Güncelleme Kütüğü
+
+## 2026-11-14 — Şema yenilendi
+
+### AÇIK — DRIVE'A YÜKLENECEK
+
+| Dosya | Sürüm | Yerel yol |
+|---|---|---|
+| `Mimari.docx` | 3.1.0 | `belgeler\` |
+| `Mimari.pdf` | 3.1.0 | `@K@\belgeler\Mimari.pdf` |
+| Sunum | 1.0 | hazırlanıyor |
+
+### KAPATILDI — DRIVE'A YÜKLENDİ (2026-11-02)
+
+| Dosya | Sürüm | Yerel yol |
+|---|---|---|
+| `Eski.docx` | 3.0.0 | `belgeler\` |
+MD

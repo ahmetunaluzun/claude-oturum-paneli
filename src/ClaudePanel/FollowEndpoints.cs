@@ -4,6 +4,7 @@ namespace ClaudePanel;
 public sealed record HostedRequest(string? Cwd, string? Prompt, string? Model, string? Name, string? ResumeId, string? Mode = null);
 public sealed record FollowRepoRequest(string? Path, bool? Push, string? Lang);
 public sealed record FollowAllRequest(string[]? Paths, string? Lang);
+public sealed record FollowLedgerRequest(string? Ledger, string[]? Files, string? Lang);
 
 /// <summary>
 /// Takip 2. aşama uçları (0.12.0): aynı projede ikinci oturumu önleyen başlatma (/api/hosted'ın gövdesi) ve
@@ -101,6 +102,19 @@ public static class FollowEndpoints
             var req = await ctx.Request.ReadFromJsonAsync<FollowAllRequest>();
             if (req?.Paths is not { Length: > 0 and <= 200 }) return Results.BadRequest();
             return Enqueue(fu, jobs, req.Paths, req.Lang, r => (r.Dirty > 0, true));
+        });
+        // Kütüğü kapat: gizli oturum kütüğü günceller (panel kütüğe kendisi yazmaz). Yalnız Takip'in okuduğu kütük ve
+        // o kütükte "yüklenecek" diye duran dosyalar kabul edilir (istekle rastgele klasörde claude çalıştırılamaz).
+        app.MapPost("/api/follow/ledger", async (HttpContext ctx, FollowUp fu, FollowJobs jobs) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<FollowLedgerRequest>();
+            if (req?.Ledger is null || req.Files is not { Length: > 0 and <= 500 }) return Results.BadRequest();
+            var rows = fu.Get().Drive.Where(d => d.Path is not null && ProjectRoots.Same(d.Ledger, ProjectRoots.Normalize(req.Ledger))).ToList();
+            var files = req.Files.Select(f => rows.FirstOrDefault(d => ProjectRoots.Same(d.Path!, ProjectRoots.Normalize(f ?? "")))?.Path).ToList();
+            if (rows.Count == 0 || files.Any(f => f is null)) return Results.Json(new { error = "noledger" }, statusCode: 404);
+            var job = jobs.EnqueueLedger(rows[0].Ledger, rows[0].Name, files.Distinct(StringComparer.OrdinalIgnoreCase).ToList()!, req.Lang);
+            return job is null ? Results.Json(new { error = "jobactive" }, statusCode: 409) : Results.Json(job);
         });
     }
 

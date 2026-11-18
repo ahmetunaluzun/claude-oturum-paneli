@@ -4,6 +4,9 @@
 #   "BEKLE" içeriyorsa      → yanıt vermez (oturum "çalışıyor" kalır)
 #   commit istemi ise       → (PANEL-TAMAM işareti isteniyorsa) klasörde .sahte-karar varsa [PANEL-KARAR]; yoksa
 #                             SAHTE_CLAUDE_GECIKME sn bekler, `git add -A && git commit` yapar, [PANEL-TAMAM] ile biter
+#   kütük istemi ise        → (istemde GUNCELLEME_KUTUGU.md geçiyorsa) klasörde .sahte-karar varsa [PANEL-KARAR]; .sahte-bos
+#                             varsa kütüğe dokunmadan [PANEL-TAMAM]; yoksa istemde sayılan dosyaların satırlarını kütükten
+#                             çıkarır, sona KAPATILDI bölümü olarak yazar, [PANEL-TAMAM] ile biter
 #   diğer                   → kısa yanıt
 # Her açılış ve her mesaj SAHTE_CLAUDE_LOG dosyasına yazılır: "ACILIS\t<sid>\t<cwd>" / "MESAJ\t<sid>\t<cwd>\t<metin>".
 # Çağıran .cmd argümanları iletmez (satır içi JSON'u cmd ayrıştıramıyor); bu betik argüman kullanmaz.
@@ -50,7 +53,23 @@ for line in sys.stdin:
         first = False
     if "BEKLE" in text:
         continue
-    if "[PANEL-TAMAM]" in text:
+    if "[PANEL-TAMAM]" in text and "GUNCELLEME_KUTUGU.md" in text:
+        ledger = os.path.join(CWD, "GUNCELLEME_KUTUGU.md")
+        if os.path.exists(os.path.join(CWD, ".sahte-karar")):
+            reply = "Hangi bölümün kapatılacağı belirsiz.\n[PANEL-KARAR]"
+        elif os.path.exists(os.path.join(CWD, ".sahte-bos")):
+            reply = "Kütük güncellendi.\n[PANEL-TAMAM]"
+        else:
+            time.sleep(DELAY)
+            names = [os.path.basename(row[2:].strip().replace("\\", "/")) for row in text.split("\n") if row.startswith("- ")]
+            with open(ledger, encoding="utf-8") as f:
+                rows = f.read().split("\n")
+            closed = [r for r in rows if any(n and n in r for n in names)]
+            rows = [r for r in rows if r not in closed]
+            with open(ledger, "w", encoding="utf-8", newline="\n") as f:
+                f.write("\n".join(rows).rstrip("\n") + "\n\n## KAPATILDI — DRIVE'A YÜKLENDİ (sahte oturum)\n\n" + "\n".join(closed) + "\n")
+            reply = "Kütük güncellendi.\n[PANEL-TAMAM]"
+    elif "[PANEL-TAMAM]" in text:
         if os.path.exists(os.path.join(CWD, ".sahte-karar")):
             reply = "Bu dosyada parola olabilir, commit etmedim.\n[PANEL-KARAR]"
         else:

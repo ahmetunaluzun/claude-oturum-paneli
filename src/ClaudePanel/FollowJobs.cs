@@ -2,15 +2,21 @@ using System.Collections.Concurrent;
 
 namespace ClaudePanel;
 
-/// <summary>Bir işin tek deposu. State: "queued" | "committing" | "checking" | "pushing" | "done" | "failed" | "decision" | "skipped".</summary>
+/// <summary>
+/// Bir işin tek deposu (Kind "git") ya da tek kütüğü (Kind "ledger": Root = kütük dosyasının yolu).
+/// State: "queued" | "committing" | "checking" | "pushing" | "closing" | "done" | "failed" | "decision" | "skipped".
+/// </summary>
 public sealed class FollowJobItem
 {
     public required string Root { get; init; }
     public required string Name { get; init; }
     public bool Commit { get; init; }
     public bool Push { get; init; }
+    public string Kind { get; init; } = "git";
+    /// <summary>Kütük işinde: Drive'a yüklendiği bildirilen dosyalar.</summary>
+    public IReadOnlyList<string> Files { get; init; } = [];
     public string State { get; set; } = "queued";
-    /// <summary>Sonuç kodu: "ok" | "secret" | "rejected" | "auth" | "timeout" | "noremote" | "nothing" | "insession" | "busy" | "nogit" | "failed" | "decision".</summary>
+    /// <summary>Sonuç kodu: "ok" | "secret" | "rejected" | "auth" | "timeout" | "noremote" | "nothing" | "insession" | "busy" | "nogit" | "failed" | "decision" | "unchanged".</summary>
     public string? Code { get; set; }
     public int Committed { get; set; }
     public int Pushed { get; set; }
@@ -25,7 +31,7 @@ public sealed class FollowJobItem
 
 public sealed record FollowJob(string Id, long CreatedAt, IReadOnlyList<FollowJobItem> Items, string? Lang)
 {
-    public bool Active => Items.Any(i => i.State is "queued" or "committing" or "checking" or "pushing");
+    public bool Active => Items.Any(i => i.State is "queued" or "committing" or "checking" or "pushing" or "closing");
 }
 
 /// <summary>
@@ -72,7 +78,7 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
     /// <summary>Bu depoda süren ya da sırada bekleyen iş var mı.</summary>
     public bool ActiveIn(string root)
     {
-        lock (_lock) return _jobs.Any(j => j.Items.Any(i => ProjectRoots.Same(i.Root, root) && i.State is "queued" or "committing" or "checking" or "pushing"));
+        lock (_lock) return _jobs.Any(j => j.Items.Any(i => ProjectRoots.Same(i.Root, root) && i.State is "queued" or "committing" or "checking" or "pushing" or "closing"));
     }
 
     /// <summary>İşi kuyruğa alır. Depolardan biri için zaten iş varsa o depo işe girmez; hiç depo kalmazsa null.</summary>
@@ -81,16 +87,36 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
         FollowJob job;
         lock (_lock)
         {
-            var items = repos.Where(r => !_jobs.Any(j => j.Items.Any(i => ProjectRoots.Same(i.Root, r.Root) && i.State is "queued" or "committing" or "checking" or "pushing")))
+            var items = repos.Where(r => !_jobs.Any(j => j.Items.Any(i => ProjectRoots.Same(i.Root, r.Root) && i.State is "queued" or "committing" or "checking" or "pushing" or "closing")))
                 .GroupBy(r => r.Root, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
                 .Select(r => new FollowJobItem { Root = r.Root, Name = r.Name, Commit = r.Commit, Push = r.Push, UpdatedAt = Now() }).ToList();
             if (items.Count == 0) return null;
             job = new FollowJob(Guid.NewGuid().ToString("N")[..10], Now(), items, lang == "en" ? "en" : "tr");
             _jobs.Add(job);
         }
+        Start(job);
+        return job;
+    }
+
+    /// <summary>Kütüğü kapat işini kuyruğa alır; o kütük için zaten iş varsa null.</summary>
+    public FollowJob? EnqueueLedger(string ledger, string name, IReadOnlyList<string> files, string? lang)
+    {
+        FollowJob job;
+        lock (_lock)
+        {
+            if (ActiveIn(ledger)) return null;
+            job = new FollowJob(Guid.NewGuid().ToString("N")[..10], Now(),
+                [new FollowJobItem { Root = ledger, Name = name, Kind = "ledger", Files = files, UpdatedAt = Now() }], lang == "en" ? "en" : "tr");
+            _jobs.Add(job);
+        }
+        Start(job);
+        return job;
+    }
+
+    void Start(FollowJob job)
+    {
         _queue.Add(job);
         if (Interlocked.Exchange(ref _started, 1) == 0) new Thread(Worker) { IsBackground = true, Name = "takip-isleri" }.Start();
-        return job;
     }
 
     void Worker()
@@ -115,6 +141,7 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
 
     void RunItem(FollowJobItem item, string? lang)
     {
+        if (item.Kind == "ledger") { LedgerStep(item, lang); return; }
         var before = GitOps.Status(item.Root);
         if (before is null) { Finish(item, "failed", "failed"); return; }
         var others = guard.SessionsIn(item.Root);
@@ -157,7 +184,52 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
     bool CommitStep(FollowJobItem item, string headBefore, string? lang)
     {
         Set(item, "committing");
-        var key = hosted.Start(item.Root, CommitPrompt(lang), null, $"Takip: commit · {item.Name}", null, hidden: true);
+        return HiddenStep(item, item.Root, CommitPrompt(lang), $"Takip: commit · {item.Name}", () => item.Committed = GitOps.CommitsSince(item.Root, headBefore));
+    }
+
+    /// <summary>
+    /// Kütüğü kapat: gizli oturum kütükte bildirilen dosyaları "yüklendi" olarak işler. Panel kütüğe kendisi yazmaz.
+    /// Oturum "tamam" dese de kütük değişmediyse iş başarısız sayılır (işaret satırı kanıt değildir).
+    /// </summary>
+    void LedgerStep(FollowJobItem item, string? lang)
+    {
+        var dir = Path.GetDirectoryName(item.Root)!;
+        if (!File.Exists(item.Root)) { Finish(item, "failed", "failed"); return; }
+        var others = guard.SessionsIn(ProjectRoots.Of(dir));
+        if (others.Count > 0) { Finish(item, "skipped", others.Any(s => s.Status == "busy") ? "busy" : "insession"); return; }
+        var before = File.ReadAllText(item.Root);
+        Set(item, "closing");
+        if (!HiddenStep(item, dir, LedgerPrompt(item.Files, lang), $"Takip: kütük · {item.Name}", null)) return;
+        if (File.ReadAllText(item.Root) == before) { Finish(item, "failed", "unchanged"); return; }
+        RemoteLog.Info($"Takip: kütük güncellendi, {item.Files.Count} dosya ({item.Root})");
+        Finish(item, "done", "ok");
+    }
+
+    static string LedgerPrompt(IReadOnlyList<string> files, string? lang)
+    {
+        var list = string.Join("\n", files.Select(f => "- " + f));
+        var day = DateTime.Now.ToString("dd.MM.yyyy");
+        return lang == "en"
+            ? $"In the {DriveLedger.FileName} file in this folder, the files below are listed as still to be uploaded to Drive (open). " +
+              $"The user marked them as uploaded in the panel today ({day}):\n{list}\n" +
+              "Update the ledger accordingly, following the ledger's own way of closing entries (for example the heading's open marker replaced by " +
+              "the closed marker with the date and a note that the user confirmed the upload). If only some files of a section were uploaded, " +
+              "record those as closed and leave the rest open. Change nothing else in the ledger, touch no other file, do not commit or push. " +
+              $"If everything went fine, write only {DoneMark} on the LAST line of your reply. If the user's decision is needed, change nothing: " +
+              $"explain briefly and write only {DecisionMark} on the LAST line."
+            : $"Bu klasördeki {DriveLedger.FileName} dosyasında aşağıdaki dosyalar Drive'a yüklenecek (AÇIK) olarak duruyor. " +
+              $"Kullanıcı bunları bugün ({day}) panelde \"Yükledim\" diye işaretledi:\n{list}\n" +
+              "Kütüğü buna göre güncelle; kütüğün kendi kapatma biçimine uy (örneğin başlıktaki AÇIK yerine KAPATILDI + tarih + " +
+              "kullanıcının yüklediğini bildirdiği notu). Bir bölümdeki dosyaların yalnız bir kısmı yüklendiyse yüklenenleri kapatılmış olarak " +
+              "kaydet, kalanları AÇIK bırak. Kütükte başka hiçbir yeri değiştirme, başka dosyaya dokunma, commit ya da push yapma. " +
+              $"Her şey yolundaysa yanıtının SON satırına yalnız {DoneMark} yaz. Kullanıcının kararı gerekiyorsa hiçbir şeyi değiştirme: " +
+              $"nedenini kısaca açıkla ve SON satıra yalnız {DecisionMark} yaz.";
+    }
+
+    /// <summary>Gizli oturumda tek istem çalıştırır. true: oturum işaret satırıyla "tamam" dedi ve kapatıldı.</summary>
+    bool HiddenStep(FollowJobItem item, string cwd, string prompt, string title, Action? afterReply)
+    {
+        var key = hosted.Start(cwd, prompt, null, title, null, hidden: true);
         var deadline = DateTime.UtcNow + CommitTimeout;
         (string Status, string? LastResult, bool Failed, string? LastError)? st;
         while (true)
@@ -166,7 +238,7 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
             st = hosted.Peek(key);
             if (st is null || st.Value.Status != "busy" || DateTime.UtcNow > deadline) break;
         }
-        item.Committed = GitOps.CommitsSince(item.Root, headBefore);
+        afterReply?.Invoke();
         var text = st?.LastResult ?? "";
         item.Summary = Shorten(text);
         var done = st is { Status: "idle", Failed: false } && LastLine(text).Contains(DoneMark, StringComparison.Ordinal);
