@@ -133,12 +133,12 @@ await shot("yeni-oturum");
 
 // 5) Takip sekmesi (git taraması bitene kadar bekle)
 await load(desk, "?view=follow");
-for (let i = 0; i < 40; i++) { if (await ev(`document.querySelectorAll(".fu-sec").length === 4 && !document.getElementById("btnFuRefresh").disabled`)) break; await sleep(500); }
+for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector(".fu-chip") && document.querySelectorAll(".fu-sec").length >= 3 && !document.getElementById("btnFuRefresh").disabled`)) break; await sleep(500); }
 await sleep(1200);
-// Demo projelerinin çoğunda oturum açık olduğu için Git / Sıradaki işler satırları gizli gelir (0.12.0); README'de
-// bölümlerin içeriği görünsün diye hepsi açılır ve "N proje şu an oturumda açık" satırlarına dokunulur.
+// Varsayılan görünüm projeye göre gruplamadır (0.13.0). Demo projelerinin çoğunda oturum açık olduğu için Git / Sıradaki
+// işler satırları gizli gelir; README'de içerik görünsün diye gruplar açılır ve "N proje şu an oturumda açık" satırına dokunulur.
 await click("#btnFuFold"); await sleep(400);
-for (const id of ["git", "next"]) { await click(`#fu-${id} .fu-insess[aria-expanded="false"]`); await sleep(400); }
+await click(`#fuBody > .fu-insess:not(.fu-aside)[aria-expanded="false"]`); await sleep(400);
 await shot("takip");
 
 // 6-7) Skill kütüphanesi, Son oturumlar

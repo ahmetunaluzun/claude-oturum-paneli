@@ -16,7 +16,7 @@ $T = Join-Path $env:TEMP ("readme-shot-" + [guid]::NewGuid().ToString('N').Subst
 New-Item -ItemType Directory -Force $T | Out-Null
 $panel = $null; $code = 1
 try {
-  & 'C:\Program Files\Git\bin\bash.exe' "$proj\tools\takip_ortam.sh" ($T -replace '\\', '/')
+  & 'C:\Program Files\Git\bin\bash.exe' "$proj\tools\takip_ortam.sh" ($T -replace '\\', '/') kutuk
   if ($LASTEXITCODE -ne 0) { throw "takip ortamı kurulamadı" }
   & py -3.13 "$proj\tools\readme_ortam.py" $T
   if ($LASTEXITCODE -ne 0) { throw "readme ortamı kurulamadı" }

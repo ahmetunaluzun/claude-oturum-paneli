@@ -215,6 +215,13 @@ def main() -> int:
            "Ürün listesi yavaş açılıyor, görselleri tembel yükleyelim.", "Görseller `loading=\"lazy\"` ile yükleniyor.")
     closed("C--Projeler-Ornek-API", "Örnek API", timedelta(days=3, hours=1), "JWT yenileme süresi",
            "Oturum 15 dakikada düşüyor, yenileme anahtarı ekleyelim.", "Yenileme anahtarı eklendi, süre 7 gün.")
+    # Güncelleme kütüğü olan uydurma projeler (takip_ortam.sh ... kutuk): Takip görselinde Drive satırları görünsün.
+    if os.path.isdir(p("Yardım Sitesi")):
+        closed("C--Projeler-Yardim-Sitesi", "Yardım Sitesi", timedelta(days=6, hours=4), "Yardım sayfalarını güncelle",
+               "Eğitim sayfasına yeni ekran görüntülerini ekle.", "Sayfalar güncellendi; Drive'a yüklenecek dosyalar kütüğe yazıldı.")
+    if os.path.isdir(p("Kılavuz Deposu")):
+        closed("C--Projeler-Kilavuz-Deposu", "Kılavuz Deposu", timedelta(days=8, hours=2), "Etiket kılavuzu 1.3.0",
+               "Etiket kılavuzunu yeni ekranlara göre güncelle.", "Kılavuz 1.3.0 üretildi, kütüğe yazıldı.", MODEL_SONNET)
     closed("C--Projeler-Hava-Durumu-Botu", "Hava Durumu Botu", timedelta(days=5, hours=2), "Komut listesi",
            "/yardim komutu hangi komutları gösteriyor?", "Beş komut: /bugun, /yarin, /hafta, /sehir, /yardim.", MODEL_SONNET)
 
