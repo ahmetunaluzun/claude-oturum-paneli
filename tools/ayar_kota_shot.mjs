@@ -30,7 +30,9 @@ await ev(`document.getElementById("btnSettings").click()`);
 await sleep(1200);
 console.log("kapalı:", await measure());
 await shot("kapali");
-await ev(`window.confirm = () => true; document.getElementById("tqEnabled").click()`);
+await ev(`document.getElementById("tqEnabled").click()`);
+await sleep(500);
+await ev(`document.querySelector('#dlgAsk[open] button[value="yes"]')?.click()`); // mevcut durum satırı varsa panelin onay penceresi
 await sleep(1500);
 console.log("açık:", await measure());
 await shot("acik");

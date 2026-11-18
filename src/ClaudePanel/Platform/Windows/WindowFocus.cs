@@ -87,11 +87,11 @@ public static class WindowFocus
         if (tab.Length == 0) return 0;
         if (tab == folder) return 100;
         if (folder.Contains(tab) || tab.Contains(folder)) return 60 + Math.Min(tab.Length, folder.Length);
-        // Ortak başlangıç (NETANAL ~ netanalizer); en az 4 harf.
+        // Ortak başlangıç (RAPORAR ~ raporaraci); en az 4 harf.
         var common = 0;
         while (common < tab.Length && common < folder.Length && tab[common] == folder[common]) common++;
         if (common >= 4) return 20 + common;
-        // Kelime bazında: "Protel Loyalty" ~ "Loyalty"
+        // Kelime bazında: "Demo Mağaza" ~ "Mağaza"
         var words = folder.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return words.Any(w => w.Length >= 4 && tab.Contains(w)) ? 30 : 0;
     }

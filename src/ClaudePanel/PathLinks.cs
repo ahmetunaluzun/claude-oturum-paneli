@@ -2,7 +2,7 @@ namespace ClaudePanel;
 
 /// <summary>
 /// Konuşmadaki yol adaylarını çözer: metnin başından başlayan, bu bilgisayarda var olan en uzun yolu bulur.
-/// Aday "C:\AI Projeleri\X klasörüne yazdım." ise sonuç "C:\AI Projeleri\X" olur (boşluk/noktalamada kesilir).
+/// Aday "C:\Projeler\X klasörüne yazdım." ise sonuç "C:\Projeler\X" olur (boşluk/noktalamada kesilir).
 /// %DEGISKEN% ve ~ açılır. Ağ yolları (\\sunucu, //sunucu) hiç denenmez: varlık sorgusu kimlik bilgisini dışarı gönderebilir.
 /// </summary>
 static class PathLinks

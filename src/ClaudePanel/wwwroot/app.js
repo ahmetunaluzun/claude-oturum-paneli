@@ -1010,7 +1010,7 @@
     searchDeep(); // bekleyen alt klasör aramasını iptal eder
     renderProjects();
   }
-  // Sık kullanılan kökler: son projelerin ilk iki düzeyi (ör. C:\AI Projeleri), en çok proje içeren üstte.
+  // Sık kullanılan kökler: son projelerin ilk iki düzeyi (ör. C:\Projeler), en çok proje içeren üstte.
   function dirRoots() {
     const count = new Map();
     for (const p of projects) {
