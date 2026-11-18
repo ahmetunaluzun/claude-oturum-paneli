@@ -1,4 +1,4 @@
-# Claude Oturum Paneli — Mac deneme listesi (0.9.2)
+# Claude Oturum Paneli — Mac deneme listesi (0.10.1)
 
 Panel, Mac'te açık olan Claude Code oturumlarını tek ekranda gösterir; oturumu panelde açıp yürütebilir.
 Mac sürümü Windows'ta derlendi, **gerçek Mac'te ilk kez deneniyor.** Aşağıdaki her maddede ne olduğunu yaz
@@ -25,7 +25,7 @@ Panel kendi penceresinde açılır (adres `http://127.0.0.1:8790`). Terminal pen
 
 | # | Ne yap | Beklenen |
 |---|---|---|
-| 1 | Paneli aç | Pencere açılır, başlıkta kota halkaları (5 saat / Hafta) ve yenilenme saati görünür |
+| 1 | Paneli aç | Pencere açılır, başlıkta kota halkaları (5 saat / Hafta) ve yenilenme saati görünür. 0.10'dan beri kota Anahtar Zinciri'ndeki Claude Code kimliğiyle okunur: macOS "security … Claude Code-credentials" izni sorarsa **Her Zaman İzin Ver** de ve sorduğunu yaz. Halkalar boşsa yaz |
 | 2 | iTerm2 ya da Terminal'de bir klasörde `claude` başlat, bir şey sor | Oturum panelde kart olarak çıkar; çalışırken "Çalışıyor", bitince "Sizi bekliyor" şeridine geçer |
 | 3 | Karttaki **Sekmeye git** | O oturumun iTerm2/Terminal sekmesi öne gelir. İlk seferde macOS "Otomasyon" izni sorar → izin ver |
 | 4 | Oturum bitince | macOS bildirimi gelir |
@@ -53,6 +53,15 @@ Panel kendi penceresinde açılır (adres `http://127.0.0.1:8790`). Terminal pen
 | 21 | Claude'a "bu klasördeki README'nin yolunu yaz" de, yanıttaki yola tıkla | Finder açılır, dosya seçili gösterilir (açılmaz) |
 | 22 | 📎 → bir dosya seç | Dosya seçici açılır, seçilen dosyanın yolu mesaja eklenir |
 | 23 | Başlıktaki kota kutusuna tıkla | Kalan süre ve "Bu hızla bitiş / yenilenmeye yeter" satırı görünür |
+
+## 2c. 0.10'da gelenler (kota)
+
+| # | Ne yap | Beklenen |
+|---|---|---|
+| 24 | Önce `cat ~/.claude/settings.json` çıktısını sakla. Ayarlar → **Terminal oturumlarında kota** kutusunu işaretle (mevcut durum satırın varsa onay sorar) | Kutu işaretli kalır, altında "Açık: …" yazar |
+| 25 | Terminal'de yeni bir `claude` başlat | En altta tek satır: plan, `5sa: %… kaldı · saat (kalan)`, `Hafta: …`, `Bağlam: …`. Satırın ekran görüntüsünü at |
+| 26 | Terminal'de `echo '{}' \| "<panel klasörü>/ClaudePanel" --statusline --lang tr` | Aynı satır Terminal'e yazılır (Python gerekmez) |
+| 27 | Kutunun işaretini kaldır, `cat ~/.claude/settings.json` | Dosya 24'teki hâline döner (önceki durum satırın geri gelir) |
 
 ## 3. Geri bildirim
 
