@@ -10,3 +10,4 @@ _onizleme/
 # İç çalışma notları (herkese açık depoya girmez)
 CLAUDE_MEMORY.md
 NEXT_SESSION.md
+__pycache__/
