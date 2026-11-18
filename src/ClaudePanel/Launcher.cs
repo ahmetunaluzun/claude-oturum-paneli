@@ -33,6 +33,8 @@ public static partial class Launcher
             psi.ArgumentList.Add(req.Name.Trim());
         }
         psi.ArgumentList.Add(req.Prompt!.Trim());
+        var sw = Stopwatch.StartNew();
         Process.Start(psi);
+        RemoteLog.Info($"Arka plan oturumu başlatıldı: süreç açılışı {sw.ElapsedMilliseconds} ms, klasör {req.Cwd}");
     }
 }

@@ -128,6 +128,9 @@
   // Kart ve konuşma ekranı eylemleri, toplu seçim (actions.js)
   const A = window.PanelActions({ t, api, toast, ask, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
+  // Takip sekmesi (followup.js)
+  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, items: () => items,
+    now: () => Date.now() + serverOffset, isOpen: () => view === "follow" });
 
   function render() {
     const q = $("search").value.trim();
@@ -146,6 +149,7 @@
     A.renderBulkBar();
     $("countBusy").textContent = busy.length;
     $("navCount").textContent = items.length;
+    F.onItems();
     const allIdle = items.filter(s => s.lane === "idle").length;
     $("summary").textContent = t("summary", items.length, allIdle, items.length - allIdle);
     $("empty").hidden = items.length > 0;
@@ -399,9 +403,14 @@
   }
 
   // Terminaldeki oturumu panele taşır (terminaldeki claude kapanır, konuşma panelde sürer).
+  const adopting = new Set(); // sürmekte olan "Panele al" istekleri
   async function adopt(s) {
-    if (!s || s.kind !== "terminal" || !confirm(t("adoptConfirm", s.name))) return;
-    const r = await api(`/api/adopt/${s.pid}`);
+    if (!s || s.kind !== "terminal" || adopting.has(s.pid) || !confirm(t("adoptConfirm", s.name))) return;
+    adopting.add(s.pid);
+    let r;
+    try { r = await api(`/api/adopt/${s.pid}`); }
+    catch { r = { ok: false, data: null }; }
+    finally { adopting.delete(s.pid); }
     if (!r.ok) { toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
     toast(t("adopted", s.name));
     if (drawer.target) { drawer.target.id = "h:" + r.data.key; drawer.target.kind = "panel"; drawer.target.key = r.data.key; }
@@ -717,7 +726,15 @@
     $("recentCount").textContent = t("recentPicked", picked.size);
   }
   // Seçilen kapalı oturumları panelde mesajsız (bekler durumda) açar.
+  let openingPicked = false;
   async function openPicked() {
+    if (openingPicked) return;
+    openingPicked = true;
+    $("btnRecentOpen").disabled = true;
+    try { await openPickedNow(); }
+    finally { openingPicked = false; $("btnRecentOpen").disabled = false; }
+  }
+  async function openPickedNow() {
     const liveIds = new Set(items.map(s => s.sessionId));
     const sel = recent.filter(r => picked.has(r.sessionId) && !liveIds.has(r.sessionId));
     if (!sel.length) { picked.clear(); renderRecent(); return; }
@@ -905,9 +922,11 @@
     $("viewSessions").hidden = v !== "sessions";
     $("viewRecent").hidden = v !== "recent";
     $("viewSkills").hidden = v !== "skills";
-    $("search").hidden = v === "skills";
+    $("viewFollow").hidden = v !== "follow";
+    $("search").hidden = v === "skills" || v === "follow";
     if (v === "recent") loadRecent();
     if (v === "skills") loadSkills();
+    if (v === "follow") F.open();
   }
   document.querySelectorAll("#nav button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
   document.querySelectorAll("#skillChips button").forEach(b => b.addEventListener("click", () => {
@@ -1131,12 +1150,20 @@
     if (r.ok && r.data?.path) { $("fCwd").value = r.data.path; renderProjects(); $("fPrompt").focus(); }
   });
   $("btnCancel").addEventListener("click", () => $("dlgNew").close());
+  let startingNew = false; // istek sürerken ikinci gönderim yok (yanıt gecikince art arda basılıp aynı oturum 5 kez açılmıştı)
   $("formNew").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (startingNew) return;
     if (searchPending) { $("newErr").textContent = t("err_pickFolder", $("fCwd").value.trim()); $("projSearch").focus(); return; }
     const body = { cwd: $("fCwd").value.trim(), name: $("fName").value.trim() || null, prompt: $("fPrompt").value.trim(), model: $("fModel").value || null };
     if (REMOTE) where = "panel"; // telefondan terminal penceresi açılamaz
-    const r = where === "panel" ? await api("/api/hosted", body) : await api("/api/sessions", body);
+    startingNew = true;
+    $("btnStart").disabled = true;
+    $("btnStart").textContent = t("starting");
+    let r;
+    try { r = where === "panel" ? await api("/api/hosted", body) : await api("/api/sessions", body); }
+    catch { r = { ok: false, data: null }; }
+    finally { startingNew = false; $("btnStart").disabled = false; $("btnStart").textContent = t("start"); }
     if (!r.ok) { $("newErr").textContent = t(`err_${r.data?.error || "generic"}`); return; }
     $("dlgNew").close();
     $("fPrompt").value = ""; $("fName").value = "";
@@ -1663,7 +1690,7 @@
   $("sSound").addEventListener("change", (e) => { settings.sound = e.target.checked; save(); if (settings.sound) chime(); });
   $("sLight").addEventListener("change", (e) => { settings.light = e.target.checked; save(); applyTheme(); });
   $("sLang").addEventListener("change", async (e) => {
-    settings.lang = e.target.value; save(); applyI18n(); render();
+    settings.lang = e.target.value; save(); applyI18n(); render(); F.render();
     if ($("tqEnabled").checked) { const r = await api("/api/terminal-quota", { enabled: true, lang: settings.lang }); if (r.ok) fillTermQuota(r.data); }
   });
   $("btnBulk").addEventListener("click", (e) => { e.stopPropagation(); A.laneMenu(e.currentTarget); });
@@ -1695,10 +1722,11 @@
   applyI18n();
   if (settings.notify && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
   poll();
+  F.load(false); // sekme rozeti için
 
-  // Adresten açılış: ?view=recent|skills, ?open=<oturum kimliği>
+  // Adresten açılış: ?view=recent|skills|follow, ?open=<oturum kimliği>
   const qs = new URLSearchParams(location.search);
-  if (["recent", "skills"].includes(qs.get("view"))) setView(qs.get("view"));
+  if (["recent", "skills", "follow"].includes(qs.get("view"))) setView(qs.get("view"));
   const openId = qs.get("open");
   if (openId && /^[0-9a-f-]{36}$/i.test(openId)) {
     getJson("/api/recent").then(list => {

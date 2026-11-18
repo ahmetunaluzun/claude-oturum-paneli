@@ -20,8 +20,7 @@ public sealed record CategoryCount(string Key, int Count);
 /// </summary>
 public sealed class Skills(ILogger<Skills> log)
 {
-    static readonly string ClaudeDir = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+    static readonly string ClaudeDir = Quota.ClaudeDir;
     SkillLibrary? _cache;
     DateTime _cachedAt;
 

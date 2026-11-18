@@ -205,7 +205,13 @@ window.PanelActions = function (d) {
   const allSelected = () => { const all = d.items().filter(selectable); return all.length > 0 && all.every(s => selected.has(s.id)); };
   // Seçili ve hâlâ var olan oturumlar.
   const chosen = () => d.items().filter(s => selected.has(s.id) && selectable(s));
+  let bulkBusy = false; // toplu işlem sürerken ikinci tıklama aynı oturumları yeniden açmasın
   async function bulk(kind) {
+    if (bulkBusy) return;
+    bulkBusy = true;
+    try { await bulkNow(kind); } finally { bulkBusy = false; }
+  }
+  async function bulkNow(kind) {
     const all = chosen();
     const list = all.filter(s => applies(kind, s));
     if (!list.length) return;

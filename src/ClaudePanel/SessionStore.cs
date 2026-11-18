@@ -6,8 +6,7 @@ namespace ClaudePanel;
 /// <summary>Claude Code'un ~/.claude/sessions/*.json dosyalarından canlı oturumları okur.</summary>
 public sealed class SessionStore(ILogger<SessionStore> log)
 {
-    static readonly string ClaudeDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+    static readonly string ClaudeDir = Quota.ClaudeDir;
     static readonly string SessionsDir = Path.Combine(ClaudeDir, "sessions");
     static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 

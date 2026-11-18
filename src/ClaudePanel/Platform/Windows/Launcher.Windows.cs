@@ -88,6 +88,8 @@ public static partial class Launcher
 
     public static string ClaudeExe()
     {
+        // Test: gerçek claude yerine zararsız bir süreç (CLAUDE_PANEL_CLAUDE_EXE); değişken yoksa davranış aynı.
+        if (Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_EXE") is { Length: > 0 } fake) return fake;
         var local = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), @".local\bin\claude.exe");
         if (File.Exists(local)) return local;
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))

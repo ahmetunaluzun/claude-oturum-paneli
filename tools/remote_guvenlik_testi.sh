@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Telefondan erişim güvenlik testi (0.7.0). Panelin test kopyası 8791'de, test adresiyle çalışıyor olmalı:
-#   CLAUDE_PANEL_PORT=8791 CLAUDE_PANEL_DATA=<boş klasör> CLAUDE_PANEL_REMOTE_HOST=test.ts.net ClaudePanel --no-window
+# Telefondan erişim güvenlik testi (0.7.0). Panelin test kopyası test adresiyle çalışıyor olmalı (port: PORT değişkeni, varsayılan 8791):
+#   CLAUDE_PANEL_PORT=<port> CLAUDE_PANEL_DATA=<boş klasör> CLAUDE_PANEL_REMOTE_HOST=test.ts.net ClaudePanel --no-window
+#   PORT=<port> tools/remote_guvenlik_testi.sh
 # Telefon isteği = Host: test.ts.net (Tailscale serve böyle iletir). Çıkış 0 = hepsi geçti.
 set -u
-B=http://127.0.0.1:8791
+B=http://127.0.0.1:${PORT:-8791}
 RH=test.ts.net
 JAR=$(mktemp)
 fail=0
@@ -25,6 +26,8 @@ chk "erişimi aç (yerel)" 200 "$(code -X POST "${L[@]}" -d '{"enabled":true}' $
 chk "çerezsiz ana sayfa → eşleştirmeye yönlendir" 302 "$(code "${R[@]}" $B/)"
 chk "çerezsiz /api/state" 401 "$(code "${R[@]}" $B/api/state)"
 chk "çerezsiz /api/transcript" 401 "$(code "${R[@]}" $B/api/transcript/x)"
+chk "çerezsiz /api/followup (takip, 0.11.0)" 401 "$(code "${R[@]}" $B/api/followup)"
+chk "çerezsiz /api/followup/refresh" 401 "$(code -X POST "${RO[@]}" $B/api/followup/refresh)"
 chk "çerezsiz /assets/app.js" 401 "$(code "${R[@]}" $B/assets/app.js)"
 chk "çerezsiz /api/dictation (dikte, 0.8.13)" 401 "$(code -X POST "${RO[@]}" -H 'Content-Type: audio/wav' --data-binary @/dev/null $B/api/dictation)"
 chk "çerezsiz /api/dictation/model" 401 "$(code -X POST "${RO[@]}" $B/api/dictation/model)"
@@ -55,6 +58,9 @@ RT=$(echo "$PAGE" | grep -o 'panel-token" content="[^"]*' | cut -d'"' -f3)
 RA=(-H "Host: $RH" -H "Origin: https://$RH" -H "X-Panel-Token: $RT" -H "Content-Type: application/json" "${C[@]}")
 chk "çerezli /api/state" 200 "$(code "${R[@]}" "${C[@]}" $B/api/state)"
 chk "çerezli /api/night (POST değil, okuma)" 200 "$(code "${R[@]}" "${C[@]}" $B/api/night)"
+chk "telefondan /api/followup (okuma)" 200 "$(code "${R[@]}" "${C[@]}" $B/api/followup)"
+chk "telefondan takip yenileme, belirteçsiz" 403 "$(code -X POST -H "Host: $RH" -H "Origin: https://$RH" "${C[@]}" $B/api/followup/refresh)"
+chk "telefondan takip yenileme (izinli)" 200 "$(code -X POST "${RA[@]}" $B/api/followup/refresh)"
 chk "telefondan /api/quit" 403 "$(code -X POST "${RA[@]}" $B/api/quit)"
 chk "telefondan /API/QUIT (harf)" 403 "$(code -X POST "${RA[@]}" $B/API/QUIT)"
 chk "telefondan /api/quit/ (bölü)" 403 "$(code -X POST "${RA[@]}" $B/api/quit/)"

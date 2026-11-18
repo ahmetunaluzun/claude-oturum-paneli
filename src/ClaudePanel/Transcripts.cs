@@ -15,8 +15,7 @@ public sealed record RecentSession(string SessionId, string Cwd, string Title, l
 /// </summary>
 public sealed class Transcripts(ILogger<Transcripts> log)
 {
-    static readonly string ProjectsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
+    static readonly string ProjectsDir = Path.Combine(Quota.ClaudeDir, "projects");
     const int MaxItems = 400;
     const int MaxText = 6000;
 

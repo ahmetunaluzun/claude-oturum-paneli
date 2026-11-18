@@ -28,6 +28,7 @@
       <button data-view="sessions" class="active"><span data-i18n="navSessions"></span><span class="pill" id="navCount">0</span></button>
       <button data-view="recent" data-i18n="navRecent"></button>
       <button data-view="skills" data-i18n="navSkills"></button>
+      <button data-view="follow"><span data-i18n="navFollow"></span><span class="pill" id="navFollow" hidden>0</span></button>
     </nav>
     <div class="usage" id="usage" hidden></div>
     <div class="actions">
@@ -67,6 +68,15 @@
         <button type="button" class="btn small" id="btnRecentClear" data-i18n="recentClear"></button>
       </div>
       <div class="list" id="recentList"></div>
+    </div>
+
+    <div class="view" id="viewFollow" hidden>
+      <div class="fu-head">
+        <p class="hint wide" data-i18n="fuHint"></p>
+        <small class="muted" id="fuChecked"></small>
+        <button type="button" class="btn small" id="btnFuRefresh" data-i18n="fuRefresh"></button>
+      </div>
+      <div id="fuBody"></div>
     </div>
 
     <div class="view" id="viewSkills" hidden>
@@ -170,7 +180,7 @@
       <p class="err" id="newErr"></p>
       <div class="row end">
         <button type="button" class="btn" id="btnCancel" data-i18n="cancel"></button>
-        <button type="submit" class="btn primary" data-i18n="start"></button>
+        <button type="submit" class="btn primary" id="btnStart" data-i18n="start"></button>
       </div>
     </form>
   </dialog>
@@ -298,6 +308,7 @@
   <script src="/assets/i18n.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
+  <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>
 </body>
 </html>

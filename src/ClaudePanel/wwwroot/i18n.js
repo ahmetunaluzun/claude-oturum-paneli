@@ -197,6 +197,16 @@ window.I18N = {
     rForget: "Bu cihazı unut", rForgetConfirm: "Bu cihazın eşleşmesi silinsin mi? Yeniden açmak için bilgisayardan yeni kod gerekir.",
     copied: "{0} panoya kopyalandı", cost: "maliyet ${0}", tabLabel: "Sekme: {0}",
     quitWarn: "Panelde açık oturumlar kapanacak (konuşmalar kayıtlı kalır). Devam edilsin mi?",
+    starting: "Başlatılıyor…", navFollow: "Takip", fuHint: "Günlük takip edilecekler: bekleyen commit ve gönderimler, yarım kalan planlar, karar bekleyen oturumlar, güncellemeler. Bu liste kota harcamaz.",
+    fuRefresh: "Yenile", fuScanning: "Denetleniyor…", fuChecked: "Son denetim: {0} önce", fuStarted: "Panelde oturum başlatıldı: {0}",
+    fuGit: "Git", fuDirty: "{0} commit'lenmemiş dosya", fuAhead: "{0} gönderilmemiş commit", fuNoUpstream: "uzak dal yok", fuCommit: "Commit et", fuPush: "Gönder",
+    fuCleanRepos: "{0} depo temiz", fuNoRepos: "Bilinen projelerde git deposu yok", fuNoGit: "git bulunamadı, depo durumu denetlenemedi", fuGitFailed: "{0} depo okunamadı",
+    fuCommitPrompt: "Bu depodaki commit'lenmemiş değişiklikleri incele, ilgili dosyaları anlamlı mesajlarla commit et. Gizli bilgi içeren dosyayı ekleme. Push etme.",
+    fuPushPrompt: "Bu depodaki gönderilmemiş commit'leri kontrol et (gizli bilgi taraması dahil) ve uzak depoya gönder (push).",
+    fuNext: "Sıradaki işler", fuStale: "eski plan", fuContinue: "Devam et", fuContinuePrompt: "devam", fuNoNext: "Bekleyen plan (NEXT_SESSION.md) yok",
+    fuDecisions: "Karar bekleyenler", fuOpenChat: "Konuşmayı aç", fuNoDecisions: "Karar bekleyen oturum yok",
+    fuUpdates: "Güncellemeler", fuPanelNew: "Yeni panel sürümü: {0}", fuClaudeNew: "Yeni Claude Code sürümü: {0}", fuInstalled: "Kurulu sürüm: {0}", fuClaudeHow: "claude update ile güncellenir",
+    fuReleasePage: "Sürüm sayfası", fuPanelName: "Panel", fuUpToDate: "{0} güncel ({1})", fuUnknown: "{0}: denetlenemedi",
     err_model: "Geçersiz model", emptyRecent: "Son 14 günde oturum yok", loading: "Yükleniyor…",    s: "sn", m: "dk", h: "sa", d: "gün"
   },
   en: {
@@ -396,6 +406,16 @@ window.I18N = {
     rForget: "Forget this device", rForgetConfirm: "Remove this device's pairing? Opening it again needs a new code from the computer.",
     copied: "{0} copied", cost: "cost ${0}", tabLabel: "Tab: {0}",
     quitWarn: "Sessions running in the panel will close (conversations are kept). Continue?",
+    starting: "Starting…", navFollow: "Follow-up", fuHint: "Things to keep an eye on daily: pending commits and pushes, unfinished plans, sessions waiting for a decision, updates. This list uses no quota.",
+    fuRefresh: "Refresh", fuScanning: "Checking…", fuChecked: "Last checked {0} ago", fuStarted: "Session started in the panel: {0}",
+    fuGit: "Git", fuDirty: "{0} uncommitted", fuAhead: "{0} unpushed", fuNoUpstream: "no upstream", fuCommit: "Commit", fuPush: "Push",
+    fuCleanRepos: "Clean repositories: {0}", fuNoRepos: "No git repository in the known projects", fuNoGit: "git not found, repositories couldn't be checked", fuGitFailed: "Unreadable repositories: {0}",
+    fuCommitPrompt: "Review the uncommitted changes in this repository and commit the relevant files with meaningful messages. Do not add files that contain secrets. Do not push.",
+    fuPushPrompt: "Check the unpushed commits in this repository (including a scan for secrets) and push them to the remote.",
+    fuNext: "Up next", fuStale: "old plan", fuContinue: "Continue", fuContinuePrompt: "continue", fuNoNext: "No pending plan (NEXT_SESSION.md)",
+    fuDecisions: "Waiting for a decision", fuOpenChat: "Open conversation", fuNoDecisions: "No session is waiting for a decision",
+    fuUpdates: "Updates", fuPanelNew: "New panel version: {0}", fuClaudeNew: "New Claude Code version: {0}", fuInstalled: "Installed: {0}", fuClaudeHow: "update with claude update",
+    fuReleasePage: "Release page", fuPanelName: "Panel", fuUpToDate: "{0} is up to date ({1})", fuUnknown: "{0}: couldn't check",
     err_model: "Invalid model", emptyRecent: "No sessions in the last 14 days", loading: "Loading…",    s: "s", m: "min", h: "h", d: "d"
   }
 };

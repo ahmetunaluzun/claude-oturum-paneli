@@ -91,7 +91,9 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         // Gece koruması panelle birlikte gelir; ~/.claude/hooks altında betik olmayan bilgisayarda (Mac) da çalışır.
         if (NightGuard.SettingsArg() is { } guard) { psi.ArgumentList.Add("--settings"); psi.ArgumentList.Add(guard); }
 
+        var sw = Stopwatch.StartNew();
         var proc = Process.Start(psi) ?? throw new InvalidOperationException("claude başlatılamadı");
+        var startMs = sw.ElapsedMilliseconds;
         // Panel çökse/öldürülse de claude süreci sahipsiz kalmasın (0.4.5: önceki panelin süreci çalışmaya devam ediyordu).
         KillOnPanelExit.Add(proc);
         var now = Now();
@@ -106,6 +108,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         _ = Task.Run(() => PumpStderr(h));
         log.LogInformation("Panel oturumu başladı {Key} klasör={Cwd} model={Model} resume={Resume}", h.Key, cwd, model, resumeId);
         if (!string.IsNullOrWhiteSpace(prompt)) Send(h.Key, prompt);
+        // Başlatma süresi dosya loguna: yanıtın geciktiği durumda nedeni (süreç açılışı mı) ölçülebilsin.
+        RemoteLog.Info($"Panel oturumu başlatıldı {h.Key}: süreç açılışı {startMs} ms, toplam {sw.ElapsedMilliseconds} ms, klasör {cwd}");
         return h.Key;
     }
 
@@ -312,6 +316,9 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         // Çalışıyor bilgisi diskte dursun: Windows yeniden başlarsa yarıda kalan iş açılışta sürdürülür.
         if (wasBusy != (status == "busy") && status != "ended") Persist();
     }
+
+    /// <summary>Oturum hâlâ listede mi (kapatılmadı).</summary>
+    public bool Has(string key) => _sessions.ContainsKey(key);
 
     /// <summary>Gece modunun okuduğu son yanıt metni.</summary>
     public string? LastResultOf(string key) => _sessions.TryGetValue(key, out var h) ? h.LastResult : null;

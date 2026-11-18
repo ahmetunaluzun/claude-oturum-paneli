@@ -37,6 +37,8 @@ builder.Services.AddSingleton<Transcripts>();
 builder.Services.AddSingleton<ContextWindows>();
 builder.Services.AddSingleton<HostedSessions>();
 builder.Services.AddSingleton<Skills>();
+builder.Services.AddSingleton<UpdateCheck>();
+builder.Services.AddSingleton<FollowUp>();
 builder.Services.AddSingleton<NightMode>();
 builder.Services.AddSingleton<RemoteAccess>();
 builder.Services.AddSingleton<Dictation>();
@@ -242,7 +244,8 @@ app.MapPost("/api/sessions", async (HttpContext ctx) =>
     var req = await ctx.Request.ReadFromJsonAsync<NewSessionRequest>();
     var error = Launcher.Validate(req);
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
-    Launcher.StartSession(req!);
+    // Yinelenen istek (düğmeye art arda basma) ikinci oturumu açmaz (StartOnce.cs).
+    StartOnce.Run("bg", req!.Cwd, req.Prompt, req.Name, () => { Launcher.StartSession(req); return null; });
     return Results.Ok();
 });
 
@@ -262,8 +265,10 @@ app.MapPost("/api/hosted", async (HttpContext ctx, HostedSessions hosted) =>
     var error = HostedSessions.Validate(req?.Cwd, req?.Prompt, model);
     if (error is null && string.IsNullOrWhiteSpace(req!.Prompt) && req.ResumeId is null) error = "prompt";
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
-    var key = hosted.Start(req!.Cwd!, req.Prompt, model, req.Name, req.ResumeId);
-    return Results.Json(new { key });
+    // Yinelenen istek ilk oturumun anahtarını alır; o oturum kapatıldıysa yeniden başlatılır.
+    var (key, repeated) = StartOnce.Run("hosted", req!.Cwd, req.Prompt, req.ResumeId,
+        () => hosted.Start(req.Cwd!, req.Prompt, model, req.Name, req.ResumeId), k => k is not null && hosted.Has(k));
+    return Results.Json(new { key, repeated });
 });
 app.MapPost("/api/hosted/{key}/send", async (string key, HttpContext ctx, HostedSessions hosted) =>
 {
@@ -319,7 +324,8 @@ app.MapPost("/api/adopt/{pid:int}", async (int pid, HttpContext ctx, SessionStor
     }
     catch (ArgumentException) { /* zaten kapanmış */ }
     catch (OperationCanceledException) { return Results.Json(new { error = "generic" }, statusCode: 409); }
-    var key = hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId);
+    var (key, _) = StartOnce.Run("hosted", s.Cwd, null, s.SessionId,
+        () => hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId), k => k is not null && hosted.Has(k));
     return Results.Json(new { key, sessionId = s.SessionId });
 });
 app.MapPost("/api/attach", async (HttpContext ctx) =>
@@ -497,6 +503,15 @@ app.MapPost("/api/night", async (HttpContext ctx, NightMode night) =>
     return Results.Json(night.Status());
 });
 app.MapGet("/api/projects", (Transcripts tr) => Results.Json(tr.Projects()));
+// Takip sekmesi: git durumu, NEXT_SESSION.md dosyaları, güncellemeler (FollowUp.cs). Okuma önbellekten gelir, bayatsa arka planda yenilenir.
+// "Karar bekleyenler" bölümü /api/state içindeki oturum listesinden çizilir. Oturum başlatan düğmeler /api/hosted kullanır.
+app.MapGet("/api/followup", (FollowUp fu) => Results.Json(fu.Get()));
+app.MapPost("/api/followup/refresh", (HttpContext ctx, FollowUp fu) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    fu.Refresh();
+    return Results.Ok();
+});
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {

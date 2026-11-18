@@ -24,6 +24,7 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 - **Gece modu**: belirlenen saatlerde bekleyen panel oturumları NEXT_SESSION.md'den sormadan devam eder. Sizi ilgilendiren bir karar çıkarsa oturum durur, kartında "Karar bekliyor" görünür; push/yayın/mail gibi dışarıya giden işlemler panelin kendi hook'u ile engellenir (panelin başlattığı oturumlara `--settings` ile verilir, Mac'te de çalışır); kota dolarsa sıfırlanma beklenir. Sabah Ayarlar → Gece raporu.
 - **Bilgisayar açılınca başlat** (Windows: Run kaydı, Mac: LaunchAgent): yeniden başlatmadan sonra panel penceresiz açılır, oturumları geri bağlar; yarıda kalan işe devam ettirir. Gece penceresinde bilgisayar boşta uyumaz (Windows `SetThreadExecutionState`, Mac `caffeinate`).
 - **Skill kütüphanesi**: etkin, havuzdaki ve eklenti skill'leri açıklamalarıyla; ada tıklayınca `/komut` panoya kopyalanır.
+- **Takip**: günlük takip edilecekler tek sekmede, kota harcamadan. **Git**: Claude'un çalıştığı projelerin depolarında commit'lenmemiş dosya ve gönderilmemiş commit sayısı (`git fetch` yapılmaz; temiz depolar yalnız sayı olarak), "Commit et" / "Gönder" o klasörde panel oturumu başlatır. **Sıradaki işler**: proje klasörlerindeki `NEXT_SESSION.md` dosyaları, kısa özet ve yaşıyla (3 günden eskiyse "eski plan"), "Devam et". **Karar bekleyenler**: gece modunda kararda duran oturumlar. **Güncellemeler**: panelin ve Claude Code'un yeni sürümü (yalnız bilgi; indirme/kurma yok). Sekme başlığında bekleyen madde sayısı.
 - **Telefondan erişim** (isteğe bağlı, varsayılan kapalı): iPhone/Android'den panel, Tailscale'in şifreli özel ağı üzerinden; internete port açılmaz, her telefon kare kodla eşleştirilir. Kurulum panelde Ayarlar → Telefondan erişim → **Nasıl kurulur?**
 - **Telefondan bilgisayarın masaüstüne bağlanma** (panelin parçası değil, aynı Tailscale bağlantısıyla): Windows'ta Uzak Masaüstü + Windows App, Mac'te Ekran Paylaşma + VNC uygulaması. Görselli adımlar: [docs/uzak-masaustu.md](docs/uzak-masaustu.md).
 
@@ -89,6 +90,7 @@ Kapatmak: Ayarlar → Paneli kapat.
 - Değişiklik yapan her istek, her açılışta üretilen rastgele anahtarı ve aynı kökeni ister.
 - Yeni oturum komutu kabuktan geçmez (`ArgumentList`); klasör var olmalı.
 - Dış sunucudan yazı tipi, kütüphane veya analitik yüklenmez.
+- **Güncelleme denetimi (0.11.0):** panel en çok 6 saatte bir `api.github.com` (panelin son sürümü) ve `registry.npmjs.org` (Claude Code'un son sürümü) adreslerine kimliksiz birer istek yapar; yanıt panel veri klasöründe saklanır. Başka dış istek: kota okuma (Anthropic kullanım API'si).
 - **Telefondan erişim (0.7.0, varsayılan kapalı):** açılınca yalnız bu makinenin Tailscale adı (`*.ts.net`) ek olarak kabul edilir. O addan gelen her istek eşleştirilmiş cihaz çerezi ister; eşleştirme bilgisayardaki panelden başlatılır (tek kullanımlık kod, 5 dk, 5 yanlış deneme). Bilgisayarın ekranında/panosunda iş yapan uçlar telefondan kapalıdır. Test: `bash tools/remote_guvenlik_testi.sh` (8791'de `CLAUDE_PANEL_REMOTE_HOST=test.ts.net` ile açılmış test kopyasına karşı).
 
 ## Bilinen sınırlar
@@ -103,6 +105,11 @@ Kapatmak: Ayarlar → Paneli kapat.
 
 | Sürüm | Tarih | Değişen alan | Eski değer | Yeni değer | Neden |
 |---|---|---|---|---|---|
+| 0.11.0 | 2026-11-18 | Takip sekmesi | Bekleyen commit/gönderim, yarım planlar ve güncellemeler tek yerde görünmüyordu | Takip sekmesi: Git, Sıradaki işler, Karar bekleyenler, Güncellemeler; satırdan panel oturumu başlatma | Kullanıcı isteği: günlük takip edilecekler için ayrı sekme |
+| 0.11.0 | 2026-11-18 | Oturum başlatma | Yanıt gecikince Başlat'a art arda basılırsa aynı oturum birkaç kez açılıyordu | İstek sürerken düğme kilitli; sunucu aynı isteği 20 sn içinde ikinci kez başlatmaz; başlatma süresi loga yazılır | Canlıda aynı oturum 5 kez açıldı |
+| 0.11.0 | 2026-11-18 | Güvenlik | Dış istek yalnız kota okuma | + güncelleme denetimi (GitHub, npm; 6 saatte bir, kimliksiz) | Güncellemeler bölümü |
+| 0.10.1 | 2026-11-18 | Exe ikonu | Windows varsayılan ikonu | Uygulama simgesi | Görünüm |
+| 0.10.0 | 2026-11-18 | Kota | Kota önbelleğini yalnız kullanıcının statusline betiği yazıyordu | Panel kotayı kendisi okur; kota koruması; terminalde kota satırı (Ayarlar) | Başka bilgisayarda kota halkaları boş kalıyordu |
 | 0.9.2 | 2026-11-18 | Ayarlar → Telefondan erişim (bilgisayar) | Güncelleme sırasında kitaplık yüklenemeyince kalıcı 500, bölüm boş | Kitaplıklar açılışta yüklenir; kare kod hatası kalıcı olmaz | Eşleşmiş telefon panelde görünmüyordu |
 | 0.9.2 | 2026-11-18 | Bildirime / tepsiye tıklama | Her seferinde yeni panel penceresi | Açık pencere öne gelir | Kullanıcı isteği |
 | 0.9.2 | 2026-11-18 | Sürüm karşılaştırması | Aynı sürüme "Yeni sürüm hazır" soruluyordu | 3 parçalı karşılaştırma | Hata |

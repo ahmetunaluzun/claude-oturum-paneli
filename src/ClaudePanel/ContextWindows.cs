@@ -13,8 +13,7 @@ namespace ClaudePanel;
 public sealed class ContextWindows(ILogger<ContextWindows> log)
 {
     static readonly string LearnedFile = Path.Combine(Handoff.DataDir, "context-windows.json");
-    static readonly string StatuslineFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "context-window-cache.json");
+    static readonly string StatuslineFile = Path.Combine(Quota.ClaudeDir, "context-window-cache.json");
 
     readonly ConcurrentDictionary<string, long> _byModel = new(StringComparer.OrdinalIgnoreCase);
     readonly ConcurrentDictionary<string, long> _bySession = new();

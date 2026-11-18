@@ -52,6 +52,8 @@ public static partial class Launcher
     /// <summary>claude'un yolu. Finder'dan açılan uygulamanın PATH'i kısadır; bilinen kurulum yerlerine önce bakılır.</summary>
     public static string ClaudeExe()
     {
+        // Test: gerçek claude yerine zararsız bir süreç (CLAUDE_PANEL_CLAUDE_EXE); değişken yoksa davranış aynı.
+        if (Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_EXE") is { Length: > 0 } fake) return fake;
         string[] known =
         {
             Path.Combine(Home, ".local/bin/claude"),
