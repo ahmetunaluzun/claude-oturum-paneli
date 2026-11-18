@@ -470,9 +470,9 @@ dialog { max-height: 90vh; overflow-y: auto; }
 .ring small.pace.crit { color: var(--danger); }
 
 /* ---- Gece modu ---- */
-fieldset.night { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0; display: grid; gap: 10px; }
-fieldset.night legend { padding: 0 6px; font-weight: 600; color: var(--text); font-size: 14px; }
-fieldset.night .hint.wide { margin: 0; font-size: 12px; }
+fieldset.night, fieldset.tquota { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0; display: grid; gap: 10px; }
+fieldset.night legend, fieldset.tquota legend { padding: 0 6px; font-weight: 600; color: var(--text); font-size: 14px; }
+fieldset.night .hint.wide, fieldset.tquota .hint.wide { margin: 0; font-size: 12px; }
 fieldset.night .btn { justify-self: start; }
 .night-wait { color: var(--idle) !important; }
 .night-pill { display: inline-block; margin-top: 4px; font-size: 11px; padding: 1px 8px; border-radius: 999px;

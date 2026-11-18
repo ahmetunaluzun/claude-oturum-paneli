@@ -1464,8 +1464,33 @@
   $("btnSettings").addEventListener("click", () => {
     $("sNotify").checked = settings.notify; $("sSound").checked = settings.sound;
     $("sLight").checked = settings.light; $("sLang").value = settings.lang;
-    fillNight(); loadNight(); loadRemote();
+    fillNight(); loadNight(); loadRemote(); loadTermQuota();
     $("dlgSettings").showModal();
+  });
+
+  // ---- Terminal oturumlarında kota (durum satırı + kota koruması, ~/.claude/settings.json) ----
+  function fillTermQuota(st, error) {
+    $("tqEnabled").checked = !!st?.enabled;
+    $("tqEnabled").disabled = !st?.available;
+    const lines = [st?.enabled ? t("tqOn") : t("tqOff")];
+    if (st?.ownGuard) lines.push(t("tqOwnGuard"));
+    const err = error || st?.error;
+    if (err) lines.push(t("tqErr_" + err));
+    $("tqState").textContent = lines.join(" ");
+  }
+  async function loadTermQuota() {
+    try { fillTermQuota(await getJson("/api/terminal-quota")); } catch { $("tqBox").hidden = true; }
+  }
+  $("tqEnabled").addEventListener("change", async (e) => {
+    const on = e.target.checked;
+    if (on) {
+      let st = null;
+      try { st = await getJson("/api/terminal-quota"); } catch { /* aşağıda sunucu hatası gösterilir */ }
+      if (st?.currentStatusLine && !confirm(t("tqReplace", st.currentStatusLine))) { e.target.checked = false; return; }
+    }
+    const r = await api("/api/terminal-quota", { enabled: on, lang: settings.lang });
+    if (r.ok) fillTermQuota(r.data);
+    else { e.target.checked = !on; fillTermQuota(null, r.data?.error || "write"); loadTermQuota(); }
   });
 
   // ---- Telefondan erişim (yönetim yalnız bilgisayardan) ----
@@ -1637,7 +1662,10 @@
   });
   $("sSound").addEventListener("change", (e) => { settings.sound = e.target.checked; save(); if (settings.sound) chime(); });
   $("sLight").addEventListener("change", (e) => { settings.light = e.target.checked; save(); applyTheme(); });
-  $("sLang").addEventListener("change", (e) => { settings.lang = e.target.value; save(); applyI18n(); render(); });
+  $("sLang").addEventListener("change", async (e) => {
+    settings.lang = e.target.value; save(); applyI18n(); render();
+    if ($("tqEnabled").checked) { const r = await api("/api/terminal-quota", { enabled: true, lang: settings.lang }); if (r.ok) fillTermQuota(r.data); }
+  });
   $("btnBulk").addEventListener("click", (e) => { e.stopPropagation(); A.laneMenu(e.currentTarget); });
   $("bulkBar").querySelectorAll("button[data-bulk]").forEach(b => b.addEventListener("click", () => A.bulk(b.dataset.bulk)));
   $("bulkCancel").addEventListener("click", () => A.setSelecting(false));

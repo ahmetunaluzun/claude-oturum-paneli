@@ -87,41 +87,38 @@ public static class NightGuard
     }
 
     /// <summary>
-    /// Panelin başlattığı claude'a verilecek `--settings` JSON'u; gerek yoksa null.
-    /// Kullanıcının ~/.claude/settings.json'unda eski betik (gece-modu-koruma) zaten kayıtlıysa iki kez çalışmasın diye eklenmez.
+    /// Panelin başlattığı claude'a verilecek `--settings` JSON'u (gece koruması + kota koruması hook'ları); gerek yoksa null.
+    /// Kullanıcının ~/.claude/settings.json'unda aynı iş için hook zaten kayıtlıysa (gece-modu-koruma, quota-guard —
+    /// Ayarlar'dan açılan panel kota koruması da "--quota-guard" içerir) iki kez çalışmasın diye o hook eklenmez.
     /// </summary>
     public static string? SettingsArg()
     {
-        var userSettings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "settings.json");
-        try
-        {
-            if (File.Exists(userSettings) && File.ReadAllText(userSettings).Contains("gece-modu-koruma", StringComparison.Ordinal))
-                return null;
-        }
+        var userSettings = Path.Combine(Quota.ClaudeDir, "settings.json");
+        var text = "";
+        try { if (File.Exists(userSettings)) text = File.ReadAllText(userSettings); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         var exe = PanelExe();
         if (exe is null) return null;
-        var hook = new JsonObject
-        {
-            ["hooks"] = new JsonObject
+        var pre = new JsonArray();
+        if (!text.Contains("gece-modu-koruma", StringComparison.Ordinal))
+            pre.Add(new JsonObject
             {
-                ["PreToolUse"] = new JsonArray(new JsonObject
+                ["matcher"] = "Bash|PowerShell|mcp__.*",
+                ["hooks"] = new JsonArray(new JsonObject
                 {
-                    ["matcher"] = "Bash|PowerShell|mcp__.*",
-                    ["hooks"] = new JsonArray(new JsonObject
-                    {
-                        ["type"] = "command",
-                        ["command"] = $"\"{exe}\" {Arg}",
-                        ["timeout"] = 15
-                    })
+                    ["type"] = "command",
+                    ["command"] = $"\"{exe}\" {Arg}",
+                    ["timeout"] = 15
                 })
-            }
-        };
-        return hook.ToJsonString();
+            });
+        if (!text.Contains("quota-guard", StringComparison.OrdinalIgnoreCase))
+            pre.Add(QuotaSetup.GuardEntry($"\"{exe}\" {QuotaCli.GuardArg}"));
+        if (pre.Count == 0) return null;
+        return new JsonObject { ["hooks"] = new JsonObject { ["PreToolUse"] = pre } }.ToJsonString();
     }
 
     /// <summary>Panelin kalıcı yolu. Yayın sırasında çalışan exe .old.exe olarak yeniden adlandırılır; hook asıl adı göstermeli.</summary>
-    static string? PanelExe()
+    public static string? PanelExe()
     {
         var p = Environment.ProcessPath;
         if (string.IsNullOrEmpty(p) || p.Contains('"')) return null;

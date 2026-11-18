@@ -8,6 +8,9 @@ using ClaudePanel;
 
 // Gece modu koruması: panelin başlattığı claude oturumları paneli hook olarak çağırır (NightGuard.cs).
 if (args.Length > 0 && args[0] == NightGuard.Arg) Environment.Exit(NightGuard.RunHook());
+// Terminal durum satırı ve kota koruması (QuotaCli.cs): ~/.claude/settings.json'dan çağrılır.
+if (args.Length > 0 && args[0] == QuotaCli.StatusLineArg) Environment.Exit(QuotaCli.RunStatusLine(args));
+if (args.Length > 0 && args[0] == QuotaCli.GuardArg) Environment.Exit(QuotaCli.RunGuard(args));
 
 Preload.All(); // güncelleme sırasında exe değişse de sonradan yüklenecek kitaplık kalmasın (Preload.cs)
 
@@ -494,6 +497,14 @@ app.MapPost("/api/night", async (HttpContext ctx, NightMode night) =>
     return Results.Json(night.Status());
 });
 app.MapGet("/api/projects", (Transcripts tr) => Results.Json(tr.Projects()));
+app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
+app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
+{
+    if (!IsLocal(ctx) || !Authorized(ctx)) return Results.StatusCode(403);
+    var req = await ctx.Request.ReadFromJsonAsync<TerminalQuotaRequest>();
+    if (req?.Enabled is not { } on) return Results.BadRequest();
+    return QuotaSetup.Set(on, req.Lang) is { } err ? Results.BadRequest(new { error = err }) : Results.Json(QuotaSetup.Status());
+});
 
 await app.StartAsync();
 Handoff.WriteToken(port, token); // yeni sürüm açılınca bu paneli kapatabilsin
@@ -528,6 +539,7 @@ public record WrapRequest(bool Close);
 public record NightRequest(NightSettings? Settings, bool? Autostart);
 record ClaimRequest(string? Code, string? Secret, string? Name);
 record EnableRequest(bool? Enabled);
+record TerminalQuotaRequest(bool? Enabled, string? Lang);
 
 /// <summary>Telefon adresinden gelen istekler için yol kuralları.</summary>
 static class Remote
@@ -542,7 +554,7 @@ static class Remote
     static readonly string[] Blocked =
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
-        "/api/clipboard-paths", "/api/reveal", "/api/path-links"
+        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota"
     ];
 
     public static bool IsPublic(string path) => Public.Contains(path);

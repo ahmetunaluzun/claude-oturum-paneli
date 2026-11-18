@@ -38,7 +38,6 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
     static readonly string EventsFile = Path.Combine(Handoff.DataDir, "night-events.jsonl");
     /// <summary>Hook (~\.claude\hooks\gece-modu-koruma.py) bu dosyayı okur. Test kopyası canlı korumaya dokunmasın diye veri klasöründe.</summary>
     public static readonly string GuardFile = Path.Combine(Handoff.DataDir, "night-guard.json");
-    static readonly string ClaudeDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
     readonly object _lock = new();
@@ -47,7 +46,6 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
     Timer? _timer;
     bool _wasActive;
     string? _waitReason; // kota beklemesi: arayüzde gösterilir
-    DateTimeOffset _usageFetchedAt;
     int _usageRefreshing;
     DateTimeOffset _usageCheckedAt;
 
@@ -241,64 +239,12 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
 
     static string Local(DateTimeOffset? t) => t?.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture) ?? "?";
 
-    /// <summary>usage-cache.json'u okur; 5 dakikadan eskiyse statusline'ın kullandığı API'den yeniler (gece terminal oturumu yokken statusline çalışmaz).</summary>
+    /// <summary>Kota (Quota.cs): önbellek 5 dakikadan eskiyse API'den yenilenir (gece terminal oturumu yokken statusline çalışmaz).</summary>
     (double? five, DateTimeOffset? fiveReset, double? week, DateTimeOffset? weekReset)? ReadUsage()
     {
-        var path = Path.Combine(ClaudeDir, "usage-cache.json");
-        JsonNode? root = null;
-        try { if (File.Exists(path)) root = JsonNode.Parse(File.ReadAllText(path)); }
-        catch (Exception ex) when (ex is IOException or JsonException) { }
-        var cachedAt = root?["_cached_at"]?.GetValue<double>() ?? 0;
-        var age = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - cachedAt;
-        if (age > 300 && DateTimeOffset.UtcNow - _usageFetchedAt > TimeSpan.FromMinutes(3))
-        {
-            _usageFetchedAt = DateTimeOffset.UtcNow;
-            root = FetchUsage(path) ?? root;
-        }
-        if (root is null) return null;
-        static (double?, DateTimeOffset?) Win(JsonNode? w)
-        {
-            double? used = w?["utilization"] is JsonValue v && v.TryGetValue<double>(out var d) ? d : null;
-            DateTimeOffset? reset = DateTimeOffset.TryParse(w?["resets_at"]?.GetValue<string>(), CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var r) ? r : null;
-            return (used, reset);
-        }
-        var (f, fr) = Win(root["five_hour"]);
-        var (wk, wr) = Win(root["seven_day"]);
-        return (f, fr, wk, wr);
-    }
-
-    JsonNode? FetchUsage(string cachePath)
-    {
-        try
-        {
-            var creds = JsonNode.Parse(File.ReadAllText(Path.Combine(ClaudeDir, ".credentials.json")));
-            var token = creds?["claudeAiOauth"]?["accessToken"]?.GetValue<string>();
-            if (string.IsNullOrEmpty(token)) return null;
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.anthropic.com/api/oauth/usage");
-            req.Headers.Authorization = new("Bearer", token);
-            req.Headers.Add("anthropic-beta", "oauth-2025-04-20");
-            using var resp = http.Send(req);
-            if (!resp.IsSuccessStatusCode)
-            {
-                log.LogDebug("Kota okunamadı: HTTP {Code}", (int)resp.StatusCode);
-                return null;
-            }
-            var node = JsonNode.Parse(resp.Content.ReadAsStream());
-            if (node is not JsonObject obj) return null;
-            obj["_cached_at"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
-            var tmp = cachePath + ".panel.tmp";
-            File.WriteAllText(tmp, obj.ToJsonString());
-            File.Move(tmp, cachePath, overwrite: true);
-            return obj;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
-                                       or HttpRequestException or TaskCanceledException or InvalidOperationException)
-        {
-            log.LogDebug("Kota yenilenemedi: {Msg}", ex.Message);
-            return null;
-        }
+        var q = Quota.Read(fetch: true, msg => log.LogDebug("{Msg}", msg));
+        if (q is null) return null;
+        return (q.Five.Used, q.Five.ResetsAt, q.Week.Used, q.Week.ResetsAt);
     }
 
     void WriteGuard(List<string>? sessionIds, DateTimeOffset? until)

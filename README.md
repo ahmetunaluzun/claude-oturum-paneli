@@ -11,7 +11,9 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 - **Pencereye git**: oturumun terminal penceresini öne getirir.
 - Bir oturum işini bitirince Windows bildirimi + ses.
 - **Yeni oturum**: klasör ve görev yazılır, `claude --bg` ile arka planda başlar.
-- Kota halkaları (statusline'ın `~/.claude/usage-cache.json` dosyası varsa).
+- **Kota**: 5 saatlik ve haftalık kota halkaları, sıfırlanmaya kalan süre, "bu hızla" tahmini. Panel kotayı kendisi okur (Anthropic kullanım API'si; kimlik Windows'ta `~/.claude/.credentials.json`, Mac'te Anahtar Zinciri), statusline betiği gerekmez.
+- **Kota koruması**: panelin başlattığı oturumlarda 5 saatlik kotadan %5 kalınca yalnız okuma ve hafıza kaydına (CLAUDE_MEMORY.md / NEXT_SESSION.md) izin verilir, ekstra ücretli kullanıma kayılmaz (`ClaudePanel --quota-guard`, `--settings` ile verilir; kendi `quota-guard` hook'unuz varsa eklenmez).
+- **Terminalde kota** (Ayarlar, varsayılan kapalı): terminaldeki Claude Code'un altında plan, kota ve bağlam satırı (`ClaudePanel --statusline`) ve aynı kota koruması. `~/.claude/settings.json`'a yazılır; mevcut durum satırınız yedeklenir, kutu kapatılınca geri gelir. Python gerekmez.
 - Arama (`/`), yeni oturum (`N`), açık/koyu tema, Türkçe/İngilizce.
 - **Konuşma paneli** (karta tıkla): oturumun mesajları ve araç adımları canlı akar.
 - **Panelde oturum**: yeni oturum panelin içinde çalışır (`claude -p --input-format stream-json`); mesaj buradan yazılır, iş durdurulur, oturum kapatılır. Kapalı bir oturuma yazınca `--resume` ile kaldığı yerden sürer.

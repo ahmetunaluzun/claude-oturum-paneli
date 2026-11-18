@@ -66,6 +66,8 @@ chk "telefondan dikte durumu (okuma)" 200 "$(code "${R[@]}" "${C[@]}" $B/api/dic
 chk "telefondan /api/clipboard-paths" 403 "$(code -X POST "${RA[@]}" $B/api/clipboard-paths)"
 chk "telefondan /api/reveal (Gezgin)" 403 "$(code -X POST "${RA[@]}" -d '{"path":"C:\\\\"}' $B/api/reveal)"
 chk "telefondan /api/path-links (yol varlığı)" 403 "$(code -X POST "${RA[@]}" -d '["C:\\\\"]' $B/api/path-links)"
+chk "telefondan /api/terminal-quota (settings.json yazma)" 403 "$(code -X POST "${RA[@]}" -d '{"enabled":true}' $B/api/terminal-quota)"
+chk "telefondan /api/terminal-quota (okuma)" 403 "$(code "${R[@]}" "${C[@]}" $B/api/terminal-quota)"
 chk "telefondan /api/remote (liste)" 403 "$(code "${R[@]}" "${C[@]}" $B/api/remote)"
 VIEW=$(curl -s "${R[@]}" "${C[@]}" $B/api/remote/view)
 chk "telefondan /api/remote/view (okuma)" 200 "$(code "${R[@]}" "${C[@]}" $B/api/remote/view)"
