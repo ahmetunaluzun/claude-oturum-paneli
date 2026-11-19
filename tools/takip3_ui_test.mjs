@@ -177,8 +177,9 @@ await openCont("Drive'a yüklenecekler");
 const DRV = "Drive'a yüklenecekler";
 check("Drive satırları (en eski bekleyen üstte)", await ev(`[...${contOf(DRV)}.querySelectorAll(".fu-row b")].map(x => x.textContent)`),
   ["Etiket_Kilavuzu.docx", "Label_Guide.docx", "Okunamayan satır", "yardim.html", "egitim.html", "Mimari.docx", "Mimari.pdf", "Okunamayan satır", "Fis_Kilavuzu.docx"]);
-check("olmayan dosya işaretli", (await rowInfo("Label_Guide.docx")).etiket, ["v1.3.0", "dosya yok"]);
+check("olmayan dosya işaretli", (await rowInfo("Label_Guide.docx")).etiket, ["v1.3.0", "+1 eski sürüm yüklendi sayıldı", "dosya yok"]);
 check("ek dosyalı satır", (await rowInfo("egitim.html")).etiket, ["v1.7.0", "+2 dosya"]);
+check("eski sürümleri yüklendi sayılan satır (aynı belgenin yalnız en yüksek sürümü listede)", (await rowInfo("Etiket_Kilavuzu.docx")).etiket, ["v1.3.0", "+2 eski sürüm yüklendi sayıldı"]);
 check("okunamayan satır: metni görünür, 'Yükledim' yok (sessiz atlanmaz)", await ev(`[...${contOf(DRV)}.querySelectorAll(".fu-row")].filter(r => r.querySelector("b").textContent === "Okunamayan satır").map(r => [r.querySelector(".fu-what").textContent, [...r.querySelectorAll(".fu-tag")].map(x => x.textContent).join(), r.querySelectorAll(".fu-side .btn").length])`),
   [["Kapak görseli sonra eklenecek", "okunamadı", 0], ["Sunum · 1.0 · hazırlanıyor", "okunamadı", 0]]);
 check("kapatılmış bölümlerin dosyaları yok", await ev(`[...document.querySelectorAll(".fu-row b")].some(x => ["eski.html", "Eski.docx", "basvuru.html"].includes(x.textContent))`), false);

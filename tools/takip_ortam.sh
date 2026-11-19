@@ -96,6 +96,13 @@ kutuk "Kılavuz Deposu" <<'MD'
 
 ### AÇIK — DRIVE'A YÜKLENECEK (2026-11-15 düzeltme turu)
 - Fiş Kılavuzu — `@K@\cikti\v2.0.1\Fis_Kilavuzu.docx`
+
+## 2026-11-05 — Önceki tur (aynı belgelerin eski sürümleri: satır olmaz, yüklendi sayılır)
+
+### AÇIK — DRIVE'A YÜKLENECEK
+- Etiket Kılavuzu v1.2.1 — `@K@\cikti\v1.2.1\Etiket_Kilavuzu.docx`
+- `@K@\cikti\v1.2.1\Label_Guide.docx` (v1.2.1)
+- `@K@\cikti\v1.3.0\Etiket_Kilavuzu_v1.2.docx`
 MD
 proje "Yardım Sitesi" yardim-sitesi
 mkdir -p "$T/projeler/Yardım Sitesi/yayin"

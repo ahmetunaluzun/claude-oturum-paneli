@@ -119,7 +119,9 @@ public static class FollowEndpoints
             var rows = fu.Get().Drive.Where(d => d.Path is not null && ProjectRoots.Same(d.Ledger, ProjectRoots.Normalize(req.Ledger))).ToList();
             var files = req.Files.Select(f => rows.FirstOrDefault(d => ProjectRoots.Same(d.Path!, ProjectRoots.Normalize(f ?? "")))?.Path).ToList();
             if (rows.Count == 0 || files.Any(f => f is null)) return Results.Json(new { error = "noledger" }, statusCode: 404);
-            var job = jobs.EnqueueLedger(rows[0].Ledger, rows[0].Name, files.Distinct(StringComparer.OrdinalIgnoreCase).ToList()!, req.Lang);
+            // Satırın yerine geçtiği eski sürümler de yüklendi sayılır: kütükte onlar da kapatılır.
+            var withOlder = files.Concat(files.SelectMany(f => rows.First(d => ProjectRoots.Same(d.Path!, f!)).Older ?? []));
+            var job = jobs.EnqueueLedger(rows[0].Ledger, rows[0].Name, withOlder.Distinct(StringComparer.OrdinalIgnoreCase).ToList()!, req.Lang);
             return job is null ? Results.Json(new { error = "jobactive" }, statusCode: 409) : Results.Json(job);
         });
     }

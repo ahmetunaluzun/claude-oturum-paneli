@@ -51,6 +51,9 @@ check "A: tarih üst başlıktan / kendi başlığından" "$(q "[gun(x['since'])
 check "A: nottaki \`0 - Yok\` yol sanılmadı; olmayan dosya 'yok' olarak döner" "$(q "[(x['file'], x['exists']) for x in D['Kılavuz Deposu'] if x['path']]")" "[('Etiket_Kilavuzu.docx', True), ('Label_Guide.docx', False), ('Fis_Kilavuzu.docx', True)]"
 check "A: okunamayan satır metniyle döner (sessiz atlanmaz)" "$(q "[x['text'] for x in D['Kılavuz Deposu'] if not x['path']]")" "['Kapak görseli sonra eklenecek']"
 check "A: KAPATILDI bölümündeki dosya alınmadı" "$(q "any('v1.2.0' in (x['path'] or '') for x in d['drive'])")" False
+check "A: aynı belgenin eski sürümleri satır olmadı (yoldaki sürüm klasörü ve dosya adı eki), en yüksek sürüm kaldı" \
+  "$(q "[[rel({'path':o,'ledger':x['ledger']}) for o in (x.get('older') or [])] for x in D['Kılavuz Deposu']]")" \
+  "[['cikti/v1.2.1/Etiket_Kilavuzu.docx', 'cikti/v1.3.0/Etiket_Kilavuzu_v1.2.docx'], ['cikti/v1.2.1/Label_Guide.docx'], [], []]"
 check "A: bölüm başlığı satırda" "$(q "D['Kılavuz Deposu'][3]['section']")" "AÇIK — DRIVE'A YÜKLENECEK (2026-11-15 düzeltme turu)"
 
 # ---- biçim B: - \`yol\` [+ \`ek dosya\`] (sürüm) ----
@@ -107,6 +110,7 @@ rm "$P/Mimari Belgesi/.sahte-bos"
 touch "$P/Kılavuz Deposu/.sahte-karar"
 LK=$(esc "$P/Kılavuz Deposu/GUNCELLEME_KUTUGU.md"); FK=$(esc "$P/Kılavuz Deposu/cikti/v1.3.0/Etiket_Kilavuzu.docx")
 post /api/follow/ledger "{\"ledger\":\"$LK\",\"files\":[\"$FK\"]}" >/dev/null; bitir "Kılavuz Deposu"
+check "Kütüğü kapat istemi eski sürümleri de kapatıyor" "$(grep '^MESAJ' "$T/sahte.log" | tail -1 | grep -o 'v1.2.1.Etiket_Kilavuzu.docx\|Etiket_Kilavuzu_v1.2.docx' | sort | tr '\n' ' ')" "Etiket_Kilavuzu_v1.2.docx v1.2.1\\Etiket_Kilavuzu.docx "
 check "karar gerekiyor: oturum görünür" "$(it "Kılavuz Deposu" "i['state'], bool(i['sessionKey'])") $(hosted)" "decision True 1"
 
 # ---- projede açık oturum varken kütük işi başlamaz (az önce görünür olan oturum hâlâ açık) ----

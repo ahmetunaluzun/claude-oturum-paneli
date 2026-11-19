@@ -17,7 +17,8 @@ window.PanelFollowDrive = function (c) {
           sub: `${d.ledger} · ${t("fuLine", d.line)}`, unreadable: true, sig: d.text });
         continue;
       }
-      const tags = (d.version ? tag("v" + d.version) : "") + (d.extras.length ? tag(t("fuExtras", d.extras.length)) : "") + (d.exists ? "" : tag(t("fuMissing"), "warn"));
+      const tags = (d.version ? tag("v" + d.version) : "") + (d.extras.length ? tag(t("fuExtras", d.extras.length)) : "")
+        + (d.older?.length ? tag(t("fuOlder", d.older.length)) : "") + (d.exists ? "" : tag(t("fuMissing"), "warn"));
       const it = { ...base, id: "drv:" + key + "|" + low(d.path), title: d.file, tags, what: `${d.name} · ${d.section}`,
         sub: [d.path, ...d.extras].join(" + "), sig: [d.mtime, d.version, d.exists].join() };
       out.push(it);
@@ -59,7 +60,7 @@ window.PanelFollowDrive = function (c) {
     const job = it.job, stale = job?.state === "done" && job.updatedAt > snap.checkedAt;
     if (it.type === "ledger" && !(job && isActive(job)) && !stale)
       box.appendChild(button(t("fuLedgerClose"), async (b) => {
-        const ok = await confirmBox({ title: t("fuLedgerTitle", it.title), text: t("fuLedgerText"), okText: t("fuLedgerGo"), list: it.files.map(f => f.title) });
+        const ok = await confirmBox({ title: t("fuLedgerTitle", it.title), text: t("fuLedgerText"), okText: t("fuLedgerGo"), list: it.files.flatMap(f => [f.title, ...(f.drive.older || []).map(o => t("fuOlderItem", o.split(/[\\/]/).slice(-2).join("/")))]) });
         if (ok) runJob(b, "/api/follow/ledger", { ledger: it.ledger, files: it.files.map(f => f.drive.path) });
       }, true));
   }

@@ -8,13 +8,15 @@ namespace ClaudePanel;
 /// <param name="Line">Kütükteki satır numarası (1'den başlar).</param>
 /// <param name="Since">Başlıktaki (yoksa üst başlıktaki) tam tarih, yerel gece yarısı, Unix ms.</param>
 /// <param name="Extras">Aynı satırda "+" ile eklenmiş öteki dosyalar (çözülmüş yol).</param>
-public sealed record LedgerEntry(string Section, int Line, long? Since, string? Path, IReadOnlyList<string> Extras, string? Version, string Text);
+/// <param name="Older">Aynı belgenin bu satırla geçersiz kalan eski sürümlerinin yolları (yüklendi sayılır, ayrı satır olmaz).</param>
+public sealed record LedgerEntry(string Section, int Line, long? Since, string? Path, IReadOnlyList<string> Extras, string? Version, string Text,
+    IReadOnlyList<string>? Older = null);
 
 /// <param name="Name">Kütüğün durduğu klasörün adı.</param>
 /// <param name="Root">Proje kökü (git kökü; yoksa klasör): projeye göre gruplama için.</param>
 /// <param name="Mtime">Satırdaki dosyaların en yeni değişiklik zamanı (Unix ms); hiçbiri yoksa 0.</param>
 public sealed record FollowDrive(string Name, string Root, string Ledger, string Section, int Line, string File, string? Path,
-    IReadOnlyList<string> Extras, string? Version, long? Since, bool Exists, long Mtime, string Text);
+    IReadOnlyList<string> Extras, string? Version, long? Since, bool Exists, long Mtime, string Text, IReadOnlyList<string>? Older = null);
 
 /// <summary>
 /// GUNCELLEME_KUTUGU.md ayrıştırıcısı: başlığında AÇIK ve DRIVE geçen bölümlerdeki liste ve tablo satırlarından
@@ -41,6 +43,7 @@ public static partial class DriveLedger
     [GeneratedRegex(@"\G\s*\+\s*`([^`]+)`")] private static partial Regex Plus();
     [GeneratedRegex(@"(?<![\w.])v?(\d+(?:\.\d+){1,3})(?![\w.]*\d)")] private static partial Regex Ver();
     [GeneratedRegex(@"[\\/]v?(\d+(?:\.\d+){1,3})[\\/]")] private static partial Regex VerInPath();
+    [GeneratedRegex(@"[ _\-.]v?\d+(?:\.\d+){1,3}(?=\.[A-Za-z0-9]{1,5}$)", RegexOptions.IgnoreCase)] private static partial Regex VerInName();
     [GeneratedRegex(@"^[^\\/:*?""<>|]+\.[A-Za-z0-9]{1,5}$")] private static partial Regex BareFile();
 
     public static List<LedgerEntry> Parse(string text, string dir)
@@ -87,13 +90,38 @@ public static partial class DriveLedger
         return Dedupe(list);
     }
 
-    /// <summary>Aynı dosya iki bölümde geçiyorsa en yeni tarihli satır kalır (eşitse ilki). Okunamayan satırlar hep kalır.</summary>
+    /// <summary>
+    /// Aynı belge için tek satır kalır. Belge kimliği yoldan sürüm klasörü (`\v1.2.0\`) ve dosya adındaki sürüm eki (`_v1.2`)
+    /// çıkarılarak bulunur. En yüksek sürüm kalır (sürüm okunamıyorsa ya da eşitse en yeni tarihli, o da eşitse ilki); eski
+    /// sürümler yüklendi sayılır ve kalan satırın <see cref="LedgerEntry.Older"/> listesine girer ("Kütüğü kapat" onları da kapatır).
+    /// Okunamayan satırlar hep kalır.
+    /// </summary>
     static List<LedgerEntry> Dedupe(List<LedgerEntry> list)
     {
-        var best = new Dictionary<string, LedgerEntry>(StringComparer.OrdinalIgnoreCase);
-        foreach (var e in list.Where(e => e.Path is not null))
-            if (!best.TryGetValue(e.Path!, out var old) || (e.Since ?? 0) > (old.Since ?? 0)) best[e.Path!] = e;
-        return list.Where(e => e.Path is null || ReferenceEquals(best[e.Path], e)).ToList();
+        var keep = new Dictionary<LedgerEntry, LedgerEntry>(ReferenceEqualityComparer.Instance);
+        foreach (var g in list.Where(e => e.Path is not null).GroupBy(e => DocKey(e.Path!), StringComparer.OrdinalIgnoreCase))
+        {
+            var best = g.Aggregate((a, b) => Newer(b, a) ? b : a);
+            var older = g.Select(e => e.Path!).Where(p => !p.Equals(best.Path, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            keep[best] = older.Count == 0 ? best : best with { Older = older };
+        }
+        return list.Where(e => e.Path is null || keep.ContainsKey(e)).Select(e => e.Path is null ? e : keep[e]).ToList();
+    }
+
+    /// <summary>b, a'dan daha yeni mi: önce sürüm (ikisinde de okunabiliyorsa), sonra bölüm tarihi.</summary>
+    static bool Newer(LedgerEntry b, LedgerEntry a)
+    {
+        if (System.Version.TryParse(b.Version, out var vb) && System.Version.TryParse(a.Version, out var va) && vb != va) return vb > va;
+        return (b.Since ?? 0) > (a.Since ?? 0);
+    }
+
+    /// <summary>Sürümden bağımsız belge kimliği: `…\release\v1.3.0\Kilavuz.docx` → `…\release\*\Kilavuz.docx`, `Rapor_v2.1.pdf` → `Rapor.pdf`.</summary>
+    internal static string DocKey(string path)
+    {
+        var p = VerInPath().Replace(path, m => m.Value[0] + "*" + m.Value[^1]);
+        var dir = System.IO.Path.GetDirectoryName(p) ?? "";
+        return System.IO.Path.Combine(dir, VerInName().Replace(System.IO.Path.GetFileName(p), ""));
     }
 
     static LedgerEntry FromList(string body, string dir, string section, int line, long? since)
@@ -195,7 +223,7 @@ public static partial class DriveLedger
                     var files = e.Path is null ? [] : new[] { e.Path }.Concat(e.Extras).ToList();
                     var mtime = files.Select(Mtime).DefaultIfEmpty(0).Max();
                     list.Add(new FollowDrive(name, root, f.FullName, e.Section, e.Line, e.Path is null ? "" : Path.GetFileName(e.Path.TrimEnd('\\', '/')),
-                        e.Path, e.Extras, e.Version, e.Since, e.Path is not null && (File.Exists(e.Path) || Directory.Exists(e.Path)), mtime, e.Text));
+                        e.Path, e.Extras, e.Version, e.Since, e.Path is not null && (File.Exists(e.Path) || Directory.Exists(e.Path)), mtime, e.Text, e.Older));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* kayıt başına: sonraki kütük */ }
