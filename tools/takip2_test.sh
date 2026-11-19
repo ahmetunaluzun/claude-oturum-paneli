@@ -58,8 +58,12 @@ for k in $(curl -s "http://127.0.0.1:$PORT/api/state" | grep -o '"key":"[0-9a-f]
   curl -s -o /dev/null -X POST "http://127.0.0.1:$PORT/api/hosted/$k/stop" -H "X-Panel-Token: $TOK" -H "Origin: http://127.0.0.1:$PORT"; done
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 pwsh -NoProfile -c "Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and \$_.CommandLine -like '*$TW*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }"
-sleep 1
-check "test süreci kalmadı" "$(pwsh -NoProfile -c "@(Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and (\$_.CommandLine -like '*$TW*' -or \$_.CommandLine -like '*sahte_claude.py*') }).Count" | tr -d '\r')" 0
+# Durdurulan oturumların sahte claude süreçleri birkaç saniyede kapanabiliyor: 10 sn'ye kadar bekle
+for i in $(seq 10); do
+  kalan="$(pwsh -NoProfile -c "@(Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and (\$_.CommandLine -like '*$TW*' -or \$_.CommandLine -like '*sahte_claude.py*') }).Count" | tr -d '\r')"
+  [ "$kalan" = 0 ] && break; sleep 1
+done
+check "test süreci kalmadı" "$kalan" 0
 rm -rf "$T"
 [ $fail = 0 ] && echo "TÜMÜ GEÇTİ" || echo "HATA VAR"
 exit $fail

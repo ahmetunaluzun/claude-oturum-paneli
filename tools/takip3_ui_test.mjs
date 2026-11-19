@@ -115,7 +115,7 @@ await open(1280);
 check("varsayılan: süzgeç Tümü, görünüm Projeye göre", await pressed(), ["all", "project"]);
 const upd = await ev(`fetch("/api/followup").then(r => r.json()).then(d => (d.updates.panel.newer ? 1 : 0) + (d.updates.claude.newer ? 1 : 0))`);
 let c = await chips();
-check("çip sayıları: Git 3, Planlar 2, Drive 9, Kararlar 0; Tümü = toplam", c, { all: 14 + upd, git: 3, next: 2, drive: 9, sched: 1, decisions: 0 });
+check("çip sayıları: Git 3, Planlar 2, Drive 9, Zamanlanmış 2 (bulut + Planlı işler), Kararlar 0; Tümü = toplam", c, { all: 14 + upd, git: 3, next: 2, drive: 9, sched: 2, decisions: 0 });
 check("sekme rozeti = Tümü", await ev(`document.getElementById("navFollow").textContent`), String(c.all));
 check("proje grupları: önce eski bekleyenler, sonra ada göre; güncellemeler sonda, hepsi kapalı", await conts(),
   ["Kılavuz Deposu:kapalı", "Mimari Belgesi:kapalı", "Stok Sayım:kapalı", "Yardım Sitesi:kapalı", "Demo Mağaza:kapalı", "Örnek API:kapalı", "Rapor Aracı:kapalı", "Bilgisayar:kapalı", "Güncellemeler:kapalı"]);
@@ -167,7 +167,7 @@ await mode("type");
 check("Türe göre + Planlar süzgeci: tek bölüm", await conts(), ["Sıradaki işler:kapalı"]);
 await chip("all");
 check("Türe göre: bölümler (Drive dahil)", await conts(), ["Karar bekleyenler:açık", "Git:kapalı", "Sıradaki işler:kapalı", "Drive'a yüklenecekler:kapalı", "Zamanlanmış işler:kapalı", "Güncellemeler:kapalı"]);
-check("bölüm sayıları çiplerle aynı", await ev(`[...document.querySelectorAll(".fu-sec .count")].map(x => Number(x.textContent))`), [0, 3, 2, 9, 1, upd]);
+check("bölüm sayıları çiplerle aynı", await ev(`[...document.querySelectorAll(".fu-sec .count")].map(x => Number(x.textContent))`), [0, 3, 2, 9, 2, upd]);
 await open(1280);
 check("yeniden yüklemede görünüm 'Türe göre' kalıyor", await pressed(), ["all", "type"]);
 check("türe göre görünümde tür etiketi çizilmez", await ev(`document.querySelectorAll(".fu-kind").length`), 0);
