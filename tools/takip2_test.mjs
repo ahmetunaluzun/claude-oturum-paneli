@@ -95,18 +95,18 @@ const P = (name) => showRoot + "\\" + name;
 await open(1280);
 await ev(`localStorage.setItem("panel.follow", JSON.stringify({ mode: "type" }))`); // bu test "Türe göre" görünümü sınar (varsayılan artık projeye göre; o görünüm takip3_test.mjs'te)
 await open(1280);
-check("varsayılan: karar bekleyenler açık, ötekiler kapalı", await secs(), ["decisions:açık", "git:kapalı", "next:kapalı", "updates:kapalı"]);
+check("varsayılan: karar bekleyenler açık, ötekiler kapalı", await secs(), ["decisions:açık", "git:kapalı", "next:kapalı", "sched:kapalı", "updates:kapalı"]);
 check("kapalı bölümde satır çizilmez", await ev(`document.querySelectorAll("#fu-git .fu-row, #fu-next .fu-row").length`), 0);
 check("kapalı başlık tek satır: ad + sayı + proje adları", await ev(`(() => { const h = document.querySelector("#fu-git .fu-fold"); return [h.querySelector(".fu-name").textContent, h.querySelector(".count").textContent, h.querySelector(".fu-sum").textContent, h.getBoundingClientRect().height <= 44]; })()`),
   ["Git", "5", "Demo Mağaza, Gizli Depo, Kirli Uzak, Örnek API, Rapor Aracı", true]);
-check("sekme rozeti = bölüm sayılarının toplamı", await ev(`[document.getElementById("navFollow").textContent === String([...document.querySelectorAll(".fu-fold .count")].reduce((n, c) => n + Number(c.textContent), 0)), Number(document.getElementById("navFollow").textContent) >= 8]`), [true, true]);
+check("sekme rozeti = bölüm sayılarının toplamı (zamanlanmış işlerin bilgi satırı sayılmaz)", await ev(`[document.getElementById("navFollow").textContent === String([...document.querySelectorAll(".fu-sec:not(#fu-sched) .fu-fold .count")].reduce((n, c) => n + Number(c.textContent), 0)), Number(document.getElementById("navFollow").textContent) >= 8]`), [true, true]);
 check("üstte 'Tümünü aç'", await ev(`document.getElementById("btnFuFold").textContent`), "Tümünü aç");
 
 await fold("git");
-check("başlığa tıkla: Git açıldı", await secs(), ["decisions:açık", "git:açık", "next:kapalı", "updates:kapalı"]);
+check("başlığa tıkla: Git açıldı", await secs(), ["decisions:açık", "git:açık", "next:kapalı", "sched:kapalı", "updates:kapalı"]);
 check("durum localStorage'da (panel.follow)", await ev(`JSON.parse(localStorage.getItem("panel.follow")).collapsed.git`), false);
 await open(1280);
-check("yeniden yüklemede durum kalıyor", await secs(), ["decisions:açık", "git:açık", "next:kapalı", "updates:kapalı"]);
+check("yeniden yüklemede durum kalıyor", await secs(), ["decisions:açık", "git:açık", "next:kapalı", "sched:kapalı", "updates:kapalı"]);
 
 // ---- depo başına TEK düğme ----
 check("commit'lenmemiş + gönderilmemiş → tek düğme 'Commit et ve gönder'", (await rowInfo("Kirli Uzak")).dugme, ["Commit et ve gönder"]);
@@ -119,11 +119,11 @@ check("bölüm başında 'Tümünü commit et ve gönder'", await ev(`[...docume
 // ---- Tümünü aç / kapat ----
 await click(`document.getElementById("btnFuFold")`);
 check("Tümünü aç: hepsi açık, düğme 'Tümünü kapat'", [await secs(), await ev(`document.getElementById("btnFuFold").textContent`)],
-  [["decisions:açık", "git:açık", "next:açık", "updates:açık"], "Tümünü kapat"]);
+  [["decisions:açık", "git:açık", "next:açık", "sched:açık", "updates:açık"], "Tümünü kapat"]);
 await click(`document.getElementById("btnFuFold")`);
-check("Tümünü kapat: hepsi kapalı", await secs(), ["decisions:kapalı", "git:kapalı", "next:kapalı", "updates:kapalı"]);
+check("Tümünü kapat: hepsi kapalı", await secs(), ["decisions:kapalı", "git:kapalı", "next:kapalı", "sched:kapalı", "updates:kapalı"]);
 await open(1280);
-check("yeniden yüklemede hepsi kapalı kalıyor", await secs(), ["decisions:kapalı", "git:kapalı", "next:kapalı", "updates:kapalı"]);
+check("yeniden yüklemede hepsi kapalı kalıyor", await secs(), ["decisions:kapalı", "git:kapalı", "next:kapalı", "sched:kapalı", "updates:kapalı"]);
 await click(`document.getElementById("btnFuFold")`);
 
 // ---- "Tümünü commit et ve gönder" onayı (Vazgeç: iş başlamaz) ----
@@ -252,7 +252,7 @@ check("oturumdaki depo Git'te gizli", [await rowInfo("Kirli Uzak") !== null, awa
 
 // ================= 1280 px, açık tema =================
 await open(1280, { light: true });
-check("açık tema: bölümler ve durum aynı", (await secs()).length, 5);
+check("açık tema: bölümler ve durum aynı", (await secs()).length, 6);
 await shot("1280_acik");
 const rows = await ev(`document.querySelectorAll(".fu-row").length`);
 check("1280 açık: taşma yok", await measure(), CLEAN(rows));

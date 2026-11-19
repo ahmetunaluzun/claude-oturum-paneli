@@ -178,10 +178,16 @@ check "mac: son/sonraki çalışma uydurulmaz; devre dışı bırakma sunulmaz" 
 check "mac: devre dışı bırak isteği reddedilir" "$(post /api/schedule/disable "{\"id\":\"$(esc "$T/agents/ornek.yedek.plist")\"}") $(j "d['error']")" "400 taskunsupported"
 kapat
 
+# ---- uydurma ortamda kaynak verilmezse gerçek zamanlayıcı okunmaz (gerçek görev adı teste / görüntüye sızmaz) ----
+baslat
+snap
+check "uydurma ortam: gerçek zamanlayıcı okunmadı, liste boş" "$(q "S['os']['kind'], S['os']['state'], len(S['os']['tasks'])")" "windows ok 0"
+kapat
+
 # ================= 3. aşama: gerçek Görev Zamanlayıcı (yalnız testin kendi görevi) =================
 pwsh -NoProfile -c "Register-ScheduledTask -TaskName '$TASK' -Action (New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument '-NoProfile -File \"$TW\\claude\\hooks\\temizlik.ps1\"') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddDays(300)) | Out-Null"
 check "geçici görev oluşturuldu" "$(pwsh -NoProfile -c "(Get-ScheduledTask -TaskName '$TASK').State" | tr -d '\r')" Ready
-baslat
+baslat CLAUDE_PANEL_TASKS_REAL=1
 snap
 check "windows: zamanlayıcı okundu" "$(q "S['os']['kind'], S['os']['state']")" "windows ok"
 check "windows: geçici görev listede (betik ~/.claude altında), açık, hiç çalışmamış, sonraki çalışma var" \

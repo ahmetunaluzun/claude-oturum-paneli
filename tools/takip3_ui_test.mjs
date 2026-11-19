@@ -115,10 +115,10 @@ await open(1280);
 check("varsayılan: süzgeç Tümü, görünüm Projeye göre", await pressed(), ["all", "project"]);
 const upd = await ev(`fetch("/api/followup").then(r => r.json()).then(d => (d.updates.panel.newer ? 1 : 0) + (d.updates.claude.newer ? 1 : 0))`);
 let c = await chips();
-check("çip sayıları: Git 3, Planlar 2, Drive 9, Kararlar 0; Tümü = toplam", c, { all: 14 + upd, git: 3, next: 2, drive: 9, decisions: 0 });
+check("çip sayıları: Git 3, Planlar 2, Drive 9, Kararlar 0; Tümü = toplam", c, { all: 14 + upd, git: 3, next: 2, drive: 9, sched: 1, decisions: 0 });
 check("sekme rozeti = Tümü", await ev(`document.getElementById("navFollow").textContent`), String(c.all));
 check("proje grupları: önce eski bekleyenler, sonra ada göre; güncellemeler sonda, hepsi kapalı", await conts(),
-  ["Kılavuz Deposu:kapalı", "Mimari Belgesi:kapalı", "Stok Sayım:kapalı", "Yardım Sitesi:kapalı", "Demo Mağaza:kapalı", "Örnek API:kapalı", "Rapor Aracı:kapalı", "Güncellemeler:kapalı"]);
+  ["Kılavuz Deposu:kapalı", "Mimari Belgesi:kapalı", "Stok Sayım:kapalı", "Yardım Sitesi:kapalı", "Demo Mağaza:kapalı", "Örnek API:kapalı", "Rapor Aracı:kapalı", "Bilgisayar:kapalı", "Güncellemeler:kapalı"]);
 check("kapalı grup başlığı: sayı + tür özeti", await ev(`(() => { const s = ${contOf("Örnek API")}; return [s.querySelector(".count").textContent, s.querySelector(".fu-sum").textContent]; })()`), ["2", "Git · Plan"]);
 check("kapalıyken satır çizilmez", await ev(`document.querySelectorAll(".fu-row").length`), 0);
 
@@ -166,8 +166,8 @@ check("yeniden yüklemede süzgeç ve görünüm kalıyor", [await pressed(), aw
 await mode("type");
 check("Türe göre + Planlar süzgeci: tek bölüm", await conts(), ["Sıradaki işler:kapalı"]);
 await chip("all");
-check("Türe göre: bölümler (Drive dahil)", await conts(), ["Karar bekleyenler:açık", "Git:kapalı", "Sıradaki işler:kapalı", "Drive'a yüklenecekler:kapalı", "Güncellemeler:kapalı"]);
-check("bölüm sayıları çiplerle aynı", await ev(`[...document.querySelectorAll(".fu-sec .count")].map(x => Number(x.textContent))`), [0, 3, 2, 9, upd]);
+check("Türe göre: bölümler (Drive dahil)", await conts(), ["Karar bekleyenler:açık", "Git:kapalı", "Sıradaki işler:kapalı", "Drive'a yüklenecekler:kapalı", "Zamanlanmış işler:kapalı", "Güncellemeler:kapalı"]);
+check("bölüm sayıları çiplerle aynı", await ev(`[...document.querySelectorAll(".fu-sec .count")].map(x => Number(x.textContent))`), [0, 3, 2, 9, 1, upd]);
 await open(1280);
 check("yeniden yüklemede görünüm 'Türe göre' kalıyor", await pressed(), ["all", "type"]);
 check("türe göre görünümde tür etiketi çizilmez", await ev(`document.querySelectorAll(".fu-kind").length`), 0);
@@ -347,7 +347,7 @@ await click(`[...document.querySelectorAll("#fuBulkBar .btn")].pop()`);
 await open(1280, { lang: "en" });
 check("İngilizce: çevrilmemiş anahtar yok", await ev(`[...document.querySelectorAll("#viewFollow *")].filter(e => !e.children.length && /^(fu|pc|err_)[A-Za-z_]+$/.test(e.textContent.trim())).map(e => e.textContent)`), []);
 check("İngilizce: çipler, görünüm, Toplu", await ev(`[[...document.querySelectorAll(".fu-chip")].map(x => x.firstChild.textContent), [...document.querySelectorAll(".fu-mode")].map(x => x.textContent), document.getElementById("btnFuBulk").textContent]`),
-  [["All", "Git", "Plans", "Drive", "Decisions"], ["By project", "By type"], "Bulk"]);
+  [["All", "Git", "Plans", "Drive", "Scheduled", "Decisions"], ["By project", "By type"], "Bulk"]);
 await mode("type");
 await click(`${rowOf("Mimari.docx")}.querySelector(".fu-tog")`);
 check("İngilizce: Drive satırı ve ayrıntı düğmeleri", await ev(`(() => { const r = ${rowOf("Mimari.docx")}; return [[...r.querySelectorAll(".fu-side .btn")].map(x => x.textContent), [...r.querySelectorAll(".fu-more .btn")].map(x => x.textContent), /^waiting /.test(r.querySelector(".fu-side small").textContent)]; })()`),

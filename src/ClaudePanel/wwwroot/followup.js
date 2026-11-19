@@ -1,6 +1,6 @@
 // Takip sekmesi: günlük takip edilecekler. Her kaynak bir bölümdür; bölüm, öğe listesi üretir ({ id, type, root, rank, sig, … })
 // ve çizim tek yerden yapılır. Kaynaklar kota harcamaz: git durumu, NEXT_SESSION.md, karar bekleyenler, aynı projede birden
-// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), güncellemeler.
+// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), zamanlanmış işler (followup-sched.js), güncellemeler.
 // Görünüm (süzgeç çipleri, projeye / türe göre gruplama, gizle-ertele, toplu seçim) followup-view.js'te, kalıcı durum
 // followup-state.js'te (localStorage["panel.follow"]).
 // Commit / gönder / kütüğü kapat düğmeleri oturum AÇMAZ: sunucudaki arka plan işini başlatır (/api/follow/*), sonuç satırda görünür.
@@ -166,13 +166,14 @@ window.PanelFollowUp = function (d) {
       if (u.state !== "ok") updNotes.push([t("fuUnknown", name), true]);
       else if (!u.newer) updNotes.push([t("fuUpToDate", name, u.current), false]);
     }
-    const conflicts = conflictItems(), drive = D.items(snap, jobs);
+    const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap);
     return [
       { id: "decisions", title: "fuDecisions", all: decisionItems(), notes: [], empty: t("fuNoDecisions") },
       ...(conflicts.length ? [{ id: "conflicts", title: "fuConflicts", all: conflicts, notes: [] }] : []),
       { id: "git", title: "fuGit", all: g.state === "nogit" ? [] : gitItems(), notes: gitNotes, hideable: true },
       { id: "next", title: "fuNext", all: nextItems(), notes: [], empty: t("fuNoNext"), hideable: true },
       ...(drive.length ? [{ id: "drive", title: "fuDrive", all: drive, notes: [] }] : []),
+      ...(sched ? [sched] : []),
       { id: "updates", title: "fuUpdates", all: updateItems(), notes: updNotes }
     ];
   }
@@ -230,8 +231,9 @@ window.PanelFollowUp = function (d) {
     if (it.type === "decision") side.appendChild(button(t("fuOpenChat"), () => openDrawer(it.session), true));
     if (it.type === "conflict") side.appendChild(button(t("fuShowSessions"), () => setView("sessions")));
     D.side(it, side, snap);
+    Z.side(it, side);
     if (it.link) {
-      const a = el("a", "btn small primary", esc(t("fuReleasePage")));
+      const a = el("a", "btn small" + (it.linkText ? "" : " primary"), esc(it.linkText || t("fuReleasePage")));
       a.href = it.link; a.target = "_blank"; a.rel = "noopener";
       a.addEventListener("click", (e) => e.stopPropagation());
       side.appendChild(a);
@@ -243,6 +245,7 @@ window.PanelFollowUp = function (d) {
   function moreOf(it) {
     const box = el("div", "fu-more");
     D.more(it, box);
+    Z.more(it, box);
     if (S.canDefer(it)) {
       box.appendChild(button(t("fuSnooze"), () => { S.snooze(it); toast(t("fuSnoozed", it.title)); render(); }));
       box.appendChild(button(t("fuHide"), () => { S.hide(it); toast(t("fuHidden", it.title)); render(); }));
@@ -332,6 +335,7 @@ window.PanelFollowUp = function (d) {
   }
 
   const D = window.PanelFollowDrive({ t, api, toast, dur, now, low, tag, jobOf, isActive, runJob, confirmBox, button, S, REMOTE, rerender: () => render() });
+  const Z = window.PanelFollowSched({ t, api, toast, dur, now, low, tag, confirmBox, button, lang, REMOTE, reload: () => load(false) });
   const V = window.PanelFollowView({ t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, folder,
     sessions: () => items(), rerender: () => render() });
 

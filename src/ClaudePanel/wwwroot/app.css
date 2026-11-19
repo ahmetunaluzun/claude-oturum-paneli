@@ -840,6 +840,12 @@ html.selecting .card { cursor: pointer; }
 .fu-pick.on::after { content: "✓"; font-weight: 700; }
 .fu-row.fu-picked { outline: 2px solid var(--accent); outline-offset: -2px; }
 .fu-aside { display: block; margin-top: 10px; }
+/* Zamanlanmış işler (followup-sched.js): tarihi geçmiş söz kırmızı; terminal oturumunda düğme yerine bilgi */
+.fu-tag.fu-late { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+.fu-due { border-color: color-mix(in srgb, var(--danger) 55%, var(--line)); }
+.fu-due .fu-title b { color: var(--danger); }
+[data-theme="light"] .fu-tag.fu-late, [data-theme="light"] .fu-due .fu-title b { color: #B3312A; }
+.fu-side small.fu-termhint { white-space: normal; text-align: right; max-width: 150px; }
 #viewFollow.fu-selecting { padding-bottom: 96px; }
 @media (max-width: 640px) {
   .fu-head { flex-wrap: wrap; }

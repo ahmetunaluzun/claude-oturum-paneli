@@ -18,9 +18,13 @@ public sealed record OsTask(string Id, string Name, string Folder, bool Enabled,
 ///   CLAUDE_PANEL_TASKS_FILE       → görevler bu JSON dosyasından okunur, "devre dışı bırak" yalnız bu dosyaya yazar;
 ///   CLAUDE_PANEL_LAUNCHAGENTS_DIR → görevler bu klasördeki plist'lerden okunur (macOS okuyucusu Windows'ta da denenebilsin).
 /// İkisi de yoksa platformun kendi kaynağı (Platform\Windows\NativeTasks.cs, Platform\Mac\NativeTasks.cs).
+/// Uydurma ortamda (CLAUDE_PANEL_CLAUDE_DIR verilmiş: test, ekran görüntüsü) gerçek zamanlayıcı OKUNMAZ, liste boştur:
+/// kullanıcının gerçek görev adları teste ve görüntüye sızmasın. Gerçek kaynağı bilerek denemek için CLAUDE_PANEL_TASKS_REAL=1.
 /// </summary>
 public static class OsTasks
 {
+    static readonly bool Isolated = Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_DIR") is { Length: > 0 }
+        && Environment.GetEnvironmentVariable("CLAUDE_PANEL_TASKS_REAL") != "1";
     static readonly string? FakeFile = Environment.GetEnvironmentVariable("CLAUDE_PANEL_TASKS_FILE") is { Length: > 0 } f ? f : null;
     static readonly string? AgentsDir = Environment.GetEnvironmentVariable("CLAUDE_PANEL_LAUNCHAGENTS_DIR") is { Length: > 0 } d ? d : null;
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -34,13 +38,13 @@ public static class OsTasks
     {
         if (FakeFile is not null) return ReadFake();
         if (AgentsDir is not null) return LaunchAgents.Read(AgentsDir, null);
-        return NativeTasks.List();
+        return Isolated ? [] : NativeTasks.List();
     }
 
     /// <summary>Görevi devre dışı bırakır. null: oldu; yoksa hata kodu ("unsupported" | "denied" | "notfound" | "failed").</summary>
     public static string? Disable(string id)
     {
-        if (FakeFile is null) return AgentsDir is not null ? "unsupported" : NativeTasks.Disable(id);
+        if (FakeFile is null) return AgentsDir is not null || Isolated ? "unsupported" : NativeTasks.Disable(id);
         lock (FakeLock)
         {
             var list = ReadFake();

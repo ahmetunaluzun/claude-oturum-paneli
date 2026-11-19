@@ -5,9 +5,13 @@ window.PanelFollowView = function (c) {
   "use strict";
   const { t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, sessions, folder, rerender } = c;
   // Süzgeç → bölüm kimlikleri. Güncellemeler yalnız "Tümü"nde görünür.
-  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], decisions: ["decisions", "conflicts"] };
-  const KIND = { git: "fuKind_git", job: "fuKind_git", next: "fuKind_next", drive: "fuKind_drive", ledger: "fuKind_drive", decision: "fuKind_decision", conflict: "fuKind_conflict" };
-  const counted = (i) => !(i.result && i.job?.state === "done");
+  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], decisions: ["decisions", "conflicts"] };
+  const KIND = { git: "fuKind_git", job: "fuKind_git", next: "fuKind_next", drive: "fuKind_drive", ledger: "fuKind_drive", decision: "fuKind_decision", conflict: "fuKind_conflict",
+    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise" };
+  // Bilgi satırları (info: zamanlanmış görev, ileri tarihli söz…) bekleyen iş değildir: rozete ve "Tümü" sayısına girmez,
+  // kendi süzgecinin (Zamanlanmış) sayısına girer.
+  const counted = (i) => !i.info && !(i.result && i.job?.state === "done");
+  const listed = (i) => i.info || counted(i);
   const revealed = new Set(); // açılmış "oturumda açık" / "gizli" satırları (kalıcı değil)
   const picked = new Set();
   let selecting = false, last = null;
@@ -27,7 +31,7 @@ window.PanelFollowView = function (c) {
     }
     const inFilter = (f, id) => !FILTERS[f] || FILTERS[f].includes(id);
     const chips = {};
-    for (const f of Object.keys(FILTERS)) chips[f] = secs.filter(s => inFilter(f, s.id)).reduce((n, s) => n + s.items.filter(counted).length, 0);
+    for (const f of Object.keys(FILTERS)) chips[f] = secs.filter(s => inFilter(f, s.id)).reduce((n, s) => n + s.items.filter(f === "all" ? counted : listed).length, 0);
     const filter = FILTERS[S.state.filter] !== undefined ? S.state.filter : "all";
     const shown = secs.filter(s => inFilter(filter, s.id));
     const m = { secs, shown, chips, filter, ids, total: chips.all, aside: asideAll.filter(it => inFilter(filter, it.sec)), mode: S.state.mode === "type" ? "type" : "project" };
