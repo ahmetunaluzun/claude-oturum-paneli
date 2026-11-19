@@ -146,6 +146,13 @@ check "oturuma tek mesaj gitti: durdurma istemi" "$(( $(grep -c '^MESAJ' "$T/sah
 check "oturum durdurdu: kayıtta tekrarlı iş kalmadı" "$(q "len(L)")" 0
 check "panel oturumu kapatmadı (yalnız mesaj gönderdi)" "$(curl -s "$B/api/state" | grep -c "\"key\":\"$KEY\"")" 1
 
+# ---- Kaydet ve kapat istemi verilmiş söz kuralını taşır ----
+check "Kaydet ve kapat: 200" "$(post "/api/hosted/$KEY/wrap" '{"close":true}' /dev/null)" 200
+for _ in $(seq 1 40); do grep -q 'CLAUDE_MEMORY.md' "$T/sahte.log" && break; sleep 0.3; done
+check "kayıt isteminde söz satırı biçimi yazıyor" "$(grep '^MESAJ' "$T/sahte.log" | grep 'CLAUDE_MEMORY.md' | grep -c 'TAKİP: YYYY-AA-GG — yapılacak iş')" 1
+for _ in $(seq 1 40); do [ "$(curl -s "$B/api/state" | grep -c "\"key\":\"$KEY\"")" = 0 ] && break; sleep 0.3; done
+check "oturum kaydedip kapandı" "$(curl -s "$B/api/state" | grep -c "\"key\":\"$KEY\"")" 0
+
 # ---- terminal oturumu: listelenir, panel mesaj gönderemez ----
 WPID=$(cat /proc/$PID/winpid)
 SID="11111111-2222-4333-8444-555555555555"

@@ -44,6 +44,16 @@ public sealed partial class ScheduledJobs(SessionStore store, HostedSessions hos
 {
     /// <summary>Bu yüzdelerin altında tekrarlı iş için kota uyarısı gösterilir (5 saatlik / haftalık kalan).</summary>
     const double QuotaWarnFive = 30, QuotaWarnWeek = 30;
+
+    /// <summary>
+    /// "Kaydet ve kapat" / "Kaydet ve temizle" ve gece modu istemlerine eklenen cümle: oturumun verdiği ileri tarihli söz
+    /// NEXT_SESSION.md'ye Takip'in okuduğu satır biçimiyle yazılır (ScanPromises).
+    /// </summary>
+    public const string PromiseRule =
+        "Bu oturumda kullanıcıya ileri tarihli bir söz verdiysen ya da belli bir tarihte yapılacak bir kontrol kaldıysa " +
+        "(ör. \"yarın bakarım\", \"cuma günü yeniden deneriz\"), her biri için proje kökündeki NEXT_SESSION.md'ye ayrı satırda, satır başında, " +
+        "tam şu biçimde yaz: `TAKİP: YYYY-AA-GG — yapılacak iş` (gerçek takvim tarihi; panel bu satırları Takip sekmesinde gösterir, " +
+        "tarihi gelince öne alır). Söz yerine getirildiyse satırını sil. Böyle bir söz yoksa satır ekleme.";
     const int MaxBytes = 2 * 1024 * 1024, TextMax = 240;
     const string NextFile = "NEXT_SESSION.md";
     static readonly string[] ScriptExt = [".py", ".pyw", ".ps1", ".sh"];

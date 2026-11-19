@@ -53,7 +53,10 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     const string SavePrompt =
         "Bu oturumu temizlemeden/kapatmadan önce durumu kaydet: proje kökündeki CLAUDE_MEMORY.md'yi " +
         "(yapılanlar, yarım kalanlar, kararlar) ve NEXT_SESSION.md'yi (sıradaki adımlar, dosya yolları, başlangıç noktası) " +
-        "güncelle. Yarım dosya düzenlemesi bırakma. Başka iş yapma; bitince ne kaydettiğini bir iki cümleyle yaz.";
+        "güncelle. " + ScheduledJobs.PromiseRule + " Yarım dosya düzenlemesi bırakma. Başka iş yapma; bitince ne kaydettiğini bir iki cümleyle yaz.";
+
+    /// <summary>Kayıt /smart-clear ile yapılıyorsa (istem bizim değil) verilmiş söz kuralı ayrı kısa mesajla, kayıttan SONRA gönderilir.</summary>
+    const string PromisePrompt = ScheduledJobs.PromiseRule + " Başka iş yapma; satır eklediysen ya da sildiysen tek cümleyle söyle, yoksa yalnız \"söz yok\" yaz.";
 
     public IReadOnlyList<string>? CommandsOf(string key) =>
         _sessions.TryGetValue(key, out var h) ? h.Commands : null;
@@ -155,6 +158,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         {
             h.Then.Clear();
             h.Then.Enqueue(save);
+            if (save != SavePrompt) h.Then.Enqueue(PromisePrompt);
             if (!close) { h.Then.Enqueue("/clear"); h.Then.Enqueue("devam"); }
             h.StopWhenDone = close;
             h.Task = close ? "closing" : "clearing";

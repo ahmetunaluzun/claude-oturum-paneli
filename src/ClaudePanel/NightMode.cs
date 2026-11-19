@@ -221,6 +221,7 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
         "- kullanıcının tercihine bağlı ürün, tasarım ya da kapsam kararı; önceki mesajında kullanıcıya sorduğun ve cevabı gelmemiş soru\n" +
         "- aynı hatayı iki denemede çözemediysen\n" +
         "Küçük ve geri alınabilir teknik kararlarda en makul yolu seç, gerekçesini NEXT_SESSION.md'ye yaz, devam et. " +
+        ScheduledJobs.PromiseRule + " " +
         "AskUserQuestion ve plan modunu kullanma (cevap veren olmaz). " +
         $"Bu oturumda yapılacak iş kalmadıysa yanıtının İLK satırına {DoneMark} yaz.";
 

@@ -90,7 +90,7 @@ for line in sys.stdin:
     if msg.get("type") != "user":
         continue
     text = msg.get("message", {}).get("content", "")
-    log("MESAJ", SID, CWD, text.replace("\n", " ")[:200])
+    log("MESAJ", SID, CWD, text.replace("\n", " ")[:1200])
     if first:
         out({"type": "system", "subtype": "init", "session_id": SID, "model": "claude-sahte-1", "slash_commands": []})
         first = False
