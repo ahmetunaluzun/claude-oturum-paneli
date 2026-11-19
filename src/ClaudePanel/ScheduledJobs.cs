@@ -130,7 +130,7 @@ public sealed partial class ScheduledJobs(SessionStore store, HostedSessions hos
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* kayıt başına: sonraki proje */ }
         }
-        return list;
+        return list.OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(f => f.Path, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     static List<SchedDesktop> ScanDesktop()

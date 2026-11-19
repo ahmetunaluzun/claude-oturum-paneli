@@ -863,6 +863,9 @@ html.selecting .card { cursor: pointer; }
   .fu-tog { order: 2; width: 44px; height: 44px; margin: -6px -8px -6px 0; }
   .fu-side { order: 3; }
   .fu-side .btn, .fu-more .btn, .fu-bulk .btn { min-height: 44px; }
+  /* Dar ekranda başlık kısalmasın: etiketler sığmazsa alt satıra iner (zamanlanmış işlerde 3-4 etiket olabiliyor) */
+  .fu-title { flex-wrap: wrap; row-gap: 4px; }
+  .fu-title b { max-width: 100%; }
   .fu-more .btn { flex: 1; }
   .fu-pick { width: 24px; height: 24px; }
   #viewFollow.fu-selecting { padding-bottom: 190px; }
