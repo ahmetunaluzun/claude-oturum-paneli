@@ -15,6 +15,8 @@ window.PanelFollowPlan = function (c) {
   const has = (key) => t(key) !== key;
   /** Hata kodu → metin: önce plana özel (plErr_*), sonra genel (err_*). */
   const errText = (code) => (has("plErr_" + code) ? t("plErr_" + code) : has("err_" + code) ? t("err_" + code) : t("err_generic"));
+  /** Yanıtın ilk satırındaki işaret ([GECE-BITTI] / [KARAR-BEKLIYOR]) panel içindir, gösterilmez. */
+  const unmark = (s) => String(s || "").replace(/^\s*\[(GECE-BITTI|KARAR-BEKLIYOR)\][ \t]*\r?\n?/, "").trim();
   const nameOf = (j) => j.name || (j.kind === "warmup" ? t("plWarmupName") : folder(j.cwd));
 
   async function load() {
@@ -53,7 +55,7 @@ window.PanelFollowPlan = function (c) {
         + (st === "review" ? tag(t("plReviewTag"), "warn") : st === "decision" ? tag(t("night_decision"), "warn")
           : st === "running" ? tag(t("plRunningTag")) : st === "failed" || st === "missed" ? tag(t("plLastTag_" + st), "warn")
             : st === "waiting" ? tag(t("plWaitingTag"), "warn") : "")
-        + (off && !PINNED.has(st) ? tag(t("fuTaskOff")) : "");
+        + (off && !PINNED.has(st) ? tag(t("plOffTag")) : "");
       const parts = [];
       if (j.enabled && j.nextAt && st !== "running") parts.push(nextText(j.nextAt));
       const last = lastText(j);
@@ -61,7 +63,7 @@ window.PanelFollowPlan = function (c) {
       const sub = st === "review" && r.files?.length ? r.files.join(", ")
         : j.kind === "warmup" ? t("plWarmupWhat") : `${j.prompt || ""}`;
       return { id: "plan:" + j.id, type: "plan", root: j.cwd ? low(j.cwd) : NOPROJ, rootPath: j.cwd || t("fuSchedNoProject"),
-        title: nameOf(j), tags, what: (st === "review" || st === "decision") && r.summary ? r.summary : parts.join(" · "),
+        title: nameOf(j), tags, what: (st === "review" || st === "decision") && r.summary ? unmark(r.summary) : parts.join(" · "),
         sub: (st === "review" || st === "decision") && r.summary ? `${parts.join(" · ")} — ${sub}` : sub,
         plan: j, pinned: PINNED.has(st), rank: st === "decision" ? 0.5 : attention ? 1 : 4.5, info: !attention,
         cls: off && !PINNED.has(st) && !attention ? "fu-stale" : "", sig: [j.enabled, j.nextAt, st, r?.at].join() };
@@ -145,7 +147,7 @@ window.PanelFollowPlan = function (c) {
   function more(it, box) {
     if (it.type !== "plan") return;
     const r = it.plan.last;
-    if (r?.summary) box.appendChild(button(t("fuSummary"), () => ask(t("fuSummaryTitle", it.title), r.summary, null, [{ value: "ok", label: t("ok"), cls: "primary" }])));
+    if (r?.summary) box.appendChild(button(t("fuSummary"), () => ask(t("fuSummaryTitle", it.title), unmark(r.summary), null, [{ value: "ok", label: t("ok"), cls: "primary" }])));
     if (r?.state === "review") box.appendChild(button(t("plDiscard"), () => discard(it.plan)));
   }
 
@@ -155,7 +157,7 @@ window.PanelFollowPlan = function (c) {
     kind = k;
     for (const b of $("plKind").children) b.classList.toggle("active", b.dataset.kind === k);
     for (const e of document.querySelectorAll("#dlgPlan .pl-work")) e.hidden = k === "warmup";
-    $("plHint").textContent = t("plHint_" + k, data?.awakeAheadH ?? 12);
+    $("plHint").textContent = t("plHint_" + k, Math.round((data?.graceMin ?? 180) / 60));
   }
   const setRepeat = () => { $("plDateWrap").hidden = $("plRepeat").value !== "once"; };
 

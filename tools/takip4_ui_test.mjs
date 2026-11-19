@@ -120,14 +120,14 @@ await ev(`localStorage.removeItem("panel.follow")`);
 await open(1280);
 const upd = await ev(`fetch("/api/followup").then(r => r.json()).then(d => (d.updates.panel.newer ? 1 : 0) + (d.updates.claude.newer ? 1 : 0))`);
 let c = await chips();
-check("Zamanlanmış çipi: bölümdeki tüm satırlar (15); Tümü yalnız bekleyenler (git 3 + plan 2 + dikkat isteyen 6 + güncelleme)", [c.sched, c.all, Object.keys(c)], [15, 11 + upd, ["all", "git", "next", "drive", "sched", "decisions"]]);
+check("Zamanlanmış çipi: bölümdeki tüm satırlar (15 + Planlı işler satırı); Tümü yalnız bekleyenler (git 3 + plan 2 + dikkat isteyen 6 + güncelleme)", [c.sched, c.all, Object.keys(c)], [16, 11 + upd, ["all", "git", "next", "drive", "sched", "decisions"]]);
 check("sekme rozeti = Tümü (bilgi satırları sayılmaz)", await ev(`document.getElementById("navFollow").textContent`), String(c.all));
 await mode("type");
 check("Türe göre: Zamanlanmış işler bölümü var, kapalı", (await conts()).includes(SEC + ":kapalı"), true);
-check("kapalı bölüm başlığındaki sayı", await ev(`${contOf(SEC)}.querySelector(".count").textContent`), "15");
+check("kapalı bölüm başlığındaki sayı", await ev(`${contOf(SEC)}.querySelector(".count").textContent`), "16");
 await openCont(SEC);
 const ORDER = ["Ödeme sağlayıcısının yanıtını kontrol et", "Yayın sonrası hata kayıtlarına bak", "Okunamayan söz", "Okunamayan söz", "Rapor Gönder", "Yetkisiz Görev",
-  "Sertifika yenilemesini doğrula", "Demo Yedek", "Kanca Temizliği", "Kapalı Görev", "Demo Mağaza", "Örnek API", "haftalik-rapor", "sabah-ozeti", "Bulut rutinleri"];
+  "Sertifika yenilemesini doğrula", "Demo Yedek", "Kanca Temizliği", "Kapalı Görev", "Demo Mağaza", "Örnek API", "haftalik-rapor", "sabah-ozeti", "Planlı işler", "Bulut rutinleri"];
 check("sıra: geçen söz, bugünkü söz, okunamayanlar, hatalı görevler; sonra bilgi satırları; bulut sonda", await titles("#fu-sched .fu-row"), ORDER);
 
 // ---- zamanlayıcı görevleri ----
@@ -186,7 +186,7 @@ check("boş dönen döngü öne geçti: aralık + ardışık boş tur uyarısı,
 check("döngü ayrıntısı: /loop argümanı, süre, token, tur", /^\/loop 5m dağıtım durumunu denetle · .* önce başladı · o günden beri 90 token · 4 tur$/.test(L[0].alt), true);
 check("cron satırları: ifade, tek sefer etiketi, istem, Durdur", [L[1].etiket, L[1].ne, L[1].dugme, L[2].etiket, L[2].ne], [["*/30 * * * *"], "Derleme durumunu denetle", ["Durdur"], ["0 9 * * *", "tek sefer"], "Sabah raporunu gönder"]);
 check("cron ayrıntısı: token sayısı yerel biçimde", [/o günden beri 1,4.B token$/.test(L[1].alt), /o günden beri 120 token$/.test(L[2].alt)], [true, true]);
-check("Zamanlanmış çipi: üç satır eklendi", (await chips()).sched, 18);
+check("Zamanlanmış çipi: üç satır eklendi", (await chips()).sched, 19);
 
 // ---- kota düşükken uyarı ----
 const reset = new Date(Date.now() + 3 * 3_600_000).toISOString();
@@ -225,7 +225,7 @@ let g = await conts();
 check("projeye göre: projesiz satırlar 'Bilgisayar' grubunda; sözü geçen proje öne geçti", [g.some(x => x.startsWith("Bilgisayar:")), g[0].startsWith("Örnek API:") || g[0].startsWith("Rapor Aracı:")], [true, true]);
 await openCont("Örnek API");
 check("proje grubunda tür adı: Söz / Zamanlanmış", [(await rowInfo("promise", "Yayın sonrası hata kayıtlarına bak")).tur, (await rowInfo("task", "Yetkisiz Görev")).tur, (await rowInfo("sfile", "Örnek API")).tur], ["Söz", "Zamanlanmış", "Zamanlanmış"]);
-check("kapalı grup özeti türleri sayıyor", await ev(`${contOf("Bilgisayar")}.querySelector(".fu-sum").textContent`), "Zamanlanmış");
+check("kapalı grup özeti türleri sayıyor", await ev(`${contOf("Bilgisayar")}.querySelector(".fu-sum").textContent`), "Zamanlanmış · Planlı iş");
 await chip("sched");
 g = await conts();
 check("Zamanlanmış süzgeci: yalnız zamanlanmış işi olan gruplar, güncellemeler yok", [g.some(x => x.startsWith("Güncellemeler")), g.some(x => x.startsWith("Bilgisayar:")), g.some(x => x.startsWith("Temiz Kütüphane"))], [false, true, false]);
