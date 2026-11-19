@@ -74,6 +74,7 @@ Tailscale macOS Ventura 13 veya üstünü ister. Tailscale'in kendi sitesindeki 
 - [ ] Ayarlar → Telefondan erişim → "Tailscale'i kur" indirme sayfasını açıyor mu; kurup giriş yapınca ilk iki adım ✓ oluyor mu?
 - [ ] Panel Tailscale'i buluyor mu? (`/usr/local/bin/tailscale` — Standalone'da Tailscale Ayarlar → CLI integration → Install Now; App Store'da uygulamanın içindeki araç). Bulamazsa ekran görüntüsü at.
 - [ ] Kutu işaretlenince "HTTPS'i aç" bağlantısı ya da adres çıkıyor mu; telefon kare kodla eşleşiyor mu?
+- [ ] **Saha tespiti (19.11.2026):** bir kullanıcıda Tailscale kurulu ve girişli olduğu hâlde telefon bağlanamadı; Tailscale uygulamasında "Tailnet" ile ilgili bir ayar açılınca bağlandı. Ayarın tam adı teyit bekliyor.
 - [ ] Mac uykudayken / kapak kapalıyken telefondan erişim ne oluyor? (belgede yazmıyor; gözlemi yaz)
 
 ## Telefondan Mac'in masaüstüne bağlanma (0.8.3, isteğe bağlı)
