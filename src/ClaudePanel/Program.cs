@@ -49,6 +49,7 @@ builder.Services.AddSingleton<FollowUp>();
 builder.Services.AddSingleton<ProjectGuard>();
 builder.Services.AddSingleton<FollowJobs>();
 builder.Services.AddSingleton<NightMode>();
+builder.Services.AddSingleton<PlannedJobs>();
 builder.Services.AddSingleton<RemoteAccess>();
 builder.Services.AddSingleton<Dictation>();
 builder.Services.AddSingleton(sp => new Tray(baseUrl, sp.GetRequiredService<SessionStore>(),
@@ -534,6 +535,7 @@ app.MapPost("/api/followup/refresh", (HttpContext ctx, FollowUp fu) =>
 });
 app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowEndpoints.cs)
 app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (ScheduleEndpoints.cs)
+app.MapPlans(Authorized); // Planlı işler: /api/plans* (PlanEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {
@@ -551,6 +553,7 @@ app.Lifetime.ApplicationStopping.Register(() => Launcher.CloseAppWindow(baseUrl)
 app.Services.GetRequiredService<HostedSessions>().Restore();
 app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();
+app.Services.GetRequiredService<PlannedJobs>().Start();
 app.Services.GetRequiredService<ProjectGuard>().Start();
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();

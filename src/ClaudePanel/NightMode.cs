@@ -148,7 +148,7 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
             _wasActive = false;
             _waitReason = null;
             WriteGuard(null, null);
-            KeepAwake.Set(false);
+            AwakeOwners.Want("night", false);
             return;
         }
         if (!_wasActive)
@@ -160,7 +160,7 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
             _wasActive = true;
         }
         // Gece boyunca bilgisayar boşta uyumasın (Windows: SetThreadExecutionState, Mac: caffeinate).
-        KeepAwake.Set(true);
+        AwakeOwners.Want("night", true);
         _ = TryTime(s.End, out var endT);
         var sessions = hosted.List();
         WriteGuard(sessions.Select(h => h.SessionId).OfType<string>().ToList(), WindowEnd(now, endT));
@@ -311,7 +311,7 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
     public void Dispose()
     {
         _timer?.Dispose();
-        KeepAwake.Set(false);
+        AwakeOwners.Want("night", false);
         // Panel kapanınca koruma kalmasın diye silinmez: dosyanın kendi bitiş anı var; panel yeniden açılınca güncellenir.
     }
 }
