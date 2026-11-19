@@ -14,7 +14,7 @@ public static partial class Launcher
     {
         if (fresh) CloseAppWindow(url);
         else if (FocusExistingAppWindow(url)) return;
-        var profile = Path.Combine(Handoff.DataDir, "browser"); // canlıda %LOCALAPPDATA%\ClaudePanelrowser; test kopyası ayrı
+        var profile = Path.Combine(Handoff.DataDir, "browser"); // canlıda %LOCALAPPDATA%\ClaudePanel\browser; test kopyası ayrı
         foreach (var exe in BrowserCandidates())
         {
             if (!File.Exists(exe)) continue;
