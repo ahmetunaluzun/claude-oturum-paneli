@@ -40,6 +40,8 @@ builder.Services.AddSingleton<ContextWindows>();
 builder.Services.AddSingleton<HostedSessions>();
 builder.Services.AddSingleton<Skills>();
 builder.Services.AddSingleton<UpdateCheck>();
+builder.Services.AddSingleton<LoopScan>();
+builder.Services.AddSingleton<ScheduledJobs>();
 builder.Services.AddSingleton<FollowUp>();
 builder.Services.AddSingleton<ProjectGuard>();
 builder.Services.AddSingleton<FollowJobs>();
@@ -527,6 +529,7 @@ app.MapPost("/api/followup/refresh", (HttpContext ctx, FollowUp fu) =>
     return Results.Ok();
 });
 app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowEndpoints.cs)
+app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (ScheduleEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {
@@ -584,7 +587,7 @@ static class Remote
     static readonly string[] Blocked =
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
-        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota"
+        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable"
     ];
 
     public static bool IsPublic(string path) => Public.Contains(path);

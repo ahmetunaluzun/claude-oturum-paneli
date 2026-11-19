@@ -15,21 +15,25 @@ public sealed record FollowGit(string State, IReadOnlyList<FollowRepo> Repos, in
 public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string Summary, string Root);
 
 /// <param name="Drive">Güncelleme kütüklerindeki "Drive'a yüklenecek" satırları (DriveLedger.cs).</param>
-public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive);
+/// <param name="Sched">Zamanlanmış işler: zamanlayıcı görevleri, Claude görev dosyaları, verilmiş sözler (ScheduledJobs.cs).</param>
+/// <param name="Loops">Açık oturumlardaki tekrarlı işler; her okumada canlı hesaplanır (LoopScan.cs).</param>
+/// <param name="QuotaLow">Kota düşükse kalan yüzdeler (tekrarlı iş uyarısı için); değilse null.</param>
+public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive,
+    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow);
 
 /// <summary>
 /// "Takip" sekmesinin kota harcamayan kaynakları: bilinen projelerin git durumu, NEXT_SESSION.md dosyaları ve
 /// güncellemeler (UpdateCheck). Tarama arka planda yapılır, sonuç önbellekte durur; ağ yalnız güncelleme denetiminde kullanılır
 /// (git fetch yapılmaz). Yeni kaynak (takvim, mail) eklenirken: anlık görüntüye alan + Scan'e adım.
 /// </summary>
-public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ILogger<FollowUp> log)
+public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ScheduledJobs sched, ILogger<FollowUp> log)
 {
     static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(150);
     const int GitTimeoutMs = 5000;
     const int SummaryMax = 140;
     const string NextFile = "NEXT_SESSION.md";
 
-    static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown, []);
+    static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown, [], FollowSched.Empty, [], null);
     volatile FollowSnapshot _snap = Empty;
     int _scanning;
 
@@ -38,7 +42,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     {
         var s = _snap;
         if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - s.CheckedAt > StaleAfter.TotalMilliseconds) Refresh();
-        return s with { Scanning = _scanning == 1 };
+        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow() };
     }
 
     /// <summary>Arka planda yeniden tarar (aynı anda tek tarama).</summary>
@@ -63,8 +67,9 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
         var next = ScanNext(projects);
         // Kütükler proje klasörlerinde ve git köklerinde aranır (alt klasör taranmaz).
         var drive = DriveLedger.Scan(projects.SelectMany(p => new[] { p.Cwd, ProjectRoots.Of(p.Cwd) }).Where(Directory.Exists));
+        var jobs = sched.Scan(projects);
         var upd = await updates.Check();
-        return new FollowSnapshot(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), false, git, next, upd, drive);
+        return new FollowSnapshot(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), false, git, next, upd, drive, jobs, [], null);
     }
 
     // ---- Git ----
