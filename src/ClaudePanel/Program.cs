@@ -42,6 +42,7 @@ builder.Services.AddSingleton<ContextWindows>();
 builder.Services.AddSingleton<HostedSessions>();
 builder.Services.AddSingleton<Skills>();
 builder.Services.AddSingleton<UpdateCheck>();
+builder.Services.AddSingleton<ClaudeUpdater>();
 builder.Services.AddSingleton<LoopScan>();
 builder.Services.AddSingleton<ScheduledJobs>();
 builder.Services.AddSingleton<FollowUp>();

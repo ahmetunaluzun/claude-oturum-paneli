@@ -95,6 +95,12 @@ public static class FollowEndpoints
             var req = await ctx.Request.ReadFromJsonAsync<FollowRepoRequest>();
             return Enqueue(fu, jobs, [req?.Path], req?.Lang, _ => (true, req?.Push == true));
         });
+        // Claude Code'u şimdi güncelle (`claude update`); sürüyorsa 409. Sonuç Takip anlık görüntüsünde (claudeUpdate).
+        app.MapPost("/api/follow/claude-update", (HttpContext ctx, FollowUp fu, ClaudeUpdater updater) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            return updater.Start(fu.ForceRefresh) ? Results.Json(updater.State, statusCode: 202) : Results.Json(new { error = "busy" }, statusCode: 409);
+        });
         // Tümünü commit et ve gönder: tek iş, depolar sırayla; sorunlu depo atlanır ve satırında raporlanır.
         app.MapPost("/api/follow/all", async (HttpContext ctx, FollowUp fu, FollowJobs jobs) =>
         {

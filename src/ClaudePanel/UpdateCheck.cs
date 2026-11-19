@@ -21,7 +21,8 @@ public sealed record UpdateInfo(UpdateItem Panel, UpdateItem Claude)
 }
 
 /// <summary>
-/// Güncelleme denetimi: panelin son GitHub sürümü ve Claude Code'un npm'deki son sürümü. Yalnız bilgi verir, indirmez/kurmaz.
+/// Güncelleme denetimi: panelin son GitHub sürümü ve Claude Code'un npm'deki son sürümü. Yalnız bilgi verir, indirmez/kurmaz
+/// (Claude Code'u <see cref="ClaudeUpdater"/> günceller).
 /// Ağa en çok 6 saatte bir çıkılır (başarısız denemeden sonra 1 saat beklenir); sonuç panel veri klasöründe durur,
 /// panel yeniden açılınca tekrar sorulmaz. Kimlik gönderilmez.
 /// </summary>
@@ -99,6 +100,9 @@ public sealed class UpdateCheck(ILogger<UpdateCheck> log)
             return (null, 0);
         }
     }
+
+    /// <summary>Güncellemeden sonra kurulu sürüm bir sonraki denetimde yeniden okunur.</summary>
+    public void ForgetLocal() => _localAt = default;
 
     /// <summary>Kurulu Claude Code sürümü (`claude --version`, saatte bir); okunamazsa null.</summary>
     string? LocalClaude()

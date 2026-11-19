@@ -206,7 +206,9 @@ window.I18N = {
     fuPushPrompt: "Bu depodaki gönderilmemiş commit'leri kontrol et (gizli bilgi taraması dahil) ve uzak depoya gönder (push).",
     fuNext: "Sıradaki işler", fuStale: "eski plan", fuContinue: "Devam et", fuContinuePrompt: "devam", fuNoNext: "Bekleyen plan (NEXT_SESSION.md) yok",
     fuDecisions: "Karar bekleyenler", fuOpenChat: "Konuşmayı aç", fuNoDecisions: "Karar bekleyen oturum yok",
-    fuUpdates: "Güncellemeler", fuPanelNew: "Yeni panel sürümü: {0}", fuClaudeNew: "Yeni Claude Code sürümü: {0}", fuInstalled: "Kurulu sürüm: {0}", fuClaudeHow: "claude update ile güncellenir",
+    fuUpdates: "Güncellemeler", fuPanelNew: "Yeni panel sürümü: {0}", fuClaudeNew: "Yeni Claude Code sürümü: {0}", fuInstalled: "Kurulu sürüm: {0}", fuClaudeHow: "panel kendiliğinden günceller", fuClaudeUpdating: "Güncelleniyor…", fuClaudeUpdateNow: "Şimdi güncelle",
+    fuClaudeFailed: "Güncellenemedi: {0}", fuClaudeNoChange: "claude update yeni sürüm kurmadı", fuClaudeUpdated: "Claude Code {0} kuruldu, yeni oturumlarda geçerli",
+    fuCuErr_timeout: "5 dakikada bitmedi", fuCuErr_nostart: "claude başlatılamadı", fuCuErr_interrupted: "panel kapandığı için yarıda kaldı",
     fuReleasePage: "Sürüm sayfası", fuPanelName: "Panel", fuUpToDate: "{0} güncel ({1})", fuUnknown: "{0}: denetlenemedi",
     err_model: "Geçersiz model", emptyRecent: "Son 14 günde oturum yok", loading: "Yükleniyor…",    s: "sn", m: "dk", h: "sa", d: "gün"
   },
@@ -416,7 +418,9 @@ window.I18N = {
     fuPushPrompt: "Check the unpushed commits in this repository (including a scan for secrets) and push them to the remote.",
     fuNext: "Up next", fuStale: "old plan", fuContinue: "Continue", fuContinuePrompt: "continue", fuNoNext: "No pending plan (NEXT_SESSION.md)",
     fuDecisions: "Waiting for a decision", fuOpenChat: "Open conversation", fuNoDecisions: "No session is waiting for a decision",
-    fuUpdates: "Updates", fuPanelNew: "New panel version: {0}", fuClaudeNew: "New Claude Code version: {0}", fuInstalled: "Installed: {0}", fuClaudeHow: "update with claude update",
+    fuUpdates: "Updates", fuPanelNew: "New panel version: {0}", fuClaudeNew: "New Claude Code version: {0}", fuInstalled: "Installed: {0}", fuClaudeHow: "the panel updates it automatically", fuClaudeUpdating: "Updating…", fuClaudeUpdateNow: "Update now",
+    fuClaudeFailed: "Update failed: {0}", fuClaudeNoChange: "claude update installed no new version", fuClaudeUpdated: "Claude Code {0} installed; new sessions use it",
+    fuCuErr_timeout: "didn't finish in 5 minutes", fuCuErr_nostart: "couldn't start claude", fuCuErr_interrupted: "interrupted because the panel closed",
     fuReleasePage: "Release page", fuPanelName: "Panel", fuUpToDate: "{0} is up to date ({1})", fuUnknown: "{0}: couldn't check",
     err_model: "Invalid model", emptyRecent: "No sessions in the last 14 days", loading: "Loading…",    s: "s", m: "min", h: "h", d: "d"
   }

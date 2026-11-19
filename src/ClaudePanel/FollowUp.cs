@@ -19,14 +19,14 @@ public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string 
 /// <param name="Loops">Açık oturumlardaki tekrarlı işler; her okumada canlı hesaplanır (LoopScan.cs).</param>
 /// <param name="QuotaLow">Kota düşükse kalan yüzdeler (tekrarlı iş uyarısı için); değilse null.</param>
 public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive,
-    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow);
+    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow, ClaudeUpdateState? ClaudeUpdate = null);
 
 /// <summary>
 /// "Takip" sekmesinin kota harcamayan kaynakları: bilinen projelerin git durumu, NEXT_SESSION.md dosyaları ve
 /// güncellemeler (UpdateCheck). Tarama arka planda yapılır, sonuç önbellekte durur; ağ yalnız güncelleme denetiminde kullanılır
 /// (git fetch yapılmaz). Yeni kaynak (takvim, mail) eklenirken: anlık görüntüye alan + Scan'e adım.
 /// </summary>
-public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ScheduledJobs sched, ILogger<FollowUp> log)
+public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ClaudeUpdater claudeUpdater, ScheduledJobs sched, ILogger<FollowUp> log)
 {
     static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(150);
     const int GitTimeoutMs = 5000;
@@ -35,20 +35,28 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
 
     static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown, [], FollowSched.Empty, [], null);
     volatile FollowSnapshot _snap = Empty;
-    int _scanning;
+    int _scanning, _again;
 
     /// <summary>Son anlık görüntü; bayatsa (ya da hiç yoksa) arka planda yeniler.</summary>
     public FollowSnapshot Get()
     {
         var s = _snap;
         if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - s.CheckedAt > StaleAfter.TotalMilliseconds) Refresh();
-        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow() };
+        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow(), ClaudeUpdate = claudeUpdater.State };
+    }
+
+    /// <summary>Yeniden tarar; tarama sürüyorsa o bitince bir kez daha (süren tarama değişiklikten önceki durumu okumuş olabilir).</summary>
+    public void ForceRefresh()
+    {
+        Interlocked.Exchange(ref _again, 1);
+        Refresh();
     }
 
     /// <summary>Arka planda yeniden tarar (aynı anda tek tarama).</summary>
     public void Refresh()
     {
         if (Interlocked.Exchange(ref _scanning, 1) == 1) return;
+        Interlocked.Exchange(ref _again, 0);
         _ = Task.Run(async () =>
         {
             try { _snap = await Scan(); }
@@ -56,7 +64,11 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
             {
                 log.LogWarning("Takip taraması yarıda kaldı: {Msg}", ex.Message);
             }
-            finally { Interlocked.Exchange(ref _scanning, 0); }
+            finally
+            {
+                Interlocked.Exchange(ref _scanning, 0);
+                if (Interlocked.Exchange(ref _again, 0) == 1) Refresh();
+            }
         });
     }
 
@@ -69,6 +81,8 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
         var drive = DriveLedger.Scan(projects.SelectMany(p => new[] { p.Cwd, ProjectRoots.Of(p.Cwd) }).Where(Directory.Exists));
         var jobs = sched.Scan(projects);
         var upd = await updates.Check();
+        // Yeni Claude Code sürümü: panel kendisi günceller (aynı sürüm için bir kez); bitince yeniden taranır.
+        if (upd.Claude.Newer && upd.Claude.Latest is { } latest) claudeUpdater.Auto(latest, ForceRefresh);
         return new FollowSnapshot(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), false, git, next, upd, drive, jobs, [], null);
     }
 

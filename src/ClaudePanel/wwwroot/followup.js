@@ -148,8 +148,29 @@ window.PanelFollowUp = function (d) {
   function updateItems() {
     const { panel, claude } = snap.updates, out = [];
     if (panel.newer) out.push({ id: "upd:panel", type: "update", rank: 4, title: t("fuPanelNew", panel.latest), what: t("fuInstalled", panel.current), link: panel.url, sig: panel.latest });
-    if (claude.newer) out.push({ id: "upd:claude", type: "update", rank: 4, title: t("fuClaudeNew", claude.latest), what: `${t("fuInstalled", claude.current)} · ${t("fuClaudeHow")}`, sig: claude.latest });
+    const cu = snap.claudeUpdate || { state: "idle" };
+    if (claude.newer || cu.state === "running")
+      out.push({ id: "upd:claude", type: "update", rank: 4, title: t("fuClaudeNew", claude.latest), what: `${t("fuInstalled", claude.current)} · ${claudeUpdateText(cu)}`,
+        claudeUpdate: cu, sig: claude.latest });
     return out;
+  }
+
+  /** Claude Code güncellemesinin satırdaki durumu: panel kendisi günceller (`claude update`). */
+  function claudeUpdateText(cu) {
+    if (cu.state === "running") return t("fuClaudeUpdating");
+    if (cu.state === "failed") return t("fuClaudeFailed", t("fuCuErr_" + cu.error) !== "fuCuErr_" + cu.error ? t("fuCuErr_" + cu.error) : cu.error || "?");
+    if (cu.state === "done" && !cu.to) return t("fuClaudeNoChange");
+    return t("fuClaudeHow");
+  }
+
+  async function claudeUpdateNow(btn) {
+    btn.disabled = true;
+    let r;
+    try { r = await api("/api/follow/claude-update", {}); } catch { r = { ok: false, data: null }; }
+    if (!r.ok && r.data?.error !== "busy") { btn.disabled = false; toast(t("err_generic"), "warn"); return; }
+    if (snap) snap.claudeUpdate = r.data?.state ? r.data : { ...(snap.claudeUpdate || {}), state: "running" };
+    render();
+    load(false);
   }
 
   /** Bölümler: ham öğeler (all) + alttaki bilgi satırları. hideable: projesinde oturum açık olan öğe gizlenir. */
@@ -166,6 +187,9 @@ window.PanelFollowUp = function (d) {
       if (u.state !== "ok") updNotes.push([t("fuUnknown", name), true]);
       else if (!u.newer) updNotes.push([t("fuUpToDate", name, u.current), false]);
     }
+    // Panelin kurduğu sürüm: yeni oturumlarda geçerli (açık oturumlar eski sürümle sürer). 12 saat gösterilir.
+    const cu = snap.claudeUpdate;
+    if (cu?.state === "done" && cu.to && !claude.newer && now() - cu.at * 1000 < 12 * 3600_000) updNotes.push([t("fuClaudeUpdated", cu.to), false]);
     const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap);
     return [
       { id: "decisions", title: "fuDecisions", all: decisionItems(), notes: [], empty: t("fuNoDecisions") },
@@ -230,6 +254,7 @@ window.PanelFollowUp = function (d) {
     if (it.type === "next") side.appendChild(continueButton(it));
     if (it.type === "decision") side.appendChild(button(t("fuOpenChat"), () => openDrawer(it.session), true));
     if (it.type === "conflict") side.appendChild(button(t("fuShowSessions"), () => setView("sessions")));
+    if (it.claudeUpdate && it.claudeUpdate.state !== "running") side.appendChild(button(t("fuClaudeUpdateNow"), claudeUpdateNow, true));
     D.side(it, side, snap);
     Z.side(it, side);
     if (it.link) {
@@ -379,7 +404,7 @@ window.PanelFollowUp = function (d) {
     if (force) { started.clear(); await api("/api/followup/refresh"); } // yeniden taranınca düğmeler yine açılır
     try { snap = await getJson("/api/followup"); } catch { /* bağlantı yok: eldeki görüntü kalır */ }
     if (!anyJobActive()) await loadJobs(); else if (snap) render();
-    const wait = snap?.scanning ? SCAN_POLL_MS : isOpen() && !document.hidden ? OPEN_POLL_MS : BACKGROUND_POLL_MS;
+    const wait = snap?.scanning || snap?.claudeUpdate?.state === "running" ? SCAN_POLL_MS : isOpen() && !document.hidden ? OPEN_POLL_MS : BACKGROUND_POLL_MS;
     timer = setTimeout(() => load(false), wait);
   }
 
