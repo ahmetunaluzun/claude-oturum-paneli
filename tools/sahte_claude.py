@@ -9,6 +9,7 @@
 #                             çıkarır, sona KAPATILDI bölümü olarak yazar, [PANEL-TAMAM] ile biter
 #   "ZAMANLA" içeriyorsa    → SAHTE_CLAUDE_KAYIT klasörüne bu oturumun konuşma kaydını yazar: iki CronCreate (biri tek seferlik),
 #                             /loop komutu, dört ScheduleWakeup (son üçü noop: true), kullanım (token) bilgisi
+#   planlı iş istemi ise   → (istem "[Planlı iş"/"[Planned task" ile başlıyorsa) PLAN-KARAR / PLAN-DOSYA / PLAN-CAKIS: bkz. plan()
 #   durdurma istemi ise     → (istemde CronDelete geçiyorsa) kayda CronDelete + ScheduleWakeup stop yazar
 #   diğer                   → kısa yanıt
 # Her açılış ve her mesaj SAHTE_CLAUDE_LOG dosyasına yazılır: "ACILIS\t<sid>\t<cwd>" / "MESAJ\t<sid>\t<cwd>\t<metin>".
@@ -80,6 +81,22 @@ def durdur():
     arac("ScheduleWakeup", "toolu_ws", {"stop": True, "reason": "durduruldu"}, (5, 5, 0))
 
 
+def plan(text):
+    """Planlı iş istemi (PlanRunner): PLAN-KARAR → karar işareti; PLAN-DOSYA → plan.txt yazar ve commit eder;
+    PLAN-CAKIS → ortak.txt'yi değiştirip commit eder (ana dalla çakışma testi); diğer → değişiklik yapmadan biter."""
+    if "PLAN-KARAR" in text:
+        return "[KARAR-BEKLIYOR]\nHangi sürüm kullanılsın? A ya da B."
+    target = "ortak.txt" if "PLAN-CAKIS" in text else "plan.txt" if "PLAN-DOSYA" in text else None
+    if not target:
+        return "[GECE-BITTI]\nYapılacak bir şey yoktu."
+    time.sleep(DELAY)
+    with open(os.path.join(CWD, target), "w", encoding="utf-8", newline="\n") as f:
+        f.write("planlı işin yazdığı satır\n")
+    subprocess.run(GIT + ["add", "-A"], cwd=CWD, capture_output=True)
+    subprocess.run(GIT + ["commit", "-q", "-m", "Planlı iş: " + target], cwd=CWD, capture_output=True)
+    return f"[GECE-BITTI]\n- {target} yazıldı ve commit edildi"
+
+
 log("ACILIS", SID, CWD)
 first = True
 for line in sys.stdin:
@@ -96,7 +113,9 @@ for line in sys.stdin:
         first = False
     if "BEKLE" in text:
         continue
-    if "[PANEL-TAMAM]" in text and "GUNCELLEME_KUTUGU.md" in text:
+    if text.startswith(("[Planlı iş", "[Planned task")):
+        reply = plan(text)
+    elif "[PANEL-TAMAM]" in text and "GUNCELLEME_KUTUGU.md" in text:
         ledger = os.path.join(CWD, "GUNCELLEME_KUTUGU.md")
         if os.path.exists(os.path.join(CWD, ".sahte-karar")):
             reply = "Hangi bölümün kapatılacağı belirsiz.\n[PANEL-KARAR]"

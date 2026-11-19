@@ -1,6 +1,7 @@
 // Takip sekmesi: günlük takip edilecekler. Her kaynak bir bölümdür; bölüm, öğe listesi üretir ({ id, type, root, rank, sig, … })
 // ve çizim tek yerden yapılır. Kaynaklar kota harcamaz: git durumu, NEXT_SESSION.md, karar bekleyenler, aynı projede birden
-// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), zamanlanmış işler (followup-sched.js), güncellemeler.
+// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), zamanlanmış ve planlı işler (followup-sched.js, followup-plan.js),
+// güncellemeler.
 // Görünüm (süzgeç çipleri, projeye / türe göre gruplama, gizle-ertele, toplu seçim) followup-view.js'te, kalıcı durum
 // followup-state.js'te (localStorage["panel.follow"]).
 // Commit / gönder / kütüğü kapat düğmeleri oturum AÇMAZ: sunucudaki arka plan işini başlatır (/api/follow/*), sonuç satırda görünür.
@@ -190,7 +191,7 @@ window.PanelFollowUp = function (d) {
     // Panelin kurduğu sürüm: yeni oturumlarda geçerli (açık oturumlar eski sürümle sürer). 12 saat gösterilir.
     const cu = snap.claudeUpdate;
     if (cu?.state === "done" && cu.to && !claude.newer && now() - cu.at * 1000 < 12 * 3600_000) updNotes.push([t("fuClaudeUpdated", cu.to), false]);
-    const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap);
+    const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap, P.list());
     return [
       { id: "decisions", title: "fuDecisions", all: decisionItems(), notes: [], empty: t("fuNoDecisions") },
       ...(conflicts.length ? [{ id: "conflicts", title: "fuConflicts", all: conflicts, notes: [] }] : []),
@@ -257,6 +258,7 @@ window.PanelFollowUp = function (d) {
     if (it.claudeUpdate && it.claudeUpdate.state !== "running") side.appendChild(button(t("fuClaudeUpdateNow"), claudeUpdateNow, true));
     D.side(it, side, snap);
     Z.side(it, side);
+    P.side(it, side);
     if (it.link) {
       const a = el("a", "btn small" + (it.linkText ? "" : " primary"), esc(it.linkText || t("fuReleasePage")));
       a.href = it.link; a.target = "_blank"; a.rel = "noopener";
@@ -271,6 +273,7 @@ window.PanelFollowUp = function (d) {
     const box = el("div", "fu-more");
     D.more(it, box);
     Z.more(it, box);
+    P.more(it, box);
     if (S.canDefer(it)) {
       box.appendChild(button(t("fuSnooze"), () => { S.snooze(it); toast(t("fuSnoozed", it.title)); render(); }));
       box.appendChild(button(t("fuHide"), () => { S.hide(it); toast(t("fuHidden", it.title)); render(); }));
@@ -361,6 +364,8 @@ window.PanelFollowUp = function (d) {
 
   const D = window.PanelFollowDrive({ t, api, toast, dur, now, low, tag, jobOf, isActive, runJob, confirmBox, button, S, REMOTE, rerender: () => render() });
   const Z = window.PanelFollowSched({ t, api, toast, dur, now, low, tag, confirmBox, button, lang, REMOTE, reload: () => load(false) });
+  const P = window.PanelFollowPlan({ t, api, getJson, toast, dur, now, low, tag, confirmBox, ask, button, lang, items, openDrawer, openMenu,
+    reload: () => render() });
   const V = window.PanelFollowView({ t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, folder,
     sessions: () => items(), rerender: () => render() });
 
@@ -402,7 +407,7 @@ window.PanelFollowUp = function (d) {
   async function load(force) {
     clearTimeout(timer);
     if (force) { started.clear(); await api("/api/followup/refresh"); } // yeniden taranınca düğmeler yine açılır
-    try { snap = await getJson("/api/followup"); } catch { /* bağlantı yok: eldeki görüntü kalır */ }
+    try { [snap] = await Promise.all([getJson("/api/followup"), P.load()]); } catch { /* bağlantı yok: eldeki görüntü kalır */ }
     if (!anyJobActive()) await loadJobs(); else if (snap) render();
     const wait = snap?.scanning || snap?.claudeUpdate?.state === "running" ? SCAN_POLL_MS : isOpen() && !document.hidden ? OPEN_POLL_MS : BACKGROUND_POLL_MS;
     timer = setTimeout(() => load(false), wait);

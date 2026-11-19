@@ -7,7 +7,7 @@ window.PanelFollowView = function (c) {
   // Süzgeç → bölüm kimlikleri. Güncellemeler yalnız "Tümü"nde görünür.
   const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], decisions: ["decisions", "conflicts"] };
   const KIND = { git: "fuKind_git", job: "fuKind_git", next: "fuKind_next", drive: "fuKind_drive", ledger: "fuKind_drive", decision: "fuKind_decision", conflict: "fuKind_conflict",
-    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise" };
+    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise", plan: "fuKind_plan", planadd: "fuKind_plan" };
   // Bilgi satırları (info: zamanlanmış görev, ileri tarihli söz…) bekleyen iş değildir: rozete ve "Tümü" sayısına girmez,
   // kendi süzgecinin (Zamanlanmış) sayısına girer.
   const counted = (i) => !i.info && !(i.result && i.job?.state === "done");

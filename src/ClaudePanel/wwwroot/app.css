@@ -875,3 +875,13 @@ html.selecting .card { cursor: pointer; }
 
 /* Paneli kapat sonrası pencere açık kaldıysa */
 .quit-done { margin: 30vh auto 0; max-width: 420px; padding: 0 20px; text-align: center; color: var(--muted); font-size: 15px; }
+
+/* Planlı işler (0.16.0): plan formu ve fark penceresi */
+.seg.pl-kinds { grid-template-columns: repeat(3, 1fr); }
+dialog .pl-hint { margin: 0; }
+#dlgPlan [hidden] { display: none; }
+.pl-diff {
+  margin: 0; max-height: 55vh; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg); font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre; tab-size: 4;
+}
+@media (max-width: 640px) { .seg.pl-kinds { grid-template-columns: 1fr; } }

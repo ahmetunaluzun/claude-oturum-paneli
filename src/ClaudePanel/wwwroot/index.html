@@ -289,6 +289,70 @@
     </form>
   </dialog>
 
+  <!-- Planlı iş formu (followup-plan.js) -->
+  <dialog id="dlgPlan">
+    <form method="dialog" id="formPlan">
+      <h3 id="plFormTitle"></h3>
+      <div class="seg pl-kinds" id="plKind">
+        <button type="button" data-kind="session"><b data-i18n="plKind_session"></b><small data-i18n="plKindHint_session"></small></button>
+        <button type="button" data-kind="review"><b data-i18n="plKind_review"></b><small data-i18n="plKindHint_review"></small></button>
+        <button type="button" data-kind="warmup"><b data-i18n="plKind_warmup"></b><small data-i18n="plKindHint_warmup"></small></button>
+      </div>
+      <label class="pl-work"><span data-i18n="folder"></span>
+        <input id="plCwd" list="plProjects" autocomplete="off" class="cwd-input" data-i18n-ph="folderPh">
+        <datalist id="plProjects"></datalist>
+      </label>
+      <div class="row two">
+        <label><span data-i18n="plName"></span>
+          <input id="plName" maxlength="60" autocomplete="off" data-i18n-ph="optional">
+        </label>
+        <label class="pl-work"><span data-i18n="model"></span>
+          <select id="plModel">
+            <option value="" data-i18n="modelDefault"></option>
+            <option value="opus">Opus</option>
+            <option value="sonnet">Sonnet</option>
+            <option value="haiku">Haiku</option>
+            <option value="fable">Fable</option>
+          </select>
+        </label>
+      </div>
+      <div class="row two">
+        <label><span data-i18n="plTime"></span><input id="plTime" type="time" required></label>
+        <label><span data-i18n="plRepeat"></span>
+          <select id="plRepeat">
+            <option value="once" data-i18n="plRep_once"></option>
+            <option value="daily" data-i18n="plRep_daily"></option>
+            <option value="weekdays" data-i18n="plRep_weekdays"></option>
+          </select>
+        </label>
+      </div>
+      <label id="plDateWrap"><span data-i18n="plDate"></span><input id="plDate" type="date"></label>
+      <label class="pl-work"><span data-i18n="task"></span>
+        <textarea id="plPrompt" rows="5" data-i18n-ph="plPromptPh"></textarea>
+      </label>
+      <p class="hint pl-hint" id="plHint"></p>
+      <p class="err" id="plErr"></p>
+      <div class="row end">
+        <button type="button" class="btn" id="plCancel" data-i18n="cancel"></button>
+        <button type="submit" class="btn primary" id="plSave" data-i18n="plSave"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Planlı işin farkı: birleştir / at (followup-plan.js) -->
+  <dialog id="dlgDiff" class="wide">
+    <form method="dialog">
+      <h3 id="diffTitle"></h3>
+      <p class="hint pl-hint" id="diffInfo"></p>
+      <pre class="pl-diff" id="diffText"></pre>
+      <div class="row end">
+        <button class="btn cbox-danger" value="discard" data-i18n="plDiscard"></button>
+        <button class="btn" value="close" data-i18n="plClose" autofocus></button>
+        <button class="btn primary" value="merge" data-i18n="plMerge"></button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Gece raporu -->
   <dialog id="dlgNight" class="wide">
     <form method="dialog">
@@ -311,11 +375,13 @@
   <div class="toasts" id="toasts"></div>
   <script src="/assets/i18n.js"></script>
   <script src="/assets/i18n-follow.js"></script>
+  <script src="/assets/i18n-plan.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
   <script src="/assets/followup-state.js"></script>
   <script src="/assets/followup-drive.js"></script>
   <script src="/assets/followup-sched.js"></script>
+  <script src="/assets/followup-plan.js"></script>
   <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>

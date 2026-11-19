@@ -6,14 +6,14 @@ window.PanelFollowState = function (d) {
   const { now } = d;
   const STORE = "panel.follow", KNOWN_MAX = 600;
   const OPEN_BY_DEFAULT = new Set(["decisions", "conflicts"]);
-  const DEFER_TYPES = new Set(["git", "next", "drive", "update", "task", "sfile", "sdesk", "promise", "cloud"]); // karar, çakışma ve açık oturumdaki tekrarlı iş ertelenemez/gizlenemez: her zaman görünür
+  const DEFER_TYPES = new Set(["git", "next", "drive", "update", "task", "sfile", "sdesk", "promise", "cloud", "plan"]); // karar, çakışma ve açık oturumdaki tekrarlı iş ertelenemez/gizlenemez: her zaman görünür
   const state = Object.assign({ collapsed: {}, dismissed: [], mode: "project", filter: "all", hidden: {}, snoozed: {}, uploaded: {}, known: null },
     (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })());
   const save = () => localStorage.setItem(STORE, JSON.stringify(state));
   const fresh = new Set(); // bu bakışta "yeni" görünen öğeler (sekme yeniden açılınca sıfırlanır)
 
   const isCollapsed = (id, openDefault) => state.collapsed[id] ?? !(openDefault ?? OPEN_BY_DEFAULT.has(id));
-  const canDefer = (it) => DEFER_TYPES.has(it.type);
+  const canDefer = (it) => DEFER_TYPES.has(it.type) && !it.pinned; // pinned: süren / kontrol ya da karar bekleyen planlı iş
 
   /** Yarın (yerel gece yarısı), sunucu saatine göre. */
   function tomorrow() {

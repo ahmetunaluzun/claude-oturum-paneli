@@ -86,12 +86,12 @@ window.PanelFollowSched = function (c) {
   }
 
   /** Bölümün öğeleri ve alt notları. Sıra: dikkat isteyenler (rank) → sözler → tekrarlı işler → görevler → dosyalar → bulut. */
-  function section(snap) {
+  function section(snap, plans = []) {
     const s = snap.sched;
     if (!s) return null;
     const cloud = { id: "cloud:routines", type: "cloud", root: NOPROJ, rootPath: t("fuSchedNoProject"), title: t("fuCloud"), what: t("fuCloudWhat"),
       link: ROUTINES_URL, linkText: t("fuCloudOpen"), rank: 6, info: true, sig: "1" };
-    const all = [...promiseItems(s.promises), ...loopItems(snap), ...taskItems(s.os), ...fileItems(s), cloud];
+    const all = [...plans, ...promiseItems(s.promises), ...loopItems(snap), ...taskItems(s.os), ...fileItems(s), cloud];
     all.forEach((it, i) => { it.order = i; });
     all.sort((a, b) => a.rank - b.rank || a.order - b.order);
     const notes = [];
