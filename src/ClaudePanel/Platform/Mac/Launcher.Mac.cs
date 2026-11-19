@@ -7,8 +7,9 @@ public static partial class Launcher
     static string Home => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
     /// <summary>Paneli adres çubuğu olmayan uygulama penceresinde açar (Chrome, Edge, Brave, Chromium; yoksa varsayılan tarayıcı).</summary>
-    public static void OpenAppWindow(string url)
+    public static void OpenAppWindow(string url, bool fresh = false)
     {
+        if (fresh) CloseAppWindow(url);
         var profile = Path.Combine(Handoff.DataDir, "browser");
         foreach (var exe in BrowserCandidates())
         {
@@ -23,6 +24,15 @@ public static partial class Launcher
         }
         Sh.Run("/usr/bin/open", [url]);
     }
+
+    /// <summary>
+    /// Panelin uygulama penceresini kapatır (Paneli kapat, yeni sürüme devir, yeni açılış): komut satırında `--app=&lt;adres&gt;`
+    /// olan tarayıcı sürecine SIGTERM. Tarayıcı panelin kendi profiliyle açıldığı için kullanıcının tarayıcısına dokunmaz;
+    /// varsayılan tarayıcıya düşülmüşse (`open`) eşleşen süreç yoktur.
+    /// </summary>
+    public static void CloseAppWindow(string url) =>
+        // Desen düzenli ifade: noktalar kaçırılır, port sonrası boşluk/son gelir (":5000" ":50001"i eşlemesin).
+        Sh.Run("/usr/bin/pkill", ["-TERM", "-f", "--", $"--app={url.Replace(".", "\\.")}( |$)"], 3000);
 
     static IEnumerable<string> BrowserCandidates()
     {

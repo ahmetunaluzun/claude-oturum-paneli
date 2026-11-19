@@ -8,9 +8,12 @@ public static partial class Launcher
     /// Paneli adres çubuğu olmayan uygulama penceresinde açar (Edge, yoksa Chrome, yoksa varsayılan tarayıcı).
     /// Panel penceresi zaten açıksa yenisini açmaz, onu öne getirir (bildirime/tepsiye tıklama, exe'ye ikinci kez tıklama).
     /// </summary>
-    public static void OpenAppWindow(string url)
+    /// <param name="fresh">Sunucu yeni açıldı: önceki sunucudan kalan pencere eski sayfayı ve geçersiz anahtarı taşır;
+    /// öne getirmek yerine kapatılır, yenisi açılır (0.13.0'da eski sürümün sayfası yeni sunucuyla bozuk göründü).</param>
+    public static void OpenAppWindow(string url, bool fresh = false)
     {
-        if (FocusExistingAppWindow(url)) return;
+        if (fresh) CloseAppWindow(url);
+        else if (FocusExistingAppWindow(url)) return;
         var profile = Path.Combine(Handoff.DataDir, "browser"); // canlıda %LOCALAPPDATA%\ClaudePanelrowser; test kopyası ayrı
         foreach (var exe in BrowserCandidates())
         {
@@ -32,6 +35,39 @@ public static partial class Launcher
     /// </summary>
     static bool FocusExistingAppWindow(string url)
     {
+        using var p = FindAppWindowProcess(url);
+        if (p is null) return false;
+        WindowFocus.BringToFront(p.MainWindowHandle);
+        return true;
+    }
+
+    /// <summary>
+    /// Panelin uygulama penceresini kapatır (Paneli kapat, yeni sürüme devir, yeni açılış). Sayfanın window.close() çağrısı
+    /// Edge uygulama penceresinde her zaman çalışmıyor; sunucu durunca pencere açık kalıp "kapanmadı" gibi görünüyordu.
+    /// WM_CLOSE doğrudan gönderilir: Edge uygulama penceresi kendini "etkin değil" bildiriyor, Process.CloseMainWindow bu
+    /// durumda mesajı hiç göndermeyip false dönüyor (19.11.2026'da ölçüldü). En çok 3 sn kapanması beklenir.
+    /// </summary>
+    public static void CloseAppWindow(string url)
+    {
+        using var p = FindAppWindowProcess(url);
+        if (p is null) return;
+        try
+        {
+            if (PostMessage(p.MainWindowHandle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero)) p.WaitForExit(3000);
+        }
+        catch (InvalidOperationException) { } // süreç bu arada kapandı
+    }
+
+    const uint WM_CLOSE = 0x0010;
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>
+    /// Panel penceresinin sahibi: komut satırında `--app=&lt;adres&gt;` olan ana tarayıcı süreci
+    /// (aynı profille ikinci açılış ilk sürece devredilip kapanır; alt süreçlerde --type= vardır). Pencere yoksa null.
+    /// </summary>
+    static Process? FindAppWindowProcess(string url)
+    {
         var app = $"--app={url}";
         try
         {
@@ -41,15 +77,14 @@ public static partial class Launcher
             {
                 var cl = o["CommandLine"] as string ?? "";
                 if (!cl.Contains(app, StringComparison.OrdinalIgnoreCase) || cl.Contains("--type=", StringComparison.Ordinal)) continue;
-                using var p = Process.GetProcessById(Convert.ToInt32(o["ProcessId"], System.Globalization.CultureInfo.InvariantCulture));
-                if (p.MainWindowHandle == IntPtr.Zero) continue; // pencere kapanmış, süreç arka planda kalmış
-                WindowFocus.BringToFront(p.MainWindowHandle);
-                return true;
+                var p = Process.GetProcessById(Convert.ToInt32(o["ProcessId"], System.Globalization.CultureInfo.InvariantCulture));
+                if (p.MainWindowHandle != IntPtr.Zero) return p;
+                p.Dispose(); // pencere kapanmış, süreç arka planda kalmış
             }
         }
         catch (Exception ex) when (ex is System.Management.ManagementException or ArgumentException or InvalidOperationException
                                        or System.Runtime.InteropServices.COMException or UnauthorizedAccessException) { }
-        return false;
+        return null;
     }
 
     static IEnumerable<string> BrowserCandidates()

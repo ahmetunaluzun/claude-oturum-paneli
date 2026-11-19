@@ -128,9 +128,14 @@
     return rootOf([...term, ...hosted]);
   }
 
+  let serverBoot = null, panelQuit = false;
   async function poll() {
+    if (panelQuit) return;
     try {
       const st = await getJson("/api/state");
+      // Sunucu yeniden açıldı (yeni sürüm, yeniden başlatma): bu sayfanın kodu ve anahtarı eski, yenile.
+      if (st.boot && serverBoot && st.boot !== serverBoot) { location.reload(); return; }
+      serverBoot ||= st.boot;
       serverOffset = st.now - Date.now();
       trayNotify = !!st.trayNotify;
       const next = normalize(st);
@@ -1800,7 +1805,11 @@
     if (items.some(s => s.kind === "panel") && !await confirmBox({ title: t("quitTitle"), text: t("quitWarn"), okText: t("quit"), danger: true })) return;
     let r = await api("/api/quit");
     if (r.status === 409 && await confirmBox({ title: t("quitBusyTitle"), text: t("quitBusy"), okText: t("quitBusyGo"), danger: true })) r = await api("/api/quit?force=1");
-    if (r.ok) window.close();
+    if (!r.ok) return;
+    panelQuit = true;
+    window.close();
+    // Tarayıcı kapatmayı reddederse (sunucu pencereyi de kapatır; o da olmazsa) sayfa canlı görünmesin.
+    setTimeout(() => { document.body.replaceChildren(Object.assign(document.createElement("p"), { className: "quit-done", textContent: t("quitDone") })); }, 1500);
   });
 
   document.addEventListener("keydown", (e) => {

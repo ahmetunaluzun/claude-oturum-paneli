@@ -872,3 +872,6 @@ html.selecting .card { cursor: pointer; }
   /* Dört sekme 390 px'e tek satırda sığmıyor: uzun adlar iki satıra iner, sekmeler eşit genişlikte. */
   .tabs button { flex: 1 1 0; min-width: 0; padding: 4px; gap: 5px; white-space: normal; line-height: 1.15; text-align: center; font-size: 12.5px; }
 }
+
+/* Paneli kapat sonrası pencere açık kaldıysa */
+.quit-done { margin: 30vh auto 0; max-width: 420px; padding: 0 20px; text-align: center; color: var(--muted); font-size: 15px; }

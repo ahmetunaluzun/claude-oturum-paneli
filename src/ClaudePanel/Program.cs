@@ -29,6 +29,8 @@ if (await PanelAlreadyRunning(baseUrl) && !await Handoff.TryReplaceOlder(baseUrl
 }
 
 var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+// Sunucunun bu açılışının kimliği: açık sayfa farklı bir değer görürse (yeni sürüm, yeniden başlatma) kendini yeniler.
+var boot = Convert.ToHexString(RandomNumberGenerator.GetBytes(6));
 int pickerOpen = 0; // Gözat penceresi açık mı (aynı anda tek pencere)
 var builder = WebApplication.CreateSlimBuilder(args);
 builder.WebHost.UseUrls(baseUrl); // yalnız bu bilgisayar; ağa açılmaz
@@ -196,6 +198,7 @@ app.MapGet("/api/state", (SessionStore store, HostedSessions hosted, Tray tray, 
     {
     night = night.Brief(),
     now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+    boot,
     trayNotify = tray.Notifies,
     sessions,
     hosted = hostedList,
@@ -542,11 +545,13 @@ app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 await app.StartAsync();
 Handoff.WriteToken(port, token); // yeni sürüm açılınca bu paneli kapatabilsin
 app.Lifetime.ApplicationStopping.Register(() => Handoff.DeleteToken(port));
+// Paneli kapat / yeni sürüme devir: pencere de kapanır (sayfanın window.close()'u Edge uygulama penceresinde yetmiyordu).
+app.Lifetime.ApplicationStopping.Register(() => Launcher.CloseAppWindow(baseUrl));
 app.Services.GetRequiredService<HostedSessions>().Restore();
 app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();
 app.Services.GetRequiredService<ProjectGuard>().Start();
-if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl);
+if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();
 
 static async Task<bool> PanelAlreadyRunning(string url)
