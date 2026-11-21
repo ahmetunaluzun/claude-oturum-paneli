@@ -25,7 +25,8 @@ public sealed class SessionStore(ILogger<SessionStore> log)
                     raw.Pid, raw.SessionId ?? "", raw.Name ?? Path.GetFileName(raw.Cwd ?? ""),
                     raw.Cwd ?? "", raw.Kind ?? "interactive", raw.Status ?? "unknown",
                     raw.StartedAt, raw.StatusUpdatedAt ?? raw.UpdatedAt ?? raw.StartedAt,
-                    raw.Version ?? "", raw.NameSource == "derived" ? null : raw.Name));
+                    raw.Version ?? "", raw.NameSource == "derived" ? null : raw.Name,
+                    raw.Entrypoint, raw.Status == "waiting" ? raw.WaitingFor ?? "" : null));
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
@@ -96,9 +97,12 @@ public sealed class SessionStore(ILogger<SessionStore> log)
         public string? Status { get; set; }
         public long? UpdatedAt { get; set; }
         public long? StatusUpdatedAt { get; set; }
+        public string? Entrypoint { get; set; }  // cli, claude-vscode, claude-desktop, sdk-cli...
+        public string? WaitingFor { get; set; }  // status "waiting" iken: "dialog open", "input needed"...
     }
 }
 
 public sealed record SessionInfo(
     int Pid, string SessionId, string Name, string Cwd, string Kind, string Status,
-    long StartedAt, long StatusSince, string Version, string? CustomName);
+    long StartedAt, long StatusSince, string Version, string? CustomName,
+    string? Entrypoint = null, string? WaitingFor = null);

@@ -16,9 +16,10 @@ public static class WindowFocus
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int max);
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
-    public static FocusResult Focus(int pid, string folder, string? preferredTab)
+    public static FocusResult Focus(int pid, string folder, string? preferredTab, string? preferredTabId = null)
     {
         var owner = FindWindowOwner(pid);
         if (owner is null) return new(false, "no-window");
@@ -26,16 +27,20 @@ public static class WindowFocus
 
         if (!name.Equals("WindowsTerminal", StringComparison.OrdinalIgnoreCase))
         {
-            BringToFront(mainWindow);
+            // VS Code gibi uygulamalar tüm pencerelerini tek süreçte tutar; MainWindowHandle o an hangisiyse odur.
+            // Birden çok pencere varsa başlığı klasör adıyla eşleşen pencere seçilir.
+            var all = VirtualDesktops.TopWindows().GetValueOrDefault(ownerPid) ?? [];
+            BringToFront(all.Count > 1 && ByTitle(all, folder) is { } w ? w : mainWindow);
             return new(true);
         }
 
         var tabs = TerminalTabs(ownerPid);
         if (tabs.Count == 0) { BringToFront(mainWindow); return new(true); }
 
-        var target = preferredTab is not null
-            ? tabs.FirstOrDefault(t => t.Name == preferredTab)
-            : BestMatch(tabs, folder);
+        // Önce sekme kimliği (claude sekme başlığını değiştirse de aynı kalır), sonra hatırlanan ad, sonra klasör adı.
+        var target = (preferredTabId is not null ? tabs.FirstOrDefault(t => t.Id == preferredTabId) : null)
+            ?? (preferredTab is not null ? tabs.FirstOrDefault(t => t.Name == preferredTab) : null)
+            ?? BestMatch(tabs, folder);
         if (target is null)
             return new(false, "pick-tab", tabs.Select(t => t.Name).Distinct().ToList());
 
@@ -46,10 +51,31 @@ public static class WindowFocus
         }
         catch (ElementNotAvailableException) { return new(false, "pick-tab", tabs.Select(t => t.Name).ToList()); }
         BringToFront(target.Window);
-        return new(true, Tab: target.Name);
+        return new(true, Tab: target.Name, TabId: target.Id);
     }
 
-    sealed record Tab(string Name, AutomationElement Element, IntPtr Window);
+    sealed record Tab(string Name, string Id, AutomationElement Element, IntPtr Window);
+
+    /// <summary>Başlığı klasör adıyla en iyi eşleşen pencere; tek ve açık eşleşme yoksa null.</summary>
+    internal static IntPtr? ByTitle(List<IntPtr> windows, string folder)
+    {
+        var f = Norm(Path.GetFileName(folder.TrimEnd('\\', '/')));
+        if (f.Length == 0) return null;
+        // VS Code başlığı: "dosya - klasör - Visual Studio Code" (ayraç ayara göre " - " ya da " — "); parçalar ayrı puanlanır.
+        var scored = windows
+            .Select(h => (h, score: Title(h).Split([" — ", " - ", " | "], StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => Score(Norm(part), f)).DefaultIfEmpty(0).Max()))
+            .Where(x => x.score > 0).OrderByDescending(x => x.score).ToList();
+        if (scored.Count == 0 || (scored.Count > 1 && scored[0].score == scored[1].score)) return null;
+        return scored[0].h;
+    }
+
+    static string Title(IntPtr h)
+    {
+        var sb = new System.Text.StringBuilder(512);
+        GetWindowText(h, sb, sb.Capacity);
+        return sb.ToString();
+    }
 
     static List<Tab> TerminalTabs(int ownerPid)
     {
@@ -62,7 +88,7 @@ public static class WindowFocus
             var tabs = w.FindAll(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TabItem));
             foreach (AutomationElement t in tabs)
-                list.Add(new Tab(t.Current.Name, t, hwnd));
+                list.Add(new Tab(t.Current.Name, string.Join('.', t.GetRuntimeId()), t, hwnd));
         }
         return list;
     }

@@ -84,8 +84,9 @@ window.PanelActions = function (d) {
       return { label: t("resume"), run: () => done(resume(s)) };
     }
     if (isPanel(s) && s.lane === "busy") return { label: t("interrupt"), cls: "", run: () => api(`/api/hosted/${s.key}/interrupt`) };
-    if (s.kind === "terminal" && s.lane === "idle" && !REMOTE) return { label: t("adopt"), run: () => adopt(s) };
-    if (s.kind !== "panel" && !REMOTE) return { label: t(s.kind === "terminal" ? "goTab" : "openAgents"), cls: "", run: () => goTo(s) };
+    // Masaüstü uygulamasındaki oturumda "Panele al" öne çıkmaz (oturumu uygulamadan koparır); ⋯ menüsünde durur.
+    if (canAdopt(s) && s.surface !== "desktop") return { label: t("adopt"), run: () => adopt(s) };
+    if (s.kind !== "panel" && !REMOTE) return { label: t(goLabel(s)), cls: "", run: () => goTo(s) };
     return null;
   }
 
@@ -105,8 +106,8 @@ window.PanelActions = function (d) {
       }
     }
     if (s?.kind === "terminal" && !REMOTE) {
-      add(t("goTab"), () => goTo(s));
-      if (s.lane === "idle") add(t("adopt"), () => adopt(s));
+      add(t(goLabel(s)), () => goTo(s));
+      if (canAdopt(s)) add(t("adopt"), () => adopt(s));
     }
     if (s?.kind === "bg" && !REMOTE) add(t("openAgents"), () => goTo(s));
     if (!inDrawer) add(t("openConv"), () => openDrawer(s));
@@ -115,6 +116,10 @@ window.PanelActions = function (d) {
     if (isPanel(s)) add(t("closeNow"), () => stopNow(s), "danger");
     while (L.length && L[L.length - 1] === null) L.pop();
     return L;
+  }
+
+  function goLabel(s) {
+    return s.kind !== "terminal" ? "openAgents" : s.surface === "desktop" ? "goApp" : s.surface === "vscode" ? "goVscode" : "goTab";
   }
 
   function taskLabel(s) {
@@ -186,7 +191,7 @@ window.PanelActions = function (d) {
   let selecting = false;
   // Her canlı oturum seçilebilir; her toplu işlem yalnız uygulanabildiği oturumlara gider.
   const selectable = s => !!s && s.status !== "ended";
-  const canAdopt = s => !!s && s.kind === "terminal" && s.lane === "idle" && !REMOTE;
+  const canAdopt = s => !!s && s.kind === "terminal" && s.lane === "idle" && s.waiting == null && !REMOTE;
   const applies = (kind, s) => kind === "adopt" ? canAdopt(s) : isPanel(s);
   function setSelecting(on) {
     selecting = on;

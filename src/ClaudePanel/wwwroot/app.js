@@ -12,7 +12,7 @@
 
   // ---- Ayarlar (tarayıcıda saklanır) ----
   const defaults = { notify: true, sound: true, light: false,
-    lang: (navigator.language || "tr").toLowerCase().startsWith("tr") ? "tr" : "en", folders: [], tabMap: {} };
+    lang: (navigator.language || "tr").toLowerCase().startsWith("tr") ? "tr" : "en", folders: [], tabMap: {}, tabIds: {} };
   const settings = Object.assign({}, defaults, JSON.parse(localStorage.getItem("panel.settings") || "{}"));
   const save = () => localStorage.setItem("panel.settings", JSON.stringify(settings));
   const t = (key, ...args) => {
@@ -125,13 +125,22 @@
       task: h.task, night: h.night, stats: st.stats?.[h.sessionId]
     }));
     const hostedIds = new Set(hosted.map(h => h.sessionId).filter(Boolean));
+    // surface: oturum nerede açık (Claude Code'un entrypoint alanı): masaüstü uygulaması, VS Code ya da terminal.
+    // status "waiting": Claude soru/izin için kullanıcıyı bekliyor → bekleyenler şeridinde, "cevap bekliyor".
     const term = (st.sessions || []).filter(s => !hostedIds.has(s.sessionId)).map(s => ({
       id: s.sessionId, kind: s.kind === "interactive" ? "terminal" : "bg", sessionId: s.sessionId, pid: s.pid,
       name: s.customName || folderName(s.cwd) || s.name, cwd: s.cwd, status: s.status,
-      lane: s.status === "idle" ? "idle" : "busy", since: s.statusSince, started: s.startedAt,
+      surface: surfaceOf(s.entrypoint), waiting: s.status === "waiting" ? (s.waitingFor || "") : null,
+      desk: st.desktops?.[s.pid] || null,
+      lane: s.status === "idle" || s.status === "waiting" ? "idle" : "busy", since: s.statusSince, started: s.startedAt,
       stats: st.stats?.[s.sessionId]
     }));
     return rootOf([...term, ...hosted]);
+  }
+
+  function surfaceOf(entrypoint) {
+    if (["claude-desktop", "claude-desktop-3p", "local-agent"].includes(entrypoint)) return "desktop";
+    return entrypoint === "claude-vscode" ? "vscode" : "terminal";
   }
 
   let serverBoot = null, panelQuit = false;
@@ -301,7 +310,7 @@
     card.querySelector(".path").title = s.cwd;
     const badge = card.querySelector(".kind-badge");
     // Panel oturumu varsayılan; rozet yalnız terminal/arka plan için (uzun ad model rozetiyle kısalmasın).
-    badge.textContent = s.kind === "panel" ? "" : s.kind === "bg" ? t("bg") : (settings.tabMap[s.sessionId] ? t("tabLabel", settings.tabMap[s.sessionId]) : t("terminal"));
+    badge.textContent = kindLabel(s);
     badge.hidden = !badge.textContent;
     badge.dataset.kind = s.kind;
     // Aynı projede (git kökü) birden çok oturum: çakışma riski kartta görünür.
@@ -316,6 +325,15 @@
     nb.dataset.night = s.night || "";
     nb.title = s.night === "decision" ? t("nightDecisionHint") : "";
     updateCardDetails(card, s);
+  }
+
+  // Kart rozeti: nerede açık (+ birden çok sanal masaüstü varsa hangisi). Panel oturumunda rozet yok.
+  function kindLabel(s) {
+    if (s.kind === "panel") return "";
+    if (s.kind === "bg") return t("bg");
+    const where = s.surface === "desktop" ? t("desktopApp") : s.surface === "vscode" ? "VS Code"
+      : settings.tabMap[s.sessionId] ? t("tabLabel", settings.tabMap[s.sessionId]) : t("terminal");
+    return s.desk ? `${where} · ${s.desk.name || t("deskN", s.desk.number)}` : where;
   }
 
   // "Bu projede N oturum açık" rozeti: aynı projedeki oturumlardan birini kaydedip kapatma / panele alma kısayolu.
@@ -352,7 +370,8 @@
     const tool = card.querySelector(".tool");
     tool.textContent = s.lane === "busy" ? A.lastTool(s) : "";
     tool.hidden = !tool.textContent;
-    card.querySelector(".reason").textContent = s.lane === "idle" && text ? (A.asked(s) ? t("reasonAsked") : "") : "";
+    card.querySelector(".reason").textContent = s.waiting != null ? t("reasonWaiting")
+      : s.lane === "idle" && text ? (A.asked(s) ? t("reasonAsked") : "") : "";
     const c = A.ctxInfo(s), ctx = card.querySelector(".ctx");
     ctx.hidden = !c;
     if (c) {
@@ -369,7 +388,7 @@
       chip.querySelector(".task-cancel").textContent = t("cancel");
     }
     // Eylemler yalnız durum değişince yeniden kurulur (açık menü/odak kaybolmasın).
-    const sig = [s.kind, s.lane, s.status, s.task, A.wantsClear(s), c?.level, settings.lang].join("|");
+    const sig = [s.kind, s.surface, s.lane, s.status, s.task, A.wantsClear(s), c?.level, settings.lang].join("|");
     const box = card.querySelector(".card-actions");
     if (box.dataset.sig !== sig) {
       box.dataset.sig = sig;
@@ -465,13 +484,19 @@
     if (!s) return;
     if (s.kind === "bg") { await api("/api/attach"); return; }
     if (s.kind !== "terminal") return;
-    const r = await api(`/api/focus/${s.pid}`, { tab: tab ?? settings.tabMap[s.sessionId] ?? null });
+    // Sekme kimliği (tabId) claude sekme başlığını değiştirse de aynı kalır; ad yalnız kimlik yoksa/kaybolduysa kullanılır.
+    const r = await api(`/api/focus/${s.pid}`, tab ? { tab } : { tab: settings.tabMap[s.sessionId] ?? null, tabId: settings.tabIds[s.sessionId] ?? null });
     if (r.ok) {
-      if (r.data?.tab && settings.tabMap[s.sessionId] !== r.data.tab) { settings.tabMap[s.sessionId] = r.data.tab; save(); render(); }
+      const d = r.data || {};
+      if (d.tab && (settings.tabMap[s.sessionId] !== d.tab || settings.tabIds[s.sessionId] !== d.tabId)) {
+        settings.tabMap[s.sessionId] = d.tab;
+        if (d.tabId) settings.tabIds[s.sessionId] = d.tabId;
+        save(); render();
+      }
       return;
     }
     if (r.data?.error === "pick-tab") {
-      if (settings.tabMap[s.sessionId]) { delete settings.tabMap[s.sessionId]; save(); }
+      if (settings.tabMap[s.sessionId] || settings.tabIds[s.sessionId]) { delete settings.tabMap[s.sessionId]; delete settings.tabIds[s.sessionId]; save(); }
       pickTab(s, r.data.tabs || []);
     } else toast(t("noWindow"), "warn");
   }
@@ -592,7 +617,8 @@
     $("dSend").title = sendLabel; // telefonda düğme yalnız ok simgesi, ad title/aria'da
     $("dSend").setAttribute("aria-label", sendLabel);
     $("dNote").textContent =
-      live?.kind === "terminal" || live?.kind === "bg" ? t(REMOTE ? "noteTerminalRemote" : "noteTerminal")
+      live?.surface === "desktop" ? t("noteDesktop")
+      : live?.kind === "terminal" || live?.kind === "bg" ? t(REMOTE ? "noteTerminalRemote" : "noteTerminal")
       : !live ? t("noteClosed")
       : live.status === "ended" ? t("noteEnded")
       : !live.sessionId ? t("noteStarting") : "";
@@ -1809,7 +1835,7 @@
   $("btnResumeAll").addEventListener("click", resumeAllIdle);
   $("btnRecentOpen").addEventListener("click", openPicked);
   $("btnRecentClear").addEventListener("click", () => { picked.clear(); renderRecent(); });
-  $("btnResetTabs").addEventListener("click", () => { settings.tabMap = {}; save(); render(); toast(t("tabsReset")); });
+  $("btnResetTabs").addEventListener("click", () => { settings.tabMap = {}; settings.tabIds = {}; save(); render(); toast(t("tabsReset")); });
   $("btnQuit").addEventListener("click", async () => {
     if (items.some(s => s.kind === "panel") && !await confirmBox({ title: t("quitTitle"), text: t("quitWarn"), okText: t("quit"), danger: true })) return;
     let r = await api("/api/quit");

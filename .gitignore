@@ -11,3 +11,4 @@ _onizleme/
 CLAUDE_MEMORY.md
 NEXT_SESSION.md
 __pycache__/
+.claude/worktrees/

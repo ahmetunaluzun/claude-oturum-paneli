@@ -18,7 +18,7 @@ sealed class SessionLanes(SessionStore store, HostedSessions hosted)
         foreach (var h in hostedList)
             now["h:" + h.Key] = (h.Status is "busy" or "starting" ? "busy" : "idle", h.Name ?? Folder(h.Cwd), h.Cwd);
         foreach (var s in store.List().Where(s => !hostedIds.Contains(s.SessionId)))
-            now[s.SessionId] = (s.Status == "idle" ? "idle" : "busy", s.CustomName ?? Folder(s.Cwd), s.Cwd);
+            now[s.SessionId] = (s.Status is "idle" or "waiting" ? "idle" : "busy", s.CustomName ?? Folder(s.Cwd), s.Cwd);
 
         foreach (var (id, cur) in now)
         {

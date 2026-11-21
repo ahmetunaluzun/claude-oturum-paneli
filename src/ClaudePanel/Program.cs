@@ -192,11 +192,15 @@ app.MapGet("/assets/{file}", (string file) => Web.Serve(file));
 app.MapGet("/api/ping", () => Results.Text("claude-panel"));
 app.MapGet("/api/version", () => Results.Json(new { version = typeof(Web).Assembly.GetName().Version?.ToString(3) }));
 
-app.MapGet("/api/state", (SessionStore store, HostedSessions hosted, Tray tray, NightMode night,
+app.MapGet("/api/state", async (SessionStore store, HostedSessions hosted, Tray tray, NightMode night,
     Transcripts transcripts, ContextWindows windows) =>
 {
     var sessions = store.List();
     var hostedList = hosted.List();
+    var hostedIds = hostedList.Select(h => h.SessionId).Where(x => x is not null).ToHashSet();
+    // Terminal oturumlarının sanal masaüstü (Windows; birden çok masaüstü varsa). 30 sn önbellekli.
+    var desktops = await VirtualDesktops.Of(sessions.Where(s => s.Kind == "interactive" && !hostedIds.Contains(s.SessionId))
+        .Select(s => (s.Pid, s.Cwd)).ToList());
     return Results.Json(new
     {
     night = night.Brief(),
@@ -205,6 +209,7 @@ app.MapGet("/api/state", (SessionStore store, HostedSessions hosted, Tray tray, 
     trayNotify = tray.Notifies,
     sessions,
     hosted = hostedList,
+    desktops = desktops.ToDictionary(d => d.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), d => d.Value),
     stats = SessionStatsOf(sessions, hostedList, transcripts, windows),
     usage = store.Usage(night.RefreshUsageSoon),
     // Oturum klasörü → proje kökü (git kökü; yoksa klasör): "bu projede N oturum açık" ve Takip'te oturumdaki projeler.
@@ -221,7 +226,7 @@ app.MapPost("/api/focus/{pid:int}", async (int pid, HttpContext ctx, SessionStor
     if (s is null) return Results.NotFound();
     var body = ctx.Request.ContentLength > 0 ? await ctx.Request.ReadFromJsonAsync<FocusRequest>() : null;
     // UI Automation STA iş parçacığında çalışmalı.
-    var result = await Sta.Run(() => WindowFocus.Focus(pid, s.Cwd, body?.Tab));
+    var result = await Sta.Run(() => WindowFocus.Focus(pid, s.Cwd, body?.Tab, body?.TabId));
     return result.Ok ? Results.Json(result) : Results.Json(result, statusCode: 409);
 });
 
@@ -578,7 +583,7 @@ static async Task<bool> PanelAlreadyRunning(string url)
 }
 
 record PathRequest(string? Path);
-record FocusRequest(string? Tab);
+record FocusRequest(string? Tab, string? TabId);
 record SendRequest(string? Text);
 public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null);
 public record DirsRequest(string? Path, string? Q = null);

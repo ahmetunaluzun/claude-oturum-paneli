@@ -48,7 +48,7 @@ public static class WindowFocus
         end run
         """;
 
-    public static FocusResult Focus(int pid, string folder, string? preferredTab)
+    public static FocusResult Focus(int pid, string folder, string? preferredTab, string? preferredTabId = null)
     {
         var tty = Sh.Run("/bin/ps", ["-o", "tty=", "-p", pid.ToString(System.Globalization.CultureInfo.InvariantCulture)]).Out;
         if (tty.Length == 0 || tty.StartsWith('?')) return new(false, "no-window");
