@@ -46,6 +46,9 @@ builder.Services.AddSingleton<ClaudeUpdater>();
 builder.Services.AddSingleton<LoopScan>();
 builder.Services.AddSingleton<ScheduledJobs>();
 builder.Services.AddSingleton<GitHubWatch>();
+builder.Services.AddSingleton<MailSettings>();
+builder.Services.AddSingleton<MailLogin>();
+builder.Services.AddSingleton<MailWatch>();
 builder.Services.AddSingleton<FollowUp>();
 builder.Services.AddSingleton<ProjectGuard>();
 builder.Services.AddSingleton<FollowJobs>();
@@ -542,6 +545,7 @@ app.MapPost("/api/followup/refresh", (HttpContext ctx, FollowUp fu) =>
 app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowEndpoints.cs)
 app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (ScheduleEndpoints.cs)
 app.MapPlans(Authorized); // Planlı işler: /api/plans* (PlanEndpoints.cs)
+app.MapMail(Authorized, IsLocal); // Mail ve takvim: /api/mail* (Mail/MailEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {
@@ -565,6 +569,8 @@ app.Services.GetRequiredService<ProjectGuard>().Start();
 var ghWatch = app.Services.GetRequiredService<GitHubWatch>();
 ghWatch.Notify = app.Services.GetRequiredService<Tray>().Notify;
 ghWatch.Start();
+// Takip → Mail ve Takvim: hesap varsa pencere kapalıyken de 10 dakikada bir denetler (yalnız başlık meta verisi).
+app.Services.GetRequiredService<MailWatch>().Start();
 app.Services.GetRequiredService<Dictation>(); // inmiş dikte modelini açılışta arka planda bir kez doğrular (SHA256, damga dosyası)
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();
@@ -607,7 +613,8 @@ static class Remote
     static readonly string[] Blocked =
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
-        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable", "/api/schedule/run", "/api/schedule/log"
+        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable", "/api/schedule/run", "/api/schedule/log",
+        "/api/mail/client", "/api/mail/accounts" // mail hesabı ekleme/kaldırma, istemci dosyası: yalnız bilgisayardan
     ];
 
     public static bool IsPublic(string path) => Public.Contains(path);

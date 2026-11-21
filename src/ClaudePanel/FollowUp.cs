@@ -19,15 +19,16 @@ public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string 
 /// <param name="Loops">Açık oturumlardaki tekrarlı işler; her okumada canlı hesaplanır (LoopScan.cs).</param>
 /// <param name="QuotaLow">Kota düşükse kalan yüzdeler (tekrarlı iş uyarısı için); değilse null.</param>
 /// <param name="Github">Kullanıcının depolarındaki açık issue ve PR'lar; her okumada son bilinen durum (GitHubWatch.cs).</param>
+/// <param name="Mail">Mail hesaplarının süzgece uyan konuşmaları ve önümüzdeki 24 saatin etkinlikleri (Mail/MailWatch.cs).</param>
 public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive,
-    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow, ClaudeUpdateState? ClaudeUpdate = null, GhSnapshot? Github = null);
+    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow, ClaudeUpdateState? ClaudeUpdate = null, GhSnapshot? Github = null, MailSnapshot? Mail = null);
 
 /// <summary>
 /// "Takip" sekmesinin kota harcamayan kaynakları: bilinen projelerin git durumu, NEXT_SESSION.md dosyaları ve
 /// güncellemeler (UpdateCheck). Tarama arka planda yapılır, sonuç önbellekte durur; ağ yalnız güncelleme denetiminde kullanılır
 /// (git fetch yapılmaz). Yeni kaynak (takvim, mail) eklenirken: anlık görüntüye alan + Scan'e adım.
 /// </summary>
-public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ClaudeUpdater claudeUpdater, ScheduledJobs sched, GitHubWatch github, ILogger<FollowUp> log)
+public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ClaudeUpdater claudeUpdater, ScheduledJobs sched, GitHubWatch github, MailWatch mail, ILogger<FollowUp> log)
 {
     static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(150);
     const int GitTimeoutMs = 5000;
@@ -44,7 +45,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     {
         var s = _snap;
         if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - s.CheckedAt > StaleAfter.TotalMilliseconds) Refresh();
-        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow(), ClaudeUpdate = claudeUpdater.State, Github = github.Snapshot(_ghRoots) };
+        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow(), ClaudeUpdate = claudeUpdater.State, Github = github.Snapshot(_ghRoots), Mail = mail.Snapshot() };
     }
 
     /// <summary>Yeniden tarar; tarama sürüyorsa o bitince bir kez daha (süren tarama değişiklikten önceki durumu okumuş olabilir).</summary>
