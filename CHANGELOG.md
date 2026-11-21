@@ -2,6 +2,18 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## Yayınlanmamış
+- **Takip: GitHub.** Kendi depolarınızdaki açık issue ve PR'lar Takip'te ayrı bölümde ve "GitHub" çipinde görünür. Kaynak bilgisayardaki GitHub CLI'dır (`gh`); ek giriş ya da anahtar istenmez. Panel **yalnız okur**, GitHub'a hiçbir şey yazmaz. Kuruluş depoları kapsam dışıdır.
+  - **Cevap bekliyor:** son söz sizde değilse (başkası açmış ve yorum yok, ya da son yorumu başkası yazmış) satır uyarı etiketiyle öne çıkar, sekme rozetine ve "Tümü" sayısına girer. Son söz sizdeyse ya da kendi açtığınız yorumsuz issue ise sakin bilgi satırıdır.
+  - **Satır:** depo, numara, başlık, açan, yorum sayısı, son yazan, son hareket zamanı, tür (issue / PR). **GitHub'da aç** tarayıcıda açar. Depo bilinen bir yerel klasörle eşleşiyorsa (origin adresi) **Oturumda ele al** o klasörde oturum açar: issue'yu inceler, maddeleri koda karşı doğrular, yapılacakları ve cevap taslağını önerir; istem GitHub'a yazmayı yasaklar. Projede oturum varsa mevcut çakışma penceresi çıkar.
+  - **Sıklık:** 15 dakikada bir, panel penceresi kapalıyken de; "Yenile" hemen denetler. Takip'in olağan taraması GitHub'a gitmez. Son yorumcu yalnız değişen öğe için sorulur.
+  - **Bildirim:** yeni bir öğe cevap beklemeye başlayınca bir kez sistem bildirimi; ilk denetimde var olanlar için tek toplu bildirim. Tepsideki "Bildirimler" kapalıysa gösterilmez.
+  - **Ertele / Gizle:** diğer Takip satırları gibi; gizlenen satır yeni hareket gelince geri gelir.
+  - **Durumlar:** `gh` kurulu değilse ya da giriş yapılmamışsa bölümde kısa ipucu (`gh auth login`); ağ yoksa son bilinen liste "güncellenemedi" notuyla kalır.
+  - **Ayarlar:** "Takip'te GitHub issue ve PR'larını göster" (varsayılan açık, kalıcı).
+  - Sunucu: `GitHubWatch.cs` (`github-watch.json`), `/api/github`, `/api/github/refresh`. İstemci: `followup-github.js`.
+- Test: `tools/github_test.sh` 59/59 (yeni; sahte gh `tools/sahte_gh.py`), `tools/github_ui_test.sh` 46/46 (yeni; 1280 koyu/açık, 390 telefon, İngilizce); takip3_ui 82/82, takip4_ui 63/63, takip4 ve plan_ui 32/32 geçti.
+
 ## 0.16.0 — 2026-11-19
 - **Takip: Planlı işler.** Belirlenen saatte bir projede iş çalıştırır. Zamanlanmış işler bölümündeki "Planla" satırından eklenir (form: klasör, tür, saat, tekrar "Bir kez / Her gün / Hafta içi", bir kez için tarih, model, istem); planlar panel veri klasöründe (`planned.json`), en fazla 50. Üç tür:
   - **Oturum aç:** saati gelince o klasörde görünür bir oturum açılır ("Planlı: <ad>"); iş bitince oturum kapanmaz. Oturum kararda durursa satırda "Karar bekliyor" ve "Konuşmayı aç".
