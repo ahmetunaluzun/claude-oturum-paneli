@@ -151,6 +151,11 @@ baslat data2 "$TW\\sahte-gh.cmd"
 bekle failed; check "ilk denetim ağ hatası: 'alınamadı' (boş liste değil)" "$(q "G['state'], G['checkedAt'], len(G['items'])")" "failed 0 0"
 check "alınamayınca bildirim yok" "$(bildirim)" 0
 kapat
+# Sahte gh verilmemiş test kopyası (diğer testlerin durumu): gerçek gh'ye gitmesin diye varsayılan kapalı.
+C2="$(cagri user)"
+baslat data3 ""; sleep 6; snap
+check "sahte gh'siz test kopyası: varsayılan kapalı, gh çağrılmaz" "$(curl -s "$B/api/github" | grep -c '"enabled":false') $(q "G['state']") $(cagri user)" "1 off $C2"
+kapat
 
 check "GitHub'a hiçbir yazma çağrısı yok" "$(grep -c '^YAZMA' "$T/gh.log")" 0
 check "yalnız üç uç çağrıldı (user, search/issues, yorumlar)" "$(cut -f2 "$T/gh.log" | sed -E 's#^repos/.*/comments$#yorum#' | sort -u | tr '\n' ' ')" "search/issues user yorum "
@@ -158,7 +163,7 @@ check "yalnız üç uç çağrıldı (user, search/issues, yorumlar)" "$(cut -f2
 # ---- temizlik ----
 panel_sayisi() { pwsh -NoProfile -c "@(Get-CimInstance Win32_Process -Filter \"Name='ClaudePanel.exe'\" | Where-Object { \$_.ExecutablePath -notlike '*\\dist\\*' }).Count" | tr -d '\r'; }
 for _ in $(seq 1 10); do [ "$(panel_sayisi)" = 0 ] && break; sleep 1; done
-check "test süreci kalmadı" "$(pwsh -NoProfile -c "@(Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and (\$_.CommandLine -like '*$TW*' -or \$_.CommandLine -like '*sahte_gh.py*') }).Count" | tr -d '\r')" 0
+check "test süreci kalmadı" "$(pwsh -NoProfile -c "@(Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and \$_.Name -ne 'bash.exe' -and (\$_.CommandLine -like '*$TW*' -or \$_.CommandLine -like '*sahte_gh.py*') }).Count" | tr -d '\r')" 0
 check "test panelleri kapandı (yalnız canlı panel kalabilir)" "$(panel_sayisi)" 0
 rm -rf "$T"
 echo "$n denetim"

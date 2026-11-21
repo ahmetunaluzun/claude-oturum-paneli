@@ -276,9 +276,16 @@ public sealed partial class GitHubWatch(ILogger<GitHubWatch> log)
         }
     }
 
+    /// <summary>
+    /// Varsayılan açık. Ayrı veri klasörüyle çalışan kopyada (CLAUDE_PANEL_DATA: testler) sahte gh verilmediyse varsayılan kapalı:
+    /// test kopyaları kullanıcının gerçek GitHub hesabını sorgulamasın, ekranına bildirim düşürmesin. Ayarlar'dan açılabilir.
+    /// </summary>
+    static bool DefaultOn => Environment.GetEnvironmentVariable("CLAUDE_PANEL_DATA") is not { Length: > 0 }
+        || Environment.GetEnvironmentVariable("CLAUDE_PANEL_GH_EXE") is { Length: > 0 };
+
     static Saved Load()
     {
-        try { return File.Exists(StateFile) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(StateFile)) ?? new() : new(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return new(); }
+        try { return File.Exists(StateFile) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(StateFile)) ?? new(DefaultOn) : new(DefaultOn); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return new(DefaultOn); }
     }
 }

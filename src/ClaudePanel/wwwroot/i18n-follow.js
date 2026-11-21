@@ -95,7 +95,21 @@
     fuBulk_commit: "Commit et ve gönder", fuBulk_snooze: "Ertele (yarına)", fuBulk_hide: "Gizle", fuBulk_upload: "Yükledim",
     fuBulkSkipped: "{0} öğe atlandı: {1}", fuBulkWhy_commit: "yalnız Git satırları commit edilir", fuBulkWhy_upload: "yalnız Drive dosyaları işaretlenir",
     fuBulkWhy_snooze: "bu öğe ertelenemez", fuBulkWhy_hide: "bu öğe gizlenemez",
-    fuBulkDone_snooze: "{0} öğe yarına ertelendi", fuBulkDone_hide: "{0} öğe gizlendi", fuBulkDone_upload: "{0} dosya yüklendi olarak işaretlendi"
+    fuBulkDone_snooze: "{0} öğe yarına ertelendi", fuBulkDone_hide: "{0} öğe gizlendi", fuBulkDone_upload: "{0} dosya yüklendi olarak işaretlendi",
+    // Takip → GitHub (followup-github.js): kullanıcının depolarındaki açık issue ve PR'lar; panel yalnız okur
+    fuGithub: "GitHub", fuFilter_github: "GitHub", fuKind_github: "GitHub", fuGhIssue: "issue", fuGhPr: "PR", fuGhWaiting: "cevap bekliyor",
+    fuGhBy: "açan {0}", fuGhComments: "{0} yorum", fuGhNoComments: "yorum yok", fuGhLast: "son yazan {0}",
+    fuGhOpen: "GitHub'da aç", fuGhHandle: "Oturumda ele al", fuGhStarted: "{0} için oturum başlatıldı",
+    fuGhPromptIssue: "Bu GitHub issue'sunu incele: {0} — maddeleri koda karşı doğrula, yapılacakları ve cevap taslağını öner. GitHub'a hiçbir şey yazma (yorum, etiket, kapatma yok); gönderme kararı kullanıcının.",
+    fuGhPromptPr: "Bu GitHub PR'ını incele: {0} — değişiklikleri koda karşı doğrula, yapılacakları ve cevap taslağını öner. GitHub'a hiçbir şey yazma (yorum, onay, birleştirme yok); gönderme kararı kullanıcının.",
+    fuGhNoCli: "GitHub CLI (gh) bulunamadı. Kurup terminalde gh auth login ile giriş yapınca açık issue ve PR'lar burada görünür.",
+    fuGhNoAuth: "GitHub CLI'da giriş yapılmamış. Terminalde gh auth login ile giriş yapın.",
+    fuGhPending: "GitHub denetleniyor…", fuGhFailed: "GitHub'dan liste alınamadı (ağ yok olabilir). Birazdan yeniden denenecek.",
+    fuGhStale: "GitHub güncellenemedi; liste {0} önceki durumu gösteriyor.",
+    fuGhChecked: "{0} · {1} önce denetlendi (15 dakikada bir)", fuGhNone: "{0}: açık issue ya da PR yok · {1} önce denetlendi",
+    sGithub: "Takip'te GitHub issue ve PR'larını göster", sGithubOff: "Kapalı: GitHub'a bağlanılmaz.",
+    sGithubOn: "{0} hesabının depoları 15 dakikada bir denetlenir. Panel yalnız okur, GitHub'a hiçbir şey yazmaz.",
+    sGithubHint: "Bilgisayardaki GitHub CLI (gh) girişi kullanılır; ek giriş gerekmez. Panel yalnız okur.",
   });
   Object.assign(window.I18N.en, {
     pcTitle: "A session is already open in this project",
@@ -184,6 +198,20 @@
     fuBulk_commit: "Commit and push", fuBulk_snooze: "Snooze (tomorrow)", fuBulk_hide: "Hide", fuBulk_upload: "Uploaded",
     fuBulkSkipped: "{0} item(s) skipped: {1}", fuBulkWhy_commit: "only Git rows can be committed", fuBulkWhy_upload: "only Drive files can be marked",
     fuBulkWhy_snooze: "this item can't be snoozed", fuBulkWhy_hide: "this item can't be hidden",
-    fuBulkDone_snooze: "{0} item(s) snoozed until tomorrow", fuBulkDone_hide: "{0} item(s) hidden", fuBulkDone_upload: "{0} file(s) marked as uploaded"
+    fuBulkDone_snooze: "{0} item(s) snoozed until tomorrow", fuBulkDone_hide: "{0} item(s) hidden", fuBulkDone_upload: "{0} file(s) marked as uploaded",
+    // Follow-up → GitHub (followup-github.js)
+    fuGithub: "GitHub", fuFilter_github: "GitHub", fuKind_github: "GitHub", fuGhIssue: "issue", fuGhPr: "PR", fuGhWaiting: "needs reply",
+    fuGhBy: "opened by {0}", fuGhComments: "{0} comment(s)", fuGhNoComments: "no comments", fuGhLast: "last from {0}",
+    fuGhOpen: "Open on GitHub", fuGhHandle: "Handle in a session", fuGhStarted: "Session started for {0}",
+    fuGhPromptIssue: "Review this GitHub issue: {0} — verify its points against the code, then propose what to do and a draft reply. Do not write anything to GitHub (no comment, label or close); sending is the user's decision.",
+    fuGhPromptPr: "Review this GitHub PR: {0} — verify the changes against the code, then propose what to do and a draft reply. Do not write anything to GitHub (no comment, approval or merge); sending is the user's decision.",
+    fuGhNoCli: "GitHub CLI (gh) not found. Install it and run gh auth login in a terminal; open issues and PRs will then show here.",
+    fuGhNoAuth: "Not signed in to GitHub CLI. Run gh auth login in a terminal.",
+    fuGhPending: "Checking GitHub…", fuGhFailed: "Couldn't get the list from GitHub (maybe offline). Will retry shortly.",
+    fuGhStale: "GitHub couldn't be refreshed; the list shows the state from {0} ago.",
+    fuGhChecked: "{0} · checked {1} ago (every 15 minutes)", fuGhNone: "{0}: no open issues or PRs · checked {1} ago",
+    sGithub: "Show GitHub issues and PRs in Follow-up", sGithubOff: "Off: the panel doesn't contact GitHub.",
+    sGithubOn: "Repositories of {0} are checked every 15 minutes. The panel only reads; it never writes to GitHub.",
+    sGithubHint: "Uses the GitHub CLI (gh) sign-in on this computer; no extra sign-in needed. The panel only reads.",
   });
 })();

@@ -5,9 +5,9 @@ window.PanelFollowView = function (c) {
   "use strict";
   const { t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, sessions, folder, rerender } = c;
   // Süzgeç → bölüm kimlikleri. Güncellemeler yalnız "Tümü"nde görünür.
-  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], decisions: ["decisions", "conflicts"] };
+  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], github: ["github"], decisions: ["decisions", "conflicts"] };
   const KIND = { git: "fuKind_git", job: "fuKind_git", next: "fuKind_next", drive: "fuKind_drive", ledger: "fuKind_drive", decision: "fuKind_decision", conflict: "fuKind_conflict",
-    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise", plan: "fuKind_plan", planadd: "fuKind_plan" };
+    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise", plan: "fuKind_plan", planadd: "fuKind_plan", gh: "fuKind_github" };
   // Bilgi satırları (info: zamanlanmış görev, ileri tarihli söz…) bekleyen iş değildir: rozete ve "Tümü" sayısına girmez,
   // kendi süzgecinin (Zamanlanmış) sayısına girer.
   const counted = (i) => !i.info && !(i.result && i.job?.state === "done");
@@ -32,9 +32,10 @@ window.PanelFollowView = function (c) {
     const inFilter = (f, id) => !FILTERS[f] || FILTERS[f].includes(id);
     const chips = {};
     for (const f of Object.keys(FILTERS)) chips[f] = secs.filter(s => inFilter(f, s.id)).reduce((n, s) => n + s.items.filter(f === "all" ? counted : listed).length, 0);
-    const filter = FILTERS[S.state.filter] !== undefined ? S.state.filter : "all";
+    const off = new Set(secs.some(s => s.id === "github") ? [] : ["github"]); // kapalı kaynağın çipi çizilmez
+    const filter = FILTERS[S.state.filter] !== undefined && !off.has(S.state.filter) ? S.state.filter : "all";
     const shown = secs.filter(s => inFilter(filter, s.id));
-    const m = { secs, shown, chips, filter, ids, total: chips.all, aside: asideAll.filter(it => inFilter(filter, it.sec)), mode: S.state.mode === "type" ? "type" : "project" };
+    const m = { secs, shown, chips, filter, ids, off, total: chips.all, aside: asideAll.filter(it => inFilter(filter, it.sec)), mode: S.state.mode === "type" ? "type" : "project" };
     if (m.mode === "project") Object.assign(m, groups(shown));
     m.folds = m.mode === "type" ? shown : [...m.groups, ...m.rest];
     last = m;
@@ -73,7 +74,7 @@ window.PanelFollowView = function (c) {
     const chips = box.appendChild(el("div", "fu-chips"));
     chips.setAttribute("role", "group");
     chips.setAttribute("aria-label", t("fuFilterLabel"));
-    for (const f of Object.keys(FILTERS)) {
+    for (const f of Object.keys(FILTERS).filter(x => !m.off.has(x))) {
       const b = el("button", "fu-chip", `${esc(t("fuFilter_" + f))}<span>${m.chips[f]}</span>`);
       b.type = "button"; b.dataset.filter = f;
       b.setAttribute("aria-pressed", String(m.filter === f));

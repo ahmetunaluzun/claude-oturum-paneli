@@ -6,7 +6,7 @@ window.PanelFollowState = function (d) {
   const { now } = d;
   const STORE = "panel.follow", KNOWN_MAX = 600;
   const OPEN_BY_DEFAULT = new Set(["decisions", "conflicts"]);
-  const DEFER_TYPES = new Set(["git", "next", "drive", "update", "task", "sfile", "sdesk", "promise", "cloud", "plan"]); // karar, çakışma ve açık oturumdaki tekrarlı iş ertelenemez/gizlenemez: her zaman görünür
+  const DEFER_TYPES = new Set(["git", "next", "drive", "update", "task", "sfile", "sdesk", "promise", "cloud", "plan", "gh"]); // karar, çakışma ve açık oturumdaki tekrarlı iş ertelenemez/gizlenemez: her zaman görünür
   const state = Object.assign({ collapsed: {}, dismissed: [], mode: "project", filter: "all", hidden: {}, snoozed: {}, uploaded: {}, known: null },
     (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })());
   const save = () => localStorage.setItem(STORE, JSON.stringify(state));

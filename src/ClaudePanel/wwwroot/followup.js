@@ -1,7 +1,7 @@
 // Takip sekmesi: günlük takip edilecekler. Her kaynak bir bölümdür; bölüm, öğe listesi üretir ({ id, type, root, rank, sig, … })
 // ve çizim tek yerden yapılır. Kaynaklar kota harcamaz: git durumu, NEXT_SESSION.md, karar bekleyenler, aynı projede birden
-// çok oturum, güncelleme kütükleri (Drive; followup-drive.js), zamanlanmış ve planlı işler (followup-sched.js, followup-plan.js),
-// güncellemeler.
+// çok oturum, GitHub issue ve PR'ları (followup-github.js), güncelleme kütükleri (Drive; followup-drive.js), zamanlanmış ve
+// planlı işler (followup-sched.js, followup-plan.js), güncellemeler.
 // Görünüm (süzgeç çipleri, projeye / türe göre gruplama, gizle-ertele, toplu seçim) followup-view.js'te, kalıcı durum
 // followup-state.js'te (localStorage["panel.follow"]).
 // Commit / gönder / kütüğü kapat düğmeleri oturum AÇMAZ: sunucudaki arka plan işini başlatır (/api/follow/*), sonuç satırda görünür.
@@ -191,12 +191,13 @@ window.PanelFollowUp = function (d) {
     // Panelin kurduğu sürüm: yeni oturumlarda geçerli (açık oturumlar eski sürümle sürer). 12 saat gösterilir.
     const cu = snap.claudeUpdate;
     if (cu?.state === "done" && cu.to && !claude.newer && now() - cu.at * 1000 < 12 * 3600_000) updNotes.push([t("fuClaudeUpdated", cu.to), false]);
-    const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap, P.list());
+    const conflicts = conflictItems(), drive = D.items(snap, jobs), sched = Z.section(snap, P.list()), github = G.section(snap);
     return [
       { id: "decisions", title: "fuDecisions", all: decisionItems(), notes: [], empty: t("fuNoDecisions") },
       ...(conflicts.length ? [{ id: "conflicts", title: "fuConflicts", all: conflicts, notes: [] }] : []),
       { id: "git", title: "fuGit", all: g.state === "nogit" ? [] : gitItems(), notes: gitNotes, hideable: true },
       { id: "next", title: "fuNext", all: nextItems(), notes: [], empty: t("fuNoNext"), hideable: true },
+      ...(github ? [github] : []),
       ...(drive.length ? [{ id: "drive", title: "fuDrive", all: drive, notes: [] }] : []),
       ...(sched ? [sched] : []),
       { id: "updates", title: "fuUpdates", all: updateItems(), notes: updNotes }
@@ -259,6 +260,7 @@ window.PanelFollowUp = function (d) {
     D.side(it, side, snap);
     Z.side(it, side);
     P.side(it, side);
+    G.side(it, side);
     if (it.link) {
       const a = el("a", "btn small" + (it.linkText ? "" : " primary"), esc(it.linkText || t("fuReleasePage")));
       a.href = it.link; a.target = "_blank"; a.rel = "noopener";
@@ -274,6 +276,7 @@ window.PanelFollowUp = function (d) {
     D.more(it, box);
     Z.more(it, box);
     P.more(it, box);
+    G.more(it, box);
     if (S.canDefer(it)) {
       box.appendChild(button(t("fuSnooze"), () => { S.snooze(it); toast(t("fuSnoozed", it.title)); render(); }));
       box.appendChild(button(t("fuHide"), () => { S.hide(it); toast(t("fuHidden", it.title)); render(); }));
@@ -366,6 +369,7 @@ window.PanelFollowUp = function (d) {
   const Z = window.PanelFollowSched({ t, api, toast, dur, now, low, tag, confirmBox, button, lang, REMOTE, reload: () => load(false) });
   const P = window.PanelFollowPlan({ t, api, getJson, toast, dur, now, low, tag, confirmBox, ask, button, lang, items, openDrawer, openMenu,
     reload: () => render() });
+  const G = window.PanelFollowGithub({ t, api, getJson, toast, dur, now, low, tag, button, startHosted, setView, reload: () => load(false) });
   const V = window.PanelFollowView({ t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, folder,
     sessions: () => items(), rerender: () => render() });
 
@@ -409,7 +413,7 @@ window.PanelFollowUp = function (d) {
     if (force) { started.clear(); await api("/api/followup/refresh"); } // yeniden taranınca düğmeler yine açılır
     try { [snap] = await Promise.all([getJson("/api/followup"), P.load()]); } catch { /* bağlantı yok: eldeki görüntü kalır */ }
     if (!anyJobActive()) await loadJobs(); else if (snap) render();
-    const wait = snap?.scanning || snap?.claudeUpdate?.state === "running" ? SCAN_POLL_MS : isOpen() && !document.hidden ? OPEN_POLL_MS : BACKGROUND_POLL_MS;
+    const wait = snap?.scanning || snap?.claudeUpdate?.state === "running" || snap?.github?.fetching ? SCAN_POLL_MS : isOpen() && !document.hidden ? OPEN_POLL_MS : BACKGROUND_POLL_MS;
     timer = setTimeout(() => load(false), wait);
   }
 
@@ -426,7 +430,7 @@ window.PanelFollowUp = function (d) {
     if (liveSig() !== itemSig) render(); else badge();
   }
 
-  $("btnFuRefresh").addEventListener("click", () => load(true));
+  $("btnFuRefresh").addEventListener("click", async () => { await G.poke(); load(true); });
   $("btnFuBulk").addEventListener("click", (e) => { e.stopPropagation(); V.menu(e.currentTarget); });
   $("btnFuFold").addEventListener("click", () => {
     const openAll = $("btnFuFold").dataset.open === "1";
