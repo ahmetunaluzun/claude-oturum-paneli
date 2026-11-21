@@ -34,6 +34,23 @@
 ## Risk
 Biçim sık değişiyor (alan adları, takma adlar, sıkıştırma, kalıcılık modu). Savunmacı okuma + `cli_version` loglanır.
 
+## Ölçüm — bu bilgisayar, codex-cli 0.171.0, 2026-11-22 (saha tespiti)
+Tek `codex exec` oturumu (ChatGPT Go hesabı), 30 satır:
+- Kök `C:\Users\<kullanıcı>\.codex` (Windows yolu doğrulandı). Dosya `sessions/2026/11/22/rollout-2026-11-22T02-23-32-<uuid>.jsonl`:
+  klasör ve ad **yerel saat** (02:23 yerel = 23:23 UTC; zaman damgaları UTC). Belgedeki "UTC" ifadesi bu sürümde tutmadı.
+- `session_meta`: `id` = `session_id`, `source: "exec"`, `originator: "codex_exec"`, `thread_source: "user"`, `history_mode: "paginated"`,
+  `cwd`, `cli_version`, `git {commit_hash, branch, repository_url}`; ayrıca `base_instructions` (uzun), `creator_account_id` (kişisel — loga yazılmaz).
+- Satır türleri: `session_meta`, `event_msg`, `response_item`, `turn_context`, `world_state` (yeni), `token_usage_record` (yeni).
+- `event_msg` türleri: `task_started`, `thread_settings_applied`, `item_completed` (`item.type` `UserMessage` / `AgentMessage`, `content`),
+  `token_count`, `task_complete` (`completed_at` Unix sn, `duration_ms`, `last_agent_message`). `user_message`/`agent_message` YOK (paginated mod).
+- `response_item` `message`: rol `developer` (sistem), `user` (ilki `<environment_context>` enjekte metni — gösterilmez), `assistant`;
+  `content[].text` (`input_text` / `output_text`). Ayrıca `custom_tool_call(_output)`, `reasoning`, `additional_tools`.
+- Model `turn_context.model` (bu hesapta `gpt-6-luna`).
+- `token_count.rate_limits`: `limit_id: "codex"`, `plan_type: "go"`, `primary.window_minutes: 43200` (30 gün; Go planında 5 sa/haftalık
+  yerine aylık pencere), `secondary: null`, `resets_at` Unix sn, `credits`.
+- `exec` bitince `thread-writer-locks/` BOŞ; `session_index.jsonl` oluşmadı (adsız oturum). Etkileşimli oturumda kilit henüz ölçülmedi.
+- Windows'ta `--sandbox read-only` komut çalıştırmayı da engelledi ("blocked by policy").
+
 ## Kaynaklar (2026-11-22)
 1. https://learn.chatgpt.com/docs/config-file/config-advanced
 2. https://github.com/openai/codex/tree/main/codex-rs/rollout/src (recorder.rs, rollout_file_name.rs, compression.rs, list.rs, session_index.rs, writer_lock.rs)
