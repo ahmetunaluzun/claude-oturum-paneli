@@ -91,6 +91,26 @@ check("çekmece notu: uygulamada arşivleyin", await ev(`document.getElementById
 await shot("cekmece");
 await ev(`document.querySelector("#drawer .close, #dClose")?.click()`); await sleep(200);
 
+// Çakışma penceresi: aynı projede yeni oturum açılmak istenince. Masaüstü uygulaması oturumu "Panele al" diye önerilmez,
+// listede "(Masaüstü uygulaması)" yazar; VS Code oturumu önerilir, "(VS Code)" yazar.
+const conflictFor = async (name) => {
+  const cwd = await ev(`fetch("/api/state").then(r => r.json()).then(d => d.sessions.find(s => s.name === ${JSON.stringify(name)}).cwd)`);
+  await ev(`(() => { document.getElementById("btnNew").click(); const f = document.getElementById("fCwd"); f.value = ${JSON.stringify(cwd)}; f.dispatchEvent(new Event("input"));
+    const p = document.getElementById("fPrompt"); if (p) p.value = "deneme"; })()`);
+  await sleep(500);
+  await ev(`document.getElementById("btnStart").click()`);
+  if (!(await until(`!!document.querySelector("#dlgAsk[open]")`, 5000)))
+    console.log("ÇAKIŞMA PENCERESİ YOK:", await ev(`JSON.stringify({ err: document.getElementById("newErr")?.textContent, newOpen: document.getElementById("dlgNew").open, cwd: document.getElementById("fCwd").value, toasts: [...document.querySelectorAll(".toast")].map(x => x.textContent), sessions: document.querySelectorAll(".card").length })`));
+  const b = await ev(`({ list: [...document.querySelectorAll("#askList li")].map(x => x.textContent), buttons: [...document.querySelectorAll("#askButtons button")].map(b => b.value) })`);
+  await ev(`document.querySelector('#dlgAsk[open] button[value="cancel"]').click()`); await sleep(300);
+  await ev(`document.getElementById("dlgNew").close()`); await sleep(200);
+  return b;
+};
+let cf = await conflictFor("masaustu");
+check("çakışma: masaüstü uygulaması oturumu etiketli, Panele al önerilmiyor", [cf.list, cf.buttons.includes("adopt")], [["Masaustu Projesi — bekliyor (Masaüstü uygulaması)"], false]);
+cf = await conflictFor("kod");
+check("çakışma: VS Code oturumu etiketli, Panele al önerilir", [cf.list, cf.buttons.filter(v => v !== "cancel")[0]], [["Kod Projesi — bekliyor (VS Code)"], "adopt"]);
+
 await shot("1280_koyu");
 await load("tr", false, 390, 844);
 const over = await ev(`[...document.querySelectorAll(".card")].filter(c => c.scrollWidth > c.clientWidth + 1).length`);

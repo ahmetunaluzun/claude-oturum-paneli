@@ -38,7 +38,9 @@ P_CODE=$(oturum kod "Kod Projesi" claude-vscode idle "")
 P_SORU=$(oturum soru "Soru Projesi" cli waiting "dialog open")
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
-CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" TMP="$TW\\tmp" TEMP="$TW\\tmp" "$EXE" --no-window >/dev/null 2>&1 &
+# Çakışma penceresi testinde oturum açılmaz; çakışma çıkmasa bile gerçek claude açılmasın diye sahte claude.
+printf '@echo off\r\npy -3.13 "%s"\r\n' "$(cygpath -w "$PWD/tools/sahte_claude.py")" > "$T/sahte-claude.cmd"
+CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CLAUDE_EXE="$TW\\sahte-claude.cmd" TMP="$TW\\tmp" TEMP="$TW\\tmp" "$EXE" --no-window >/dev/null 2>&1 &
 PID=$!
 for _ in $(seq 1 50); do [ -f "$T/data/panel-$PORT.token" ] && break; sleep 0.2; done
 ST=$(curl -s "$B/api/state")

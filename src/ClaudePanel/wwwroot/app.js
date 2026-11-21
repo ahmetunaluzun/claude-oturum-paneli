@@ -56,14 +56,18 @@
     try { r = await api(path, body); } catch { return { ok: false, status: 0, data: null }; }
     if (r.status !== 409 || r.data?.error !== "conflict") return r;
     const c = r.data, opts = c.options || [], sessions = c.sessions || [];
-    const list = sessions.map(s => `${s.name} — ${t(s.kind === "job" ? "pcJob" : s.status === "busy" ? "pcBusy" : "pcIdle")}${s.kind === "terminal" ? ` (${t("terminal")})` : ""}`);
+    // Sunucunun "terminal" dediği oturum masaüstü uygulamasında ya da VS Code'da açık olabilir: yüzey kart listesinden (PID).
+    const surface = (s) => (s.kind === "terminal" && s.pid ? items.find(x => x.pid === s.pid)?.surface : null) || "terminal";
+    const where = (s) => ({ desktop: t("desktopApp"), vscode: "VS Code" }[surface(s)] || t("terminal"));
+    const list = sessions.map(s => `${s.name} — ${t(s.kind === "job" ? "pcJob" : s.status === "busy" ? "pcBusy" : "pcIdle")}${s.kind === "terminal" ? ` (${where(s)})` : ""}`);
     const buttons = [];
     if (opts.includes("send")) buttons.push({ value: "send", label: t("pcSend"), cls: "primary" });
     if (opts.includes("later")) buttons.push({ value: "later", label: t("pcLater"), cls: buttons.length ? "" : "primary" });
     if (opts.includes("worktree")) buttons.push({ value: "worktree", label: t("pcWorktree"), cls: "" });
     // Terminalde boşta oturum varsa onu panele alıp (istem varsa) mesajı ona yazmak: ikinci oturum açılmaz.
+    // Masaüstü uygulamasındaki oturum önerilmez (issue #1 madde 6: uygulamadan yönetilir; elle "Panele al" ⋯ menüsünde).
     const hasJob = sessions.some(s => s.kind === "job");
-    const term = !REMOTE && !hasJob ? sessions.find(s => s.kind === "terminal" && s.status === "idle" && s.pid) : null;
+    const term = !REMOTE && !hasJob ? sessions.find(s => s.kind === "terminal" && s.status === "idle" && s.pid && surface(s) !== "desktop") : null;
     if (term) buttons.unshift({ value: "adopt", label: t(body.prompt?.trim() ? "pcAdoptSend" : "pcAdopt"), cls: "primary" });
     if (term && buttons[1]?.cls) buttons[1].cls = "";
     buttons.push({ value: "force", label: t("pcForce"), cls: "" });
