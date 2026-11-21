@@ -32,6 +32,9 @@ public static partial class Launcher
             psi.ArgumentList.Add("--name");
             psi.ArgumentList.Add(req.Name.Trim());
         }
+        // "--": seçeneklerin sonu. Görev metni "-" ile başlasa seçenek, "update"/"mcp" gibi bir alt komut adı olsa komut
+        // sanılmaz. Claude Code 2.1.330'un ayrıştırıcısında doğrulandı (parseOptions: "--" görünce kalan her şey operand).
+        psi.ArgumentList.Add("--");
         psi.ArgumentList.Add(req.Prompt!.Trim());
         var sw = Stopwatch.StartNew();
         Process.Start(psi);

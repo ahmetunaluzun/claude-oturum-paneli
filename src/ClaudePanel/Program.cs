@@ -560,6 +560,7 @@ app.Services.GetRequiredService<ProjectGuard>().Start();
 var ghWatch = app.Services.GetRequiredService<GitHubWatch>();
 ghWatch.Notify = app.Services.GetRequiredService<Tray>().Notify;
 ghWatch.Start();
+app.Services.GetRequiredService<Dictation>(); // inmiş dikte modelini açılışta arka planda bir kez doğrular (SHA256, damga dosyası)
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();
 
