@@ -555,6 +555,7 @@ app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();
 app.Services.GetRequiredService<PlannedJobs>().Start();
 app.Services.GetRequiredService<ProjectGuard>().Start();
+app.Services.GetRequiredService<Dictation>(); // inmiş dikte modelini açılışta arka planda bir kez doğrular (SHA256, damga dosyası)
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();
 

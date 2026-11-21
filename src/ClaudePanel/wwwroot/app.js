@@ -1419,7 +1419,8 @@
     try { st = await getJson("/api/dictation"); } catch { toast(t("micError", ""), "warn"); return false; }
     if (st.ready) return true;
     if (st.downloading) { toast(t("micDownloading", pct(st))); return false; }
-    const v = await ask(t("micModelTitle"), t("micModelText"), [], [{ value: "go", label: t("micModelGo"), cls: "primary" }]);
+    if (st.verifying) { toast(t("micVerifying")); return false; }
+    const v = await ask(t("micModelTitle"), t(st.invalid ? "micModelBadText" : "micModelText"), [], [{ value: "go", label: t("micModelGo"), cls: "primary" }]);
     if (v !== "go") return false;
     await api("/api/dictation/model");
     toast(t("micDownloading", 0));
