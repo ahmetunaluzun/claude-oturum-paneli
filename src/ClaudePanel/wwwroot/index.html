@@ -239,6 +239,34 @@
         <label class="check"><input type="checkbox" id="tqEnabled"> <span data-i18n="tqEnabled"></span></label>
         <p class="hint wide" id="tqState"></p>
       </fieldset>
+      <fieldset class="mail-set" id="mailBox">
+        <legend data-i18n="smTitle"></legend>
+        <p class="mail-note" data-i18n="smIntro"></p>
+        <div class="mail-client local-only" id="smClient">
+          <ol class="mail-steps" id="smSteps">
+            <li data-i18n="smStep1"></li><li data-i18n="smStep2"></li><li data-i18n="smStep3"></li><li data-i18n="smStep4"></li>
+          </ol>
+          <p class="mail-note" id="smClientOk" data-i18n="smClientOk" hidden></p>
+          <button type="button" class="btn small" id="btnSmClient"></button>
+          <input type="file" id="smClientFile" accept=".json,application/json" hidden>
+        </div>
+        <ul class="mail-accounts" id="smAccounts"></ul>
+        <div class="mail-wait" id="smLogin" hidden>
+          <p class="mail-note" data-i18n="smWaiting"></p>
+          <button type="button" class="btn small" id="btnSmCancel" data-i18n="smCancel"></button>
+        </div>
+        <button type="button" class="btn small primary local-only" id="btnSmAdd" data-i18n="smAdd"></button>
+        <p class="mail-note remote-only" data-i18n="smRemoteNote"></p>
+        <div class="mail-filter" id="smFilter">
+          <p class="mail-sub" data-i18n="smFilterTitle"></p>
+          <label class="check"><input type="checkbox" id="smDirect"> <span data-i18n="smDirect"></span></label>
+          <label class="check"><input type="checkbox" id="smCc"> <span data-i18n="smCc"></span></label>
+          <label class="check"><input type="checkbox" id="smAwaiting"> <span data-i18n="smAwaiting"></span></label>
+          <label class="mail-field"><span data-i18n="smSenders"></span><input type="text" id="smSenders" autocomplete="off" spellcheck="false"></label>
+          <label class="mail-field"><span data-i18n="smKeywords"></span><input type="text" id="smKeywords" autocomplete="off"></label>
+          <label class="mail-field"><span data-i18n="smLabels"></span><input type="text" id="smLabels" autocomplete="off"></label>
+        </div>
+      </fieldset>
       <fieldset class="night">
         <legend data-i18n="nightTitle"></legend>
         <label class="check"><input type="checkbox" id="nEnabled"> <span data-i18n="nEnabled"></span></label>
@@ -378,6 +406,7 @@
   <script src="/assets/i18n.js"></script>
   <script src="/assets/i18n-follow.js"></script>
   <script src="/assets/i18n-plan.js"></script>
+  <script src="/assets/i18n-mail.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
   <script src="/assets/followup-state.js"></script>
@@ -385,6 +414,8 @@
   <script src="/assets/followup-sched.js"></script>
   <script src="/assets/followup-plan.js"></script>
   <script src="/assets/followup-github.js"></script>
+  <script src="/assets/followup-mail.js"></script>
+  <script src="/assets/settings-mail.js"></script>
   <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>

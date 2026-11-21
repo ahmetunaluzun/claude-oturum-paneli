@@ -5,9 +5,9 @@ window.PanelFollowView = function (c) {
   "use strict";
   const { t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, sessions, folder, rerender } = c;
   // Süzgeç → bölüm kimlikleri. Güncellemeler yalnız "Tümü"nde görünür.
-  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], github: ["github"], decisions: ["decisions", "conflicts"] };
+  const FILTERS = { all: null, git: ["git"], next: ["next"], drive: ["drive"], sched: ["sched"], github: ["github"], mail: ["mail"], cal: ["cal"], decisions: ["decisions", "conflicts"] };
   const KIND = { git: "fuKind_git", job: "fuKind_git", next: "fuKind_next", drive: "fuKind_drive", ledger: "fuKind_drive", decision: "fuKind_decision", conflict: "fuKind_conflict",
-    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise", plan: "fuKind_plan", planadd: "fuKind_plan", gh: "fuKind_github" };
+    task: "fuKind_sched", sfile: "fuKind_sched", sdesk: "fuKind_sched", loop: "fuKind_sched", cloud: "fuKind_sched", promise: "fuKind_promise", plan: "fuKind_plan", planadd: "fuKind_plan", gh: "fuKind_github", mail: "fuKind_mail", cal: "fuKind_cal" };
   // Bilgi satırları (info: zamanlanmış görev, ileri tarihli söz…) bekleyen iş değildir: rozete ve "Tümü" sayısına girmez,
   // kendi süzgecinin (Zamanlanmış) sayısına girer.
   const counted = (i) => !i.info && !(i.result && i.job?.state === "done");
@@ -32,7 +32,7 @@ window.PanelFollowView = function (c) {
     const inFilter = (f, id) => !FILTERS[f] || FILTERS[f].includes(id);
     const chips = {};
     for (const f of Object.keys(FILTERS)) chips[f] = secs.filter(s => inFilter(f, s.id)).reduce((n, s) => n + s.items.filter(f === "all" ? counted : listed).length, 0);
-    const off = new Set(secs.some(s => s.id === "github") ? [] : ["github"]); // kapalı kaynağın çipi çizilmez
+    const off = new Set(["github", "mail", "cal"].filter(id => !secs.some(s => s.id === id))); // kapalı kaynağın çipi çizilmez
     const filter = FILTERS[S.state.filter] !== undefined && !off.has(S.state.filter) ? S.state.filter : "all";
     const shown = secs.filter(s => inFilter(filter, s.id));
     const m = { secs, shown, chips, filter, ids, off, total: chips.all, aside: asideAll.filter(it => inFilter(filter, it.sec)), mode: S.state.mode === "type" ? "type" : "project" };

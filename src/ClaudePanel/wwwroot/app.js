@@ -204,6 +204,8 @@
   const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask, REMOTE, openMenu: A.openMenu,
     lang: () => settings.lang, items: () => items,
     now: () => Date.now() + serverOffset, isOpen: () => view === "follow" });
+  // Ayarlar → Mail ve takvim (settings-mail.js)
+  window.PanelSettingsMail({ t, api, getJson, toast, ask, confirmBox, esc, REMOTE, reload: () => F.load(false) });
 
   function render() {
     const q = $("search").value.trim();
