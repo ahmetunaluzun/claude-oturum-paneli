@@ -13,6 +13,7 @@ if (args.Length > 0 && args[0] == ProjectGuard.Arg) Environment.Exit(ProjectGuar
 // Terminal durum satırı ve kota koruması (QuotaCli.cs): ~/.claude/settings.json'dan çağrılır.
 if (args.Length > 0 && args[0] == QuotaCli.StatusLineArg) Environment.Exit(QuotaCli.RunStatusLine(args));
 if (args.Length > 0 && args[0] == QuotaCli.GuardArg) Environment.Exit(QuotaCli.RunGuard(args));
+if (args.Length > 0 && args[0] == CodexSessions.ScanArg) Environment.Exit(CodexSessions.RunScan(args));
 
 Preload.All(); // güncelleme sırasında exe değişse de sonradan yüklenecek kitaplık kalmasın (Preload.cs)
 
