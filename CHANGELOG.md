@@ -2,7 +2,7 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
-## Yayınlanmamış
+## 0.17.0 — 2026-11-22
 - **Takip: GitHub.** Kendi depolarınızdaki açık issue ve PR'lar Takip'te ayrı bölümde ve "GitHub" çipinde görünür. Kaynak bilgisayardaki GitHub CLI'dır (`gh`); ek giriş ya da anahtar istenmez. Panel **yalnız okur**, GitHub'a hiçbir şey yazmaz. Kuruluş depoları kapsam dışıdır.
   - **Cevap bekliyor:** son söz sizde değilse (başkası açmış ve yorum yok, ya da son yorumu başkası yazmış) satır uyarı etiketiyle öne çıkar, sekme rozetine ve "Tümü" sayısına girer. Son söz sizdeyse ya da kendi açtığınız yorumsuz issue ise sakin bilgi satırıdır.
   - **Satır:** depo, numara, başlık, açan, yorum sayısı, son yazan, son hareket zamanı, tür (issue / PR). **GitHub'da aç** tarayıcıda açar. Depo bilinen bir yerel klasörle eşleşiyorsa (origin adresi) **Oturumda ele al** o klasörde oturum açar: issue'yu inceler, maddeleri koda karşı doğrular, yapılacakları ve cevap taslağını önerir; istem GitHub'a yazmayı yasaklar. Projede oturum varsa mevcut çakışma penceresi çıkar.
