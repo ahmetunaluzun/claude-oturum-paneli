@@ -164,13 +164,16 @@ public sealed class FollowJobs(HostedSessions hosted, ProjectGuard guard, Follow
         }
         Set(item, "checking");
         var check = GitOps.PushCheck(item.Root);
+        var allowedNote = check.Allowed > 0 ? $", {check.Allowed} izinli (test verisi) bulgu atlandı" : "";
         if (check.Findings.Count > 0)
         {
             item.Findings = check.Findings;
-            RemoteLog.Warn($"Takip: gönderim durduruldu, gizli bilgi denetimi {check.Findings.Count} bulgu verdi ({item.Root})"); // değer yazılmaz
+            var files = string.Join(", ", check.Findings.Select(f => f.File).Distinct().Take(5));
+            RemoteLog.Warn($"Takip: gönderim durduruldu, gizli bilgi denetimi {check.Findings.Count} bulgu verdi: {files}{allowedNote} ({item.Root})"); // değer yazılmaz
             Finish(item, "failed", "secret");
             return;
         }
+        if (check.Allowed > 0) RemoteLog.Info($"Takip: gizli bilgi denetimi temiz{allowedNote} ({item.Root})");
         Set(item, "pushing");
         var push = GitOps.Push(item.Root);
         item.Pushed = push.Pushed;

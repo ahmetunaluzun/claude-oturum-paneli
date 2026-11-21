@@ -4,6 +4,7 @@ namespace ClaudePanel;
 public sealed record HostedRequest(string? Cwd, string? Prompt, string? Model, string? Name, string? ResumeId, string? Mode = null);
 public sealed record FollowRepoRequest(string? Path, bool? Push, string? Lang);
 public sealed record FollowAllRequest(string[]? Paths, string? Lang);
+public sealed record FollowAllowRequest(string? Path, string[]? Fps, string? Lang);
 public sealed record FollowLedgerRequest(string? Ledger, string[]? Files, string? Lang);
 public sealed record GitHubRequest(bool? Enabled);
 
@@ -89,6 +90,29 @@ public static class FollowEndpoints
             if (!authorized(ctx)) return Results.StatusCode(403);
             var req = await ctx.Request.ReadFromJsonAsync<FollowRepoRequest>();
             return Enqueue(fu, jobs, [req?.Path], req?.Lang, _ => (false, true));
+        });
+        // Gizli bilgi engelinde "Test verisi, yine de gönder": istekteki parmak izleri ŞU ANKİ kalıp bulgularıyla birebir aynı
+        // olmalı (kullanıcı gördüğünü onaylar; yeni bulgu varsa 409 secretchanged). Dosya bulgusu varsa izin verilmez
+        // (409 secretfile). Geçerliyse izinler yazılır ve gönderim aynı kuyruğa alınır. Telefondan da açık (onaylı işlem).
+        app.MapPost("/api/follow/push-allow", async (HttpContext ctx, FollowUp fu, FollowJobs jobs) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<FollowAllowRequest>();
+            if (req?.Path is null || req.Fps is not { Length: > 0 and <= 50 } || req.Fps.Any(string.IsNullOrEmpty)) return Results.BadRequest();
+            var repo = fu.Get().Git.Repos.FirstOrDefault(r => ProjectRoots.Same(r.Path, ProjectRoots.Normalize(req.Path)));
+            if (repo is null) return Results.Json(new { error = "norepo" }, statusCode: 404);
+            if (jobs.ActiveIn(repo.Path)) return Results.Json(new { error = "jobactive" }, statusCode: 409);
+            (int Commits, List<SecretFinding> Findings, bool Failed, int Allowed) check;
+            try { check = await Task.Run(() => GitOps.PushCheck(repo.Path)); }
+            catch (System.ComponentModel.Win32Exception) { return Results.Json(new { error = "nogit" }, statusCode: 409); }
+            if (check.Failed) return Results.Json(new { error = "checkfailed" }, statusCode: 409);
+            if (check.Findings.Any(f => f.Kind != "pattern")) return Results.Json(new { error = "secretfile" }, statusCode: 409);
+            if (!check.Findings.Select(f => f.Fp).ToHashSet(StringComparer.Ordinal).SetEquals(req.Fps))
+                return Results.Json(new { error = "secretchanged" }, statusCode: 409);
+            var added = PushAllow.Add(repo.Path, check.Findings);
+            var files = string.Join(", ", check.Findings.Select(f => f.File).Distinct().Take(5));
+            RemoteLog.Info($"Takip: {added} gizli bilgi bulgusu test verisi olarak izinlendi: {files} ({repo.Path})"); // değer yazılmaz
+            return Enqueue(fu, jobs, [repo.Path], req.Lang, _ => (false, true));
         });
         app.MapPost("/api/follow/commit", async (HttpContext ctx, FollowUp fu, FollowJobs jobs) =>
         {

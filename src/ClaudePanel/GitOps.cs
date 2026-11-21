@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -7,7 +8,10 @@ namespace ClaudePanel;
 
 /// <param name="Kind">"file" (gönderilmemesi gereken dosya) | "pattern" (anahtar/parola kalıbı).</param>
 /// <param name="What">Dosya türünün ya da kalıbın kodu (arayüz metne çevirir: fuSec_*). Bulunan DEĞER hiçbir yere yazılmaz.</param>
-public sealed record SecretFinding(string Kind, string File, string What);
+/// <param name="Fp">Parmak izi: SHA256(depo kökü + dosya + kural + eşleşen metin), onaltılık ilk 20 hane. "Test verisi" izni bununla tutulur.</param>
+/// <param name="Hint">Eşleşen metnin ilk 4 karakteri + "***" (değerin kendisi değil; kalıplar anahtar adıyla ya da önekle başlar).</param>
+/// <param name="Line">Satırın eklendiği commit'teki satır numarası; dosya bulgusunda 0.</param>
+public sealed record SecretFinding(string Kind, string File, string What, string Fp = "", string Hint = "", int Line = 0);
 
 /// <param name="Code">"ok" | "secret" | "nothing" | "noremote" | "rejected" | "auth" | "timeout" | "nogit" | "failed".</param>
 public sealed record PushResult(string Code, int Pushed, IReadOnlyList<SecretFinding> Findings, string? Detail)
@@ -21,7 +25,7 @@ public sealed record PushResult(string Code, int Pushed, IReadOnlyList<SecretFin
 /// </summary>
 public static partial class GitOps
 {
-    const int LocalTimeoutMs = 15_000, PushTimeoutMs = 90_000, DiffMaxChars = 8_000_000;
+    const int LocalTimeoutMs = 15_000, PushTimeoutMs = 90_000, DiffMaxChars = 8_000_000, MaxFindings = 50;
 
     public sealed record Out(int Exit, string StdOut, string StdErr, bool TimedOut)
     {
@@ -79,6 +83,16 @@ public static partial class GitOps
     static Regex F(string p) => new(p, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     static Regex P(string p) => new(p, RegexOptions.CultureInvariant);
     [GeneratedRegex(@"://[^/\s@]+@")] private static partial Regex UrlCreds();
+    [GeneratedRegex(@"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")] private static partial Regex Hunk();
+
+    /// <summary>Bulgunun parmak izi. Kök büyük/küçük harf ve bölü farkından bağımsız (aynı depo iki yazımla gelebilir).</summary>
+    public static string Fingerprint(string root, string file, string what, string match)
+    {
+        var key = ProjectRoots.Normalize(root).ToLowerInvariant() + "\n" + file + "\n" + what + "\n" + match;
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..20];
+    }
+
+    static string HintOf(string match) => (match.Length > 4 ? match[..4] : match[..Math.Min(1, match.Length)]) + "***";
 
     /// <summary>Gönderilecek commit aralığı: izlenen dal varsa ondan sonrası, yoksa hiçbir uzak dalda olmayanlar.</summary>
     static string[] PushRange(string root) =>
@@ -87,39 +101,64 @@ public static partial class GitOps
 
     /// <summary>
     /// Gönderilecek commit'lerde depoya girmemesi gereken dosya ya da anahtar/parola kalıbı var mı. Yalnız eklenen satırlara
-    /// bakılır. Bulgu: dosya + kalıp adı; değer döndürülmez, loglanmaz.
+    /// bakılır. Kalıp bulguları eşleşme başına ayrıdır (parmak izine göre tekil, en çok 50); kullanıcının "test verisi" dediği
+    /// parmak izleri (PushAllow) atlanır ve Allowed'da sayılır. Dosya bulgusu hiçbir zaman atlanmaz.
+    /// Bulgu: dosya, satır, kalıp adı, parmak izi, maskeli ipucu; değer döndürülmez, loglanmaz.
     /// </summary>
-    public static (int Commits, List<SecretFinding> Findings, bool Failed) PushCheck(string root)
+    public static (int Commits, List<SecretFinding> Findings, bool Failed, int Allowed) PushCheck(string root)
     {
         var range = PushRange(root);
         var findings = new List<SecretFinding>();
         var count = Run(root, LocalTimeoutMs, ["rev-list", "--count", .. range]);
-        if (!count.Ok || !int.TryParse(count.StdOut.Trim(), out var commits)) return (0, findings, true);
-        if (commits == 0) return (0, findings, false);
+        if (!count.Ok || !int.TryParse(count.StdOut.Trim(), out var commits)) return (0, findings, true, 0);
+        if (commits == 0) return (0, findings, false, 0);
 
         var names = Run(root, LocalTimeoutMs, ["log", "--format=", "--name-status", "--no-renames", .. range]);
-        if (!names.Ok) return (commits, findings, true);
+        if (!names.Ok) return (commits, findings, true, 0);
         foreach (var line in names.StdOut.Split('\n'))
         {
             var parts = line.TrimEnd('\r').Split('\t');
             if (parts.Length < 2 || parts[0].Length == 0 || parts[0][0] is not ('A' or 'M')) continue;
             var file = parts[^1];
             foreach (var (re, what) in BadFiles)
-                if (re.IsMatch(file) && !findings.Any(f => f.File == file && f.What == what)) findings.Add(new SecretFinding("file", file, what));
+                if (re.IsMatch(file) && !findings.Any(f => f.File == file && f.What == what))
+                    findings.Add(new SecretFinding("file", file, what, Fingerprint(root, file, what, "")));
         }
 
         var diff = Run(root, LocalTimeoutMs * 2, ["log", "-p", "--format=", "--no-color", "--no-ext-diff", "--unified=0", .. range]);
-        if (!diff.Ok) return (commits, findings, true);
+        if (!diff.Ok) return (commits, findings, true, 0);
+        var (allowed, skipped) = (PushAllow.Fps(), new HashSet<string>(StringComparer.Ordinal));
         var text = diff.StdOut.Length > DiffMaxChars ? diff.StdOut[..DiffMaxChars] : diff.StdOut;
         var current = "";
-        foreach (var raw in text.Split('\n'))
+        int oldLeft = 0, newLeft = 0, lineNo = 0;
+        foreach (var rawLine in text.Split('\n'))
         {
-            if (raw.StartsWith("+++ ", StringComparison.Ordinal)) { current = raw.Length > 6 && raw[4..].StartsWith("b/", StringComparison.Ordinal) ? raw[6..].TrimEnd('\r') : ""; continue; }
-            if (raw.Length < 2 || raw[0] != '+') continue;
+            var raw = rawLine.TrimEnd('\r');
+            if (oldLeft <= 0 && newLeft <= 0) // hunk dışı: başlık satırları (eklenen satır "+++ " ile başlasa da başlık sayılmaz)
+            {
+                if (raw.StartsWith("+++ ", StringComparison.Ordinal)) current = raw.Length > 6 && raw[4..].StartsWith("b/", StringComparison.Ordinal) ? raw[6..] : "";
+                else if (Hunk().Match(raw) is { Success: true } h)
+                {
+                    oldLeft = h.Groups[1].Success ? int.Parse(h.Groups[1].Value) : 1;
+                    newLeft = h.Groups[3].Success ? int.Parse(h.Groups[3].Value) : 1;
+                    lineNo = int.Parse(h.Groups[2].Value);
+                }
+                continue;
+            }
+            if (raw.StartsWith('-')) { oldLeft--; continue; }
+            if (!raw.StartsWith('+')) continue; // "\ No newline at end of file"
+            newLeft--;
+            var at = lineNo++;
             foreach (var (re, what) in BadPatterns)
-                if (re.IsMatch(raw) && !findings.Any(f => f.File == current && f.What == what)) findings.Add(new SecretFinding("pattern", current, what));
+                foreach (Match m in re.Matches(raw))
+                {
+                    var fp = Fingerprint(root, current, what, m.Value);
+                    if (allowed.Contains(fp)) { skipped.Add(fp); continue; }
+                    if (findings.Count < MaxFindings && !findings.Any(f => f.Fp == fp))
+                        findings.Add(new SecretFinding("pattern", current, what, fp, HintOf(m.Value), at));
+                }
         }
-        return (commits, findings, false);
+        return (commits, findings, false, skipped.Count);
     }
 
     /// <summary>Denetim temizse `git push` (izlenen dal yoksa `-u <uzak> <dal>`). Sonuç kodla döner; metin kimlik bilgisinden arındırılır.</summary>
@@ -127,7 +166,7 @@ public static partial class GitOps
     {
         try
         {
-            var (commits, findings, failed) = PushCheck(root);
+            var (commits, findings, failed, _) = PushCheck(root);
             if (failed) return new PushResult("failed", 0, [], "gönderilecek commit'ler okunamadı");
             if (findings.Count > 0) return new PushResult("secret", 0, findings, null);
             var hasUpstream = Run(root, LocalTimeoutMs, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").Ok;
