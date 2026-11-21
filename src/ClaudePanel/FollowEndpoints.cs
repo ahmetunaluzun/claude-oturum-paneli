@@ -5,6 +5,7 @@ public sealed record HostedRequest(string? Cwd, string? Prompt, string? Model, s
 public sealed record FollowRepoRequest(string? Path, bool? Push, string? Lang);
 public sealed record FollowAllRequest(string[]? Paths, string? Lang);
 public sealed record FollowLedgerRequest(string? Ledger, string[]? Files, string? Lang);
+public sealed record GitHubRequest(bool? Enabled);
 
 /// <summary>
 /// Takip 2. aşama uçları (0.12.0): aynı projede ikinci oturumu önleyen başlatma (/api/hosted'ın gövdesi) ve
@@ -101,6 +102,22 @@ public static class FollowEndpoints
             if (!authorized(ctx)) return Results.StatusCode(403);
             return updater.Start(fu.ForceRefresh) ? Results.Json(updater.State, statusCode: 202) : Results.Json(new { error = "busy" }, statusCode: 409);
         });
+        // Takip → GitHub (GitHubWatch.cs): aç/kapat (kalıcı) ve "Yenile"de şimdi denetle. Panel GitHub'a yazmaz.
+        app.MapGet("/api/github", (GitHubWatch gh) => Results.Json(Brief(gh)));
+        app.MapPost("/api/github", async (HttpContext ctx, GitHubWatch gh) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<GitHubRequest>();
+            if (req?.Enabled is not { } on) return Results.BadRequest();
+            gh.SetEnabled(on);
+            return Results.Json(Brief(gh));
+        });
+        app.MapPost("/api/github/refresh", (HttpContext ctx, GitHubWatch gh) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            gh.Poke();
+            return Results.Json(Brief(gh), statusCode: 202);
+        });
         // Tümünü commit et ve gönder: tek iş, depolar sırayla; sorunlu depo atlanır ve satırında raporlanır.
         app.MapPost("/api/follow/all", async (HttpContext ctx, FollowUp fu, FollowJobs jobs) =>
         {
@@ -124,6 +141,12 @@ public static class FollowEndpoints
             var job = jobs.EnqueueLedger(rows[0].Ledger, rows[0].Name, withOlder.Distinct(StringComparer.OrdinalIgnoreCase).ToList()!, req.Lang);
             return job is null ? Results.Json(new { error = "jobactive" }, statusCode: 409) : Results.Json(job);
         });
+    }
+
+    static object Brief(GitHubWatch gh)
+    {
+        var s = gh.Snapshot();
+        return new { enabled = gh.Enabled, state = s.State, login = s.Login };
     }
 
     /// <summary>Yalnız Takip'in bildiği depolar işlenir (istekle rastgele klasörde git/claude çalıştırılamaz).</summary>

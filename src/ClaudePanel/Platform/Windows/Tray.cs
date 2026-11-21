@@ -97,6 +97,12 @@ sealed class Tray(string baseUrl, SessionStore store, HostedSessions hosted, IHo
         finally { Monitor.Exit(_watch); }
     }
 
+    /// <summary>Oturum dışı kaynakların bildirimi (Takip → GitHub); "Bildirimler" kapalıysa gösterilmez.</summary>
+    public void Notify(string title, string text)
+    {
+        if (_settings.Notify) _ui?.Post(_ => Show(title, text), null);
+    }
+
     /// <summary>Açık panel penceresini öne getirir, yoksa açar. Süreç taraması (WMI) tepsi iş parçacığını bekletmesin.</summary>
     void OpenWindow() => Task.Run(() => Launcher.OpenAppWindow(baseUrl));
 

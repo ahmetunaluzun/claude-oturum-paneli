@@ -18,15 +18,16 @@ public sealed record FollowNext(string Name, string Cwd, long UpdatedAt, string 
 /// <param name="Sched">Zamanlanmış işler: zamanlayıcı görevleri, Claude görev dosyaları, verilmiş sözler (ScheduledJobs.cs).</param>
 /// <param name="Loops">Açık oturumlardaki tekrarlı işler; her okumada canlı hesaplanır (LoopScan.cs).</param>
 /// <param name="QuotaLow">Kota düşükse kalan yüzdeler (tekrarlı iş uyarısı için); değilse null.</param>
+/// <param name="Github">Kullanıcının depolarındaki açık issue ve PR'lar; her okumada son bilinen durum (GitHubWatch.cs).</param>
 public sealed record FollowSnapshot(long CheckedAt, bool Scanning, FollowGit Git, IReadOnlyList<FollowNext> Next, UpdateInfo Updates, IReadOnlyList<FollowDrive> Drive,
-    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow, ClaudeUpdateState? ClaudeUpdate = null);
+    FollowSched Sched, IReadOnlyList<LoopInfo> Loops, SchedQuota? QuotaLow, ClaudeUpdateState? ClaudeUpdate = null, GhSnapshot? Github = null);
 
 /// <summary>
 /// "Takip" sekmesinin kota harcamayan kaynakları: bilinen projelerin git durumu, NEXT_SESSION.md dosyaları ve
 /// güncellemeler (UpdateCheck). Tarama arka planda yapılır, sonuç önbellekte durur; ağ yalnız güncelleme denetiminde kullanılır
 /// (git fetch yapılmaz). Yeni kaynak (takvim, mail) eklenirken: anlık görüntüye alan + Scan'e adım.
 /// </summary>
-public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ClaudeUpdater claudeUpdater, ScheduledJobs sched, ILogger<FollowUp> log)
+public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck updates, ClaudeUpdater claudeUpdater, ScheduledJobs sched, GitHubWatch github, ILogger<FollowUp> log)
 {
     static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(150);
     const int GitTimeoutMs = 5000;
@@ -35,6 +36,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
 
     static readonly FollowSnapshot Empty = new(0, true, new FollowGit("ok", [], 0, 0), [], UpdateInfo.Unknown, [], FollowSched.Empty, [], null);
     volatile FollowSnapshot _snap = Empty;
+    volatile IReadOnlyDictionary<string, string> _ghRoots = new Dictionary<string, string>();
     int _scanning, _again;
 
     /// <summary>Son anlık görüntü; bayatsa (ya da hiç yoksa) arka planda yeniler.</summary>
@@ -42,7 +44,7 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     {
         var s = _snap;
         if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - s.CheckedAt > StaleAfter.TotalMilliseconds) Refresh();
-        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow(), ClaudeUpdate = claudeUpdater.State };
+        return s with { Scanning = _scanning == 1, Loops = sched.Loops(), QuotaLow = ScheduledJobs.QuotaLow(), ClaudeUpdate = claudeUpdater.State, Github = github.Snapshot(_ghRoots) };
     }
 
     /// <summary>Yeniden tarar; tarama sürüyorsa o bitince bir kez daha (süren tarama değişiklikten önceki durumu okumuş olabilir).</summary>
@@ -75,7 +77,9 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     async Task<FollowSnapshot> Scan()
     {
         var projects = transcripts.Projects();
-        var git = ScanGit(projects);
+        var roots = projects.Select(p => GitRoot(p.Cwd)).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var git = ScanGit(roots);
+        if (github.Enabled && git.State == "ok") _ghRoots = GitHubRoots(roots);
         var next = ScanNext(projects);
         // Kütükler proje klasörlerinde ve git köklerinde aranır (alt klasör taranmaz).
         var drive = DriveLedger.Scan(projects.SelectMany(p => new[] { p.Cwd, ProjectRoots.Of(p.Cwd) }).Where(Directory.Exists));
@@ -88,10 +92,8 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
 
     // ---- Git ----
 
-    FollowGit ScanGit(IReadOnlyList<Transcripts.ProjectInfo> projects)
+    FollowGit ScanGit(List<string> roots)
     {
-        var roots = projects.Select(p => GitRoot(p.Cwd)).OfType<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var repos = new List<FollowRepo>();
         int clean = 0, failed = 0;
         foreach (var root in roots)
@@ -114,6 +116,25 @@ public sealed partial class FollowUp(Transcripts transcripts, UpdateCheck update
     }
 
     static string? GitRoot(string cwd) => ProjectRoots.GitRoot(cwd);
+
+    static readonly TimeSpan OriginTtl = TimeSpan.FromHours(1);
+    readonly Dictionary<string, (string? Repo, DateTime At)> _origins = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// "sahip/depo" (küçük harf) → yerel git kökü: origin uzak adresi GitHub olan depolar (Takip → GitHub satırındaki
+    /// "Oturumda ele al" için). Adres depo başına saatte bir okunur (yalnız tarama iş parçacığından çağrılır).
+    /// </summary>
+    Dictionary<string, string> GitHubRoots(List<string> roots)
+    {
+        var map = new Dictionary<string, string>();
+        foreach (var root in roots)
+        {
+            if (!_origins.TryGetValue(root, out var o) || DateTime.UtcNow - o.At > OriginTtl)
+                _origins[root] = o = (GitHubWatch.RepoOf(Git(root, "config", "--get", "remote.origin.url")), DateTime.UtcNow);
+            if (o.Repo is not null) map.TryAdd(o.Repo.ToLowerInvariant(), root);
+        }
+        return map;
+    }
 
     /// <summary>`git status --porcelain=v2 --branch` çıktısı: başlık satırları (# branch.*) + dosya satırları.</summary>
     static FollowRepo ParseStatus(string root, string status)

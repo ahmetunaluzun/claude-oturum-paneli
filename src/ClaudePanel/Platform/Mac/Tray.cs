@@ -21,6 +21,10 @@ sealed class Tray(string baseUrl, SessionStore store, HostedSessions hosted, IHo
         life.ApplicationStopping.Register(() => _timer?.Dispose());
     }
 
+    /// <summary>Oturum dışı kaynakların bildirimi (Takip → GitHub).</summary>
+    public void Notify(string title, string text) =>
+        Sh.Osa("on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run", [title, text]);
+
     void Poll()
     {
         if (!Monitor.TryEnter(_watch)) return;

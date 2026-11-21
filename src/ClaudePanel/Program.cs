@@ -45,6 +45,7 @@ builder.Services.AddSingleton<UpdateCheck>();
 builder.Services.AddSingleton<ClaudeUpdater>();
 builder.Services.AddSingleton<LoopScan>();
 builder.Services.AddSingleton<ScheduledJobs>();
+builder.Services.AddSingleton<GitHubWatch>();
 builder.Services.AddSingleton<FollowUp>();
 builder.Services.AddSingleton<ProjectGuard>();
 builder.Services.AddSingleton<FollowJobs>();
@@ -555,6 +556,10 @@ app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();
 app.Services.GetRequiredService<PlannedJobs>().Start();
 app.Services.GetRequiredService<ProjectGuard>().Start();
+// Takip → GitHub: pencere kapalıyken de 15 dakikada bir denetler; yeni "cevap bekliyor" öğesi tepsi bildirimi verir.
+var ghWatch = app.Services.GetRequiredService<GitHubWatch>();
+ghWatch.Notify = app.Services.GetRequiredService<Tray>().Notify;
+ghWatch.Start();
 if (!args.Contains("--no-window")) Launcher.OpenAppWindow(baseUrl, fresh: true);
 await app.WaitForShutdownAsync();
 
