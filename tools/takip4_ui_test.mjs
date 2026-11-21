@@ -132,14 +132,14 @@ check("sıra: geçen söz, bugünkü söz, okunamayanlar, hatalı görevler; son
 
 // ---- zamanlayıcı görevleri ----
 let r = await rowInfo("task", "Rapor Gönder");
-check("hatalı görev: etiketler, sonuç metni, tek düğme", [r.etiket, /Sonraki: .* sonra · Son: .* önce — hata ile bitti \(çıkış kodu 1\)$/.test(r.ne), r.dugme], [["Görev Zamanlayıcı", "son çalışma hatalı"], true, ["Devre dışı bırak"]]);
+check("hatalı görev: etiketler, sonuç metni, Claude'a incelet + Devre dışı bırak", [r.etiket, /Sonraki: .* sonra · Son: .* önce — hata ile bitti \(çıkış kodu 1\)$/.test(r.ne), r.dugme], [["Görev Zamanlayıcı", "son çalışma hatalı"], true, ["Claude'a incelet", "Devre dışı bırak"]]);
 check("sonuç kodları anlaşılır metne çevrildi", [(await rowInfo("task", "Demo Yedek")).ne.endsWith("— başarılı"), (await rowInfo("task", "Kanca Temizliği")).ne.endsWith("— şu an çalışıyor"),
   (await rowInfo("task", "Kapalı Görev")).ne, (await rowInfo("task", "Yetkisiz Görev")).ne.endsWith("— dosya bulunamadı")], [true, true, "henüz çalışmadı", true]);
 check("devre dışı görev: etiket var, düğme yok, soluk", [(await rowInfo("task", "Kapalı Görev")).etiket, (await rowInfo("task", "Kapalı Görev")).dugme, (await rowInfo("task", "Kapalı Görev")).sinif], [["Görev Zamanlayıcı", "devre dışı"], [], ["fu-stale"]]);
-check("kaynak izin vermiyorsa düğme yok", (await rowInfo("task", "Yetkisiz Görev")).dugme, []);
+check("kaynak izin vermiyorsa Devre dışı bırak yok (yalnız Claude'a incelet)", (await rowInfo("task", "Yetkisiz Görev")).dugme, ["Claude'a incelet"]);
 await toggleRow("task", "Rapor Gönder");
-check("açılan ayrıntı: Klasörde göster + Ertele + Gizle; komut satırı görünür", [(await rowInfo("task", "Rapor Gönder")).ek, await ev(`${rowOf("task", "Rapor Gönder")}.querySelector(".fu-main small").textContent.startsWith("cmd.exe /c ")`)],
-  [["Klasörde göster", "Ertele (yarına)", "Gizle"], true]);
+check("açılan ayrıntı: Şimdi çalıştır + kod notu + Klasörde göster + Ertele + Gizle (log yok); komut satırı görünür", [(await rowInfo("task", "Rapor Gönder")).ek, await ev(`${rowOf("task", "Rapor Gönder")}.querySelector(".fu-main small").textContent.startsWith("cmd.exe /c ")`)],
+  [["Şimdi çalıştır", "Bu kod bu görev için normal", "Klasörde göster", "Ertele (yarına)", "Gizle"], true]);
 await toggleRow("task", "Rapor Gönder");
 
 // ---- Devre dışı bırak: panelin onay penceresi ----
@@ -257,10 +257,10 @@ check("açık temada geçen söz okunur kırmızı", await ev(`getComputedStyle(
 await open(390, { remote: true, extra: [{ ...TERM[0], id: "wake:p1", sessionId: "p1", key: "panel-anahtari", pid: null, name: "Panel Demo", noopStreak: 4 }, ...TERM] });
 await openCont(SEC);
 check("telefon: sayfa uzak kipte", await ev(`document.querySelector('meta[name="panel-remote"]').content`), "1");
-check("telefon: görevlerde 'Devre dışı bırak' yok", await ev(`[...document.querySelectorAll('.fu-row[data-type="task"] .fu-side .btn')].length`), 0);
+check("telefon: görevlerde 'Devre dışı bırak' yok; hatalı görevlerde Claude'a incelet var", await ev(`[...document.querySelectorAll('.fu-row[data-type="task"] .fu-side .btn')].map(b => b.textContent)`), ["Claude'a incelet", "Claude'a incelet"]);
 await openAllRows();
 await sleep(400);
-check("telefon: hiçbir satırda 'Klasörde göster' yok; Ertele / Gizle var", await ev(`[[...document.querySelectorAll(".fu-more .btn")].filter(b => b.textContent === "Klasörde göster").length, [...document.querySelectorAll(".fu-more .btn")].some(b => b.textContent === "Gizle")]`), [0, true]);
+check("telefon: hiçbir satırda 'Klasörde göster' / 'Şimdi çalıştır' / 'Logu aç' yok; Ertele / Gizle var", await ev(`[[...document.querySelectorAll(".fu-more .btn")].filter(b => ["Klasörde göster", "Şimdi çalıştır", "Logu aç"].includes(b.textContent)).length, [...document.querySelectorAll(".fu-more .btn")].some(b => b.textContent === "Gizle")]`), [0, true]);
 check("telefon: panel oturumundaki döngüde Durdur var, terminalde bilgi", [(await loops())[0].dugme, (await loops())[1].yan], [["Durdur*"], ["Terminalden durdurun"]]);
 check("telefon 390 px, tüm satırlar açık: taşma yok, dokunma hedefleri ≥ 44 px", await measure(), CLEAN);
 await ev(`(async () => { for (const b of document.querySelectorAll('.fu-row.fu-open .fu-tog')) b.click(); })()`);
@@ -276,7 +276,7 @@ await openAllRows();
 await sleep(400);
 check("İngilizce: çevrilmemiş anahtar yok", await ev(`[...document.querySelectorAll("#viewFollow *")].filter(e => !e.children.length && /^(fu|pc|err_)[A-Za-z_]+$/.test(e.textContent.trim())).map(e => e.textContent)`), []);
 check("İngilizce: çip, görev etiketi, düğme, söz", [await ev(`document.querySelector('.fu-chip[data-filter="sched"]').firstChild.textContent`), (await rowInfo("task", "Rapor Gönder")).etiket, (await rowInfo("task", "Rapor Gönder")).dugme,
-  (await rowInfo("promise", "Ödeme sağlayıcısının yanıtını kontrol et")).etiket[1]], ["Scheduled", ["Task Scheduler", "last run failed"], ["Disable"], "3 day(s) overdue"]);
+  (await rowInfo("promise", "Ödeme sağlayıcısının yanıtını kontrol et")).etiket[1]], ["Scheduled", ["Task Scheduler", "last run failed"], ["Ask Claude to check", "Disable"], "3 day(s) overdue"]);
 check("İngilizce: taşma yok", await measure(), CLEAN);
 
 await tally();

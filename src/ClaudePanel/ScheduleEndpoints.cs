@@ -4,10 +4,11 @@ public sealed record SchedDisableRequest(string? Id);
 public sealed record SchedStopRequest(string? Key, string? Lang);
 
 /// <summary>
-/// Takip → "Zamanlanmış işler" uçları (0.14.0). Panel kendiliğinden hiçbir şeyi durdurmaz: iki uç da kullanıcının
+/// Takip → "Zamanlanmış işler" uçları (0.14.0). Panel kendiliğinden hiçbir şeyi durdurmaz: her uç kullanıcının
 /// onayladığı tek işlemi yapar.
 ///   POST /api/schedule/disable  → Takip'te listelenen bir zamanlayıcı görevini devre dışı bırakır. YALNIZ bilgisayardan
 ///                                 (telefondan 403; yol ayrıca Remote.Blocked listesinde).
+///   POST /api/schedule/run      → listelenen görevi şimdi çalıştırır; POST /api/schedule/log → logunu açar (ikisi de yalnız bilgisayardan).
 ///   POST /api/schedule/stop     → panelde barındırılan oturuma "tekrarlı işleri durdur" mesajı gönderir (mevcut gönderim
 ///                                 yolu; oturum çalışıyorsa iş bitince). Terminal oturumuna mesaj gönderilemez.
 /// </summary>
@@ -35,6 +36,38 @@ public static class ScheduleEndpoints
             RemoteLog.Info(error is null ? $"Zamanlanmış görev devre dışı bırakıldı: {task.Id}" : $"Zamanlanmış görev devre dışı bırakılamadı ({error}): {task.Id}");
             if (error is not null) return Results.Json(new { error = "task" + error }, statusCode: error == "notfound" ? 404 : 409);
             fu.Refresh();
+            return Results.Json(new { ok = true });
+        });
+
+        // Görevi şimdi çalıştırır (Görev Zamanlayıcı'daki "Çalıştır"). Yalnız bilgisayardan, yalnız Takip'in listelediği görev.
+        app.MapPost("/api/schedule/run", async (HttpContext ctx, FollowUp fu) =>
+        {
+            if (!isLocal(ctx) || !authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<SchedDisableRequest>();
+            if (string.IsNullOrEmpty(req?.Id)) return Results.BadRequest();
+            var task = fu.Get().Sched.Os.Tasks.FirstOrDefault(t => t.Id == req.Id);
+            if (task is null) return Results.Json(new { error = "notask" }, statusCode: 404);
+            if (!task.CanDisable) return Results.Json(new { error = "taskunsupported" }, statusCode: 400);
+            var error = await Task.Run(() => OsTasks.Run(task.Id));
+            RemoteLog.Info(error is null ? $"Zamanlanmış görev elle çalıştırıldı: {task.Id}" : $"Zamanlanmış görev çalıştırılamadı ({error}): {task.Id}");
+            if (error is not null) return Results.Json(new { error = "task" + error }, statusCode: error == "notfound" ? 404 : 409);
+            fu.Refresh();
+            return Results.Json(new { ok = true });
+        });
+
+        // Görevin logunu açar: dosya metin düzenleyicide, klasör Gezgin'de. Yol istemciden ALINMAZ (taramanın bulduğu yol).
+        app.MapPost("/api/schedule/log", async (HttpContext ctx, FollowUp fu) =>
+        {
+            if (!isLocal(ctx) || !authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<SchedDisableRequest>();
+            if (string.IsNullOrEmpty(req?.Id)) return Results.BadRequest();
+            var log = fu.Get().Sched.Os.Tasks.FirstOrDefault(t => t.Id == req.Id)?.Log;
+            if (log is null) return Results.Json(new { error = "nolog" }, statusCode: 404);
+            // Sahte zamanlayıcıyla (test) pencere açılmaz; açılacak yol döner.
+            if (OsTasks.Kind == "test") return Results.Json(new { ok = true, opened = log });
+            if (Directory.Exists(log)) Native.RevealFolder(log);
+            else if (File.Exists(log)) Native.OpenText(log);
+            else return Results.Json(new { error = "nolog" }, statusCode: 404);
             return Results.Json(new { ok = true });
         });
 

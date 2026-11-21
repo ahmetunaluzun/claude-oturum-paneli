@@ -607,7 +607,7 @@ static class Remote
     static readonly string[] Blocked =
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
-        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable"
+        "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable", "/api/schedule/run", "/api/schedule/log"
     ];
 
     public static bool IsPublic(string path) => Public.Contains(path);

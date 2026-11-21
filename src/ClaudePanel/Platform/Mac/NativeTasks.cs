@@ -26,4 +26,5 @@ static class NativeTasks
     }
 
     public static string? Disable(string id) => "unsupported";
+    public static string? Run(string id) => "unsupported";
 }

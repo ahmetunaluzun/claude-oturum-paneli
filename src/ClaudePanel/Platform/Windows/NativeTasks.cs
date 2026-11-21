@@ -4,7 +4,8 @@ namespace ClaudePanel;
 
 /// <summary>
 /// Windows Görev Zamanlayıcı (Schedule.Service COM arayüzü; süreç başlatılmaz, çıktı diline bağlı değildir).
-/// Yalnız listeler ve kullanıcının onayıyla tek görevi devre dışı bırakır; görev oluşturmaz, silmez, çalıştırmaz.
+/// Yalnız listeler ve kullanıcının onayıyla tek görevi devre dışı bırakır ya da hemen çalıştırır (Görev Zamanlayıcı'daki "Çalıştır";
+/// görevin kendi tanımıyla, kendi kullanıcısıyla). Görev oluşturmaz, silmez, değiştirmez.
 /// </summary>
 static class NativeTasks
 {
@@ -66,7 +67,21 @@ static class NativeTasks
     static long? Ms(DateTime local) =>
         local.Year < 2000 ? null : new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local)).ToUnixTimeMilliseconds();
 
-    public static string? Disable(string path)
+    public static string? Disable(string path) => Act(path, "devre dışı bırakılamadı", task =>
+    {
+        task.Enabled = false;
+        return (bool)task.Enabled ? "failed" : null;
+    });
+
+    /// <summary>Görevi şimdi çalıştırır (IRegisteredTask.Run). Devre dışı görev çalıştırılmaz: "disabled".</summary>
+    public static string? Run(string path) => Act(path, "çalıştırılamadı", task =>
+    {
+        if (!(bool)task.Enabled) return "disabled";
+        task.Run(null);
+        return null;
+    });
+
+    static string? Act(string path, string what, Func<dynamic, string?> act)
     {
         try
         {
@@ -74,15 +89,14 @@ static class NativeTasks
             var at = path.LastIndexOf('\\');
             if (at < 0) return "notfound";
             dynamic task = svc.GetFolder(at == 0 ? "\\" : path[..at]).GetTask(path[(at + 1)..]);
-            task.Enabled = false;
-            return (bool)task.Enabled ? "failed" : null;
+            return act(task);
         }
         catch (UnauthorizedAccessException) { return "denied"; }
         catch (COMException ex) when (unchecked((uint)ex.HResult) == 0x80070005) { return "denied"; }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return "notfound"; }
         catch (COMException ex)
         {
-            RemoteLog.Info($"Görev devre dışı bırakılamadı: 0x{unchecked((uint)ex.HResult):X8}");
+            RemoteLog.Info($"Görev {what}: 0x{unchecked((uint)ex.HResult):X8}");
             return unchecked((uint)ex.HResult) is 0x80070002 or 0x80070003 ? "notfound" : "failed";
         }
         catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException) { return "failed"; }

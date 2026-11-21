@@ -49,6 +49,9 @@ static class Native
 
     public static void RevealFolder(string path) => Sh.Run("/usr/bin/open", [path]);
 
+    /// <summary>Metin dosyasını TextEdit'te açar (-t: varsayılan metin düzenleyici; çalıştırılmaz).</summary>
+    public static void OpenText(string path) => Sh.Run("/usr/bin/open", ["-t", path]);
+
     /// <summary>Dosyayı Finder'da seçili gösterir (açmaz).</summary>
     public static void RevealFile(string path) => Sh.Run("/usr/bin/open", ["-R", path]);
 

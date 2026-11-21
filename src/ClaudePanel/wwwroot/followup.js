@@ -366,7 +366,8 @@ window.PanelFollowUp = function (d) {
   }
 
   const D = window.PanelFollowDrive({ t, api, toast, dur, now, low, tag, jobOf, isActive, runJob, confirmBox, button, S, REMOTE, rerender: () => render() });
-  const Z = window.PanelFollowSched({ t, api, toast, dur, now, low, tag, confirmBox, button, lang, REMOTE, reload: () => load(false) });
+  const Z = window.PanelFollowSched({ t, api, toast, dur, now, low, tag, confirmBox, button, lang, REMOTE, startHosted, setView, S,
+    reload: () => load(false) });
   const P = window.PanelFollowPlan({ t, api, getJson, toast, dur, now, low, tag, confirmBox, ask, button, lang, items, openDrawer, openMenu,
     reload: () => render() });
   const G = window.PanelFollowGithub({ t, api, getJson, toast, dur, now, low, tag, button, startHosted, setView, reload: () => load(false) });

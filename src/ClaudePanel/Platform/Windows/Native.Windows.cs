@@ -45,6 +45,10 @@ static class Native
     public static void RevealFolder(string path) =>
         Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { path }, UseShellExecute = false });
 
+    /// <summary>Metin dosyasını Not Defteri'nde açar (dosya türü ilişkilendirmesi kullanılmaz: hiçbir şey çalıştırılmaz).</summary>
+    public static void OpenText(string path) =>
+        Process.Start(new ProcessStartInfo("notepad.exe") { ArgumentList = { path }, UseShellExecute = false });
+
     /// <summary>Dosyayı Gezgin'de seçili gösterir (açmaz/çalıştırmaz). Yol var olan yerel dosya olmalı.</summary>
     public static void RevealFile(string path) =>
         Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"/select,\"{path}\"", UseShellExecute = false });

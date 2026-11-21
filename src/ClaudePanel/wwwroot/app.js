@@ -17,7 +17,7 @@
   const save = () => localStorage.setItem("panel.settings", JSON.stringify(settings));
   const t = (key, ...args) => {
     const s = (I18N[settings.lang] || I18N.tr)[key] ?? key;
-    return args.reduce((acc, a, i) => acc.replace(`{${i}}`, a), s);
+    return args.reduce((acc, a, i) => acc.replace(`{${i}}`, () => a), s); // işlev: değerdeki "$&", "$'" özel sayılmasın
   };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const folderName = (p) => (p || "").split(/[\\/]/).filter(Boolean).pop() || p;

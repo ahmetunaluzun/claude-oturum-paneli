@@ -6,8 +6,10 @@ namespace ClaudePanel;
 /// <summary>Takip'te gösterilen işletim sistemi görevi: OsTask + eşleşen proje + gösterilecek yol.</summary>
 /// <param name="Root">Eylemin altında durduğu proje kökü; proje eşleşmediyse null.</param>
 /// <param name="Reveal">"Klasörde göster" hedefi (betik, çalışma klasörü ya da program); yoksa null.</param>
+/// <param name="Log">Görevin logu (var olan dosya ya da klasör, TaskLogs.cs); bulunamadıysa null.</param>
+/// <param name="Cwd">"Claude'a incelet" oturumunun klasörü: proje kökü, yoksa çalışma klasörü, yoksa betiğin klasörü; yoksa null.</param>
 public sealed record SchedTask(string Id, string Name, string Folder, bool Enabled, long? NextRun, long? LastRun, long? LastResult,
-    string Command, string? Schedule, string? Root, string? Project, string? Reveal, bool CanDisable, bool Unreadable);
+    string Command, string? Schedule, string? Root, string? Project, string? Reveal, bool CanDisable, bool Unreadable, string? Log = null, string? Cwd = null);
 
 /// <param name="State">"ok" | "failed" (zamanlayıcı okunamadı).</param>
 /// <param name="Kind">"windows" | "mac" | "test".</param>
@@ -82,14 +84,17 @@ public sealed partial class ScheduledJobs(SessionStore store, HostedSessions hos
             if (t.Unreadable) { list.Add(new SchedTask(t.Id, t.Name, t.Folder, t.Enabled, null, null, null, "", null, null, null, t.Id, false, true)); continue; }
             if (Match(t, roots) is not { } m) continue;
             var command = (Path.GetFileName(t.Command) + " " + t.Args).Trim();
+            var script = TaskLogs.ScriptOf(t, m.Script);
+            var cwd = m.Root ?? (Directory.Exists(t.WorkDir) ? t.WorkDir : script is not null ? Path.GetDirectoryName(script) : null);
             list.Add(new SchedTask(t.Id, t.Name, t.Folder, t.Enabled, t.NextRun, t.LastRun, t.LastResult, Shorten(command), t.Schedule,
-                m.Root, m.Root is null ? null : Path.GetFileName(m.Root), m.Reveal, t.CanDisable, false));
+                m.Root, m.Root is null ? null : Path.GetFileName(m.Root), m.Reveal, t.CanDisable, false, TaskLogs.Find(t, script),
+                cwd is not null && Directory.Exists(cwd) ? cwd : null));
         }
         return new SchedOs("ok", OsTasks.Kind, list.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
     }
 
     /// <summary>Görev Takip'i ilgilendiriyor mu; ilgilendiriyorsa eşleşen proje kökü ve gösterilecek yol.</summary>
-    public static (string? Root, string? Reveal)? Match(OsTask t, IReadOnlyList<string> roots)
+    public static (string? Root, string? Reveal, string? Script)? Match(OsTask t, IReadOnlyList<string> roots)
     {
         var paths = new List<string>();
         if (t.Command.Length > 0) paths.Add(t.Command);
@@ -113,7 +118,7 @@ public sealed partial class ScheduledJobs(SessionStore store, HostedSessions hos
         var system = t.Folder.StartsWith(@"\Microsoft", StringComparison.OrdinalIgnoreCase);
         if (root is null && (system || !(runner || script is not null || claudeDir))) return null;
         var reveal = script ?? full.Skip(1).FirstOrDefault(p => root is not null && Under(p, root)) ?? (t.WorkDir.Length > 0 ? t.WorkDir : t.Command);
-        return (root, Path.IsPathFullyQualified(reveal) ? reveal : null);
+        return (root, Path.IsPathFullyQualified(reveal) ? reveal : null, script is not null && Path.IsPathFullyQualified(script) ? script : null);
     }
 
     static bool IsScript(string p) => ScriptExt.Any(e => p.EndsWith(e, StringComparison.OrdinalIgnoreCase));

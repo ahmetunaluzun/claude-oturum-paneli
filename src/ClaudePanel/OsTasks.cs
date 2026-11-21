@@ -41,7 +41,8 @@ public static class OsTasks
         return Isolated ? [] : NativeTasks.List();
     }
 
-    /// <summary>Görevi devre dışı bırakır. null: oldu; yoksa hata kodu ("unsupported" | "denied" | "notfound" | "failed").</summary>
+    /// <summary>Görevi devre dışı bırakır. null: oldu; yoksa hata kodu ("unsupported" | "denied" | "notfound" | "failed").
+    /// Test dosyası modunda (CLAUDE_PANEL_TASKS_FILE) Run da yalnız bu dosyaya yazar.</summary>
     public static string? Disable(string id)
     {
         if (FakeFile is null) return AgentsDir is not null || Isolated ? "unsupported" : NativeTasks.Disable(id);
@@ -52,6 +53,23 @@ public static class OsTasks
             if (list is null || at < 0) return "notfound";
             if (!list[at].CanDisable) return "denied";
             list[at] = list[at] with { Enabled = false, NextRun = null };
+            File.WriteAllText(FakeFile, JsonSerializer.Serialize(list, Json), new UTF8Encoding(false));
+            return null;
+        }
+    }
+
+    /// <summary>Görevi hemen çalıştırır. null: başlatıldı; yoksa hata kodu ("unsupported" | "disabled" | "denied" | "notfound" | "failed").
+    /// Test dosyasında görev çalıştırılmaz: son çalışma "şimdi", sonuç "çalışıyor" (0x41301) olarak yazılır.</summary>
+    public static string? Run(string id)
+    {
+        if (FakeFile is null) return AgentsDir is not null || Isolated ? "unsupported" : NativeTasks.Run(id);
+        lock (FakeLock)
+        {
+            var list = ReadFake();
+            var at = list?.FindIndex(t => t.Id == id) ?? -1;
+            if (list is null || at < 0) return "notfound";
+            if (!list[at].Enabled) return "disabled";
+            list[at] = list[at] with { LastRun = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), LastResult = 0x41301 };
             File.WriteAllText(FakeFile, JsonSerializer.Serialize(list, Json), new UTF8Encoding(false));
             return null;
         }
