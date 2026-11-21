@@ -33,11 +33,17 @@
 
   // ---- Sunucu ----
   async function api(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : null
-    });
+    let res;
+    try {
+      res = await fetch(path, {
+        method: "POST",
+        headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : null
+      });
+    } catch {
+      // Ağ hatası (telefonda kısa kopma): fırlatmak yerine "offline" döner; çağıranlar err_offline uyarısını gösterir.
+      return { ok: false, status: 0, data: { error: "offline" } };
+    }
     let data = null;
     try { data = await res.json(); } catch { /* gövde yok */ }
     return { ok: res.ok, status: res.status, data };
@@ -1277,6 +1283,8 @@
   $("dClose").addEventListener("click", closeDrawer);
   $("scrim").addEventListener("click", closeDrawer);
   $("dComposer").addEventListener("submit", (e) => { e.preventDefault(); sendFromDrawer(); });
+  // Gönder'e dokunmak yazı alanından odağı almasın: telefonda klavye kapanıp sayfa kaymasın (WhatsApp gibi).
+  $("dSend").addEventListener("mousedown", (e) => { if (document.activeElement === $("dInput")) e.preventDefault(); });
 
   // ---- "/" komut listesi (terminaldeki gibi) ----
   const slash = { items: [], idx: 0, open: false, cacheKey: null, all: [] };
