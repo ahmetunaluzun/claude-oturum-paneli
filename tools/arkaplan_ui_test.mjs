@@ -120,6 +120,7 @@ check("uyarı: başlık, oturum boşta olduğu için arka plan metni", [d1?.titl
 check("uyarı: üç iş de listede", [d1?.list.length, d1?.list.some(x => x.includes("Uzun araştırma")), d1?.list.some(x => x.includes("Derleme izleyici") && x.includes("komut")),
   d1?.list.some(x => x.includes("Takılmış ajan") && x.includes("(takılmış olabilir)"))], [3, true, true, true]);
 check("uyarı: düğmeler Vazgeç / İşler bitince yeniden başlat / Yine de şimdi", d1?.buttons, ["Vazgeç", "İşler bitince yeniden başlat", "Yine de şimdi"]);
+check("uyarı: 1280'de üç düğme tek satırda", await ev(`new Set([...document.querySelectorAll("#askButtons .btn")].map(b => Math.round(b.getBoundingClientRect().top))).size`), 1);
 await shot("1280_onay");
 const pid0 = (await version()).pid;
 await press("cancel");

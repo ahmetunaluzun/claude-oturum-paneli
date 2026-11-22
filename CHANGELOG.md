@@ -2,6 +2,10 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## Yayınlanmamış
+- **Bozuk JSON gövdesi artık 400 döner (500 değil).** Uçlardaki `ReadFromJsonAsync` bozuk gövdede `JsonException` fırlatıyordu; 40 uç için tek ara katman (`Program.cs`) yakalar, `{"error":"badjson"}` döner. Test: `tools/arkaplan_ui_test.sh` "bozuk JSON gövdesi 400".
+- **Yeniden başlat onayında "Yine de şimdi" 1280 px'te alt satıra düşmüyor.** Üç düğmeli onay penceresi 440 yerine 540 px genişlikte açılır (dar ekranda yine sarar). Test: "1280'de üç düğme tek satırda".
+
 ## 0.18.0 — 2026-11-22
 - **Arka plan işi görünürlüğü: yeniden başlatma/kapatma artık arka plandaki işi kesmez.** Panelde barındırılan bir oturum cevabını bitirince "boşta" görünür ama içinde arka planda çalışan alt ajan ya da arka plan komutu sürebilir; Yeniden başlat ve Kapat yalnız çalışan oturumlara baktığı için bunları sessizce kesiyordu, kullanıcı da bunu göremiyordu.
   - **Tespit (yalnız okur):** oturumun konuşma kaydından, artımlı: alt ajan (`isAsync` + `agentId`) ve arka plan komutu (`backgroundTaskId`) başlangıcı, eşleşen bitiş bildirimi (completed / failed / killed / stopped) gelmemişse iş sürüyor sayılır. Ek güvence: alt ajanın kaydı son 2 dakikada yazıldıysa çalışıyor sayılır; bildirim yok ve 6 saattir iz yoksa "takılmış olabilir" (bitti sayılmaz, uyarıda gösterilir). Eşzamanlı alt ajan sayılmaz.

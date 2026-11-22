@@ -116,6 +116,18 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// Bozuk JSON gövdesi: uçlardaki ReadFromJsonAsync JsonException fırlatır; 500 yerine 400 dönülür (tüm uçlar için tek yer).
+app.Use(async (ctx, next) =>
+{
+    try { await next(); }
+    catch (JsonException) when (!ctx.Response.HasStarted)
+    {
+        ctx.Response.Clear();
+        ctx.Response.StatusCode = 400;
+        await ctx.Response.WriteAsJsonAsync(new { error = "badjson" });
+    }
+});
+
 // Değişiklik yapan istekler: oturum anahtarı + aynı köken zorunlu (CSRF koruması).
 bool Authorized(HttpContext ctx)
 {

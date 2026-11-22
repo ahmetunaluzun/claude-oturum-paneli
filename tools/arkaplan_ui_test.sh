@@ -24,6 +24,8 @@ CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\data" CLAUDE_PANEL_CLAUDE_DIR="$T
   CLAUDE_PANEL_GH_EXE="$TW\yok.cmd" TMP="$TW\tmp" TEMP="$TW\tmp" "$EXE" --no-window >/dev/null 2>&1 &
 for _ in $(seq 1 60); do [ -f "$T/data/panel-$PORT.token" ] && curl -s -o /dev/null "$B/api/ping" && break; sleep 0.25; done
 check "test kopyası açıldı" "$(curl -s -o /dev/null -w '%{http_code}' "$B/api/state")" 200
+TOK0=$(cat "$T/data/panel-$PORT.token" 2>/dev/null)
+check "bozuk JSON gövdesi 400 (500 değil)" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$B/api/mail/accounts/aliases" -H "X-Panel-Token: $TOK0" -H "Origin: $B" -H 'Content-Type: application/json' --data '{bozuk')" 400
 "$CHROME" --headless=new --disable-gpu --hide-scrollbars --no-first-run --user-data-dir="$TW\chrome" --remote-debugging-port="$DPORT" about:blank >/dev/null 2>&1 &
 for _ in $(seq 1 50); do curl -s "http://127.0.0.1:$DPORT/json/version" >/dev/null 2>&1 && break; sleep 0.2; done
 check "hata ayıklama portu bizim Chrome'da" "$(pwsh -NoProfile -c "\$p=(Get-NetTCPConnection -LocalPort $DPORT -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess; if (\$p -and (Get-CimInstance Win32_Process -Filter \"ProcessId=\$p\").CommandLine -like '*$TW*') { 1 } else { 0 }" | tr -d '\r')" 1

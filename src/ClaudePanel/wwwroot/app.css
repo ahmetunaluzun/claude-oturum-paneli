@@ -463,6 +463,8 @@ dialog { max-height: 90vh; overflow-y: auto; }
 .ask-list li { margin: 3px 0; }
 /* Onay penceresi (confirmBox): dar kart, her genişlikte ekranın ortasında; tehlikeli işlemin düğmesi dolu kırmızı */
 dialog.cbox { width: min(440px, calc(100vw - 32px)); }
+/* Üç düğmeli onay (Vazgeç + iki seçenek) 440'a sığmıyor, son düğme alt satıra düşüyordu. */
+dialog.cbox:has(.row.end > .btn:nth-child(3)) { width: min(540px, calc(100vw - 32px)); }
 dialog.cbox .hint { margin: 0; color: var(--text); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 dialog.cbox .ask-list { margin: 0 0 0 20px; max-height: 30vh; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 dialog.cbox .row.end { flex-wrap: wrap; margin-top: 4px; }
