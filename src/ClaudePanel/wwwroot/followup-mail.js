@@ -62,6 +62,7 @@ window.PanelFollowMail = function (c) {
     const out = [];
     if (m.mailOn) {
       const notes = accountNotes(m), all = mailItems(m);
+      for (const a of m.accounts) if (a.mail && a.truncated) notes.push([t("fuMailTruncated", a.email, a.truncated), false]);
       if (m.filterEmpty) notes.unshift([t("fuMailFilterEmpty"), true]);
       else if (checked && !m.stale) notes.push([t(all.length ? "fuMailChecked" : "fuMailNone", ago), false]); // bayatsa "güncellenemedi" notu yeter
       out.push({ id: "mail", title: "fuMail", all, notes });

@@ -253,6 +253,55 @@ check("Gmail'de aç: her satır kendi hesabıyla (authuser)", [
 check("RFC 2047 konu Takip'te okunur", mailRows.some(r => r.konu === "Türkçe başlık: çğıöşü"), true);
 await shot("1280_takip");
 
+// ================= 8b. Benim adreslerim / gruplarım =================
+const aliasBox = (email = SIRK) => `[...document.querySelectorAll("#smAccounts .mail-acct")].find(l => l.querySelector("b").textContent === ${J(email)}).querySelector(".mail-alias")`;
+const aliasInfo = () => ev(`(() => { const d = ${aliasBox()}; return { acik: d.open, ozet: d.querySelector("summary").textContent.trim(), deger: d.querySelector("input").value,
+  oneri: [...d.querySelectorAll(".mail-alias-add")].map(b => b.textContent) }; })()`);
+const fuRules = (thread) => ev(`fetch("/api/followup").then(r => r.json()).then(d => d.mail.mails.find(m => m.threadId === ${J(thread)})?.rules ?? null)`);
+await settingsOpen(); await toWiz();
+check("adres bölümü kapalı gelir; öneri = kendi alan adındaki adres + sayı (kişi/grup ayrımı sizde)", await aliasInfo(), { acik: false, ozet: "Benim adreslerim / gruplarım", deger: "", oneri: ["herkes@sirket.com.tr · 1 mail"] });
+check("kişisel Gmail hesabında öneri yok (genel alan adı/kendi alan adı adresi yok)", await ev(`${aliasBox(KISI)}.querySelectorAll(".mail-alias-add").length`), 0);
+check("grup adresi eklenmeden: 'Yıllık izin planı' (Kime'de herkes@, bana CC) yalnız bekleyen", await fuRules("1b5a"), ["awaiting"]);
+await click(`${aliasBox()}.querySelector("summary")`, 300);
+await shot("1280_adresler_acik");
+await click(`${aliasBox()}.querySelector(".mail-alias-add")`, 900);
+check("öneri tek tıkla eklendi: bölüm açık kaldı, kutuda adres, özet sayı, öneri kalktı, bildirim", [await aliasInfo(), (await toasts()).includes("Adresler kaydedildi")],
+  [{ acik: true, ozet: "Benim adreslerim / gruplarım (1)", deger: "herkes@sirket.com.tr", oneri: [] }, true]);
+check("sunucuda kalıcı", (await mailApi()).accounts.find(a => a.email === SIRK).aliases, ["herkes@sirket.com.tr"]);
+check("eklenince hemen yeniden tarandı: grup adresi Kime'de sayılır (direct + bekleyen)", await until(`fetch("/api/followup").then(r => r.json()).then(d => (d.mail.mails.find(m => m.threadId === "1b5a")?.rules || []).includes("direct"))`, 15000) && await fuRules("1b5a"), ["awaiting", "direct"]);
+await ev(`(() => { const i = ${aliasBox()}.querySelector("input"); i.focus(); i.value = "herkes@sirket.com.tr, ekip@sirket.com.tr, bozuk adres, ${SIRK}"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+await sleep(900);
+check("elle yazılan liste: kötü adres ve kendi adresim atılır, kutu temizlenmiş değeri gösterir", (await aliasInfo()).deger, "herkes@sirket.com.tr, ekip@sirket.com.tr");
+await settingsClose();
+await open(1280);
+await settingsOpen(); await toWiz();
+check("sayfa yenilenince adresler duruyor (yükle/kaydet/yeniden aç)", (await aliasInfo()).deger, "herkes@sirket.com.tr, ekip@sirket.com.tr");
+await click(`${aliasBox()}.querySelector("summary")`, 300);
+await shot("1280_adresler");
+await settingsClose();
+
+// Çok fazla ileti: Takip'te not
+writeFileSync(join(tmpRoot, "senaryo.json"), J({ hesaplar: { [KISI]: { parola: PW1, mod: "ok", set: "kisisel" }, [SIRK]: { parola: PW2, mod: "ok", set: "cok" } },
+  ical: { "kisisel-ICALGIZLI1": { durum: 200, icerik: "kisisel" }, "sirket-ICALGIZLI2": { durum: 200, icerik: "sirket" } } }));
+await open(1280);
+await click(`document.getElementById("btnFuRefresh")`, 600);
+check("1100 ileti: Takip'te 'son 14 günde çok fazla ileti, yalnız en yeni 1000' notu hesap adıyla", await until(`[...document.querySelectorAll(".fu-clean")].some(p => p.textContent.includes("yalnız en yeni 1000 iletiye bakıldı"))`, 40000)
+  && await ev(`[...document.querySelectorAll(".fu-clean")].some(p => p.textContent.startsWith(${J(SIRK + ": son 14 günde çok fazla ileti var")}))`), true);
+await shot("1280_cok_ileti");
+sen("ok");
+await click(`document.getElementById("btnFuRefresh")`, 600);
+check("sınır altına inince not kalkar", await until(`![...document.querySelectorAll(".fu-clean")].some(p => p.textContent.includes("yalnız en yeni"))`, 30000), true);
+
+// 390 px: adres bölümü açık, öneriler
+await open(390);
+await settingsOpen(); await toWiz();
+await click(`${aliasBox()}.querySelector("summary")`, 300);
+await ev(`${aliasBox()}.scrollIntoView({ block: "center" })`);
+check("390 px adres bölümü açık: taşma yok, tüm düğmeler ≥ 44 px", await measureSet(), SET_CLEAN);
+await shot("390_adresler");
+await settingsClose();
+await open(1280);
+
 // ================= 9. Kaldır (onaylı) =================
 await settingsOpen(); await toWiz();
 await click(rowBtn(SIRK, "Kaldır"), 500);

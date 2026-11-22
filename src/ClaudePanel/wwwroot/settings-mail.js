@@ -13,6 +13,7 @@ window.PanelSettingsMail = function (c) {
   const LOGIN_POLL_MS = 1500, TYPE_MS = 450;
   const EMAIL_RX = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
   const ICAL_RX = /^https:\/\/calendar\.google\.com\/calendar\/ical\/[^\s/]+\/private-[^\s/]+\/basic\.ics$/;
+  const aliasOpen = new Set(); // grup adresi bölümü açık hesaplar (yeniden çizimde korunur)
   let st = null, pollTimer = null, typeTimer = null, provSeq = 0;
   // Sihirbaz durumu: ok1 = e-posta Google hesabı; opened = 2. adım açıldı; connected = 3. adım bağlandı; icalOk = 4. adım denendi
   const wiz = { ok1: false, opened: false, connected: false, icalOk: false, busy: false };
@@ -218,7 +219,50 @@ window.PanelSettingsMail = function (c) {
       } else if (a.state === "reauth") row.appendChild(btn(t("smReauth"), () => startLogin({ id: a.id, mail: a.mail || a.mailGranted, cal: a.cal || a.calGranted }), "primary"));
       row.appendChild(btn(t("smRemove"), () => remove(a), "danger"));
     }
+    li.appendChild(aliasBox(a));
     return li;
+  }
+
+  /**
+   * "Benim adreslerim / gruplarım": bu adresler Kime'de geçerse "Kime", CC'de geçerse "CC" sayılır (grup/liste adresiyle gelen mailler).
+   * Tam adres, virgülle; kutudan çıkınca / Enter'da kaydedilir. Öneriler (yalnız IMAP): son taramada Kime/CC'de en sık geçen, hesabın
+   * kendi alan adındaki adresler, sayılarıyla; tek tıkla eklenir. Tek kişi adresleri ile grup adreslerini sunucu ayırt edemez: seçim sizde.
+   */
+  function aliasBox(a) {
+    const d = document.createElement("details");
+    d.className = "mail-alias";
+    d.dataset.id = a.id;
+    d.open = aliasOpen.has(a.id);
+    d.addEventListener("toggle", () => { if (d.open) aliasOpen.add(a.id); else aliasOpen.delete(a.id); });
+    const count = (a.aliases || []).length;
+    d.innerHTML = `<summary>${esc(t("maTitle"))}${count ? ` <small>(${count})</small>` : ""}</summary>
+      <label class="mail-field"><span>${esc(t("maLabel"))}</span><input type="text" class="mail-alias-input" autocomplete="off" spellcheck="false"></label>
+      <small class="mail-note">${esc(t("maHelp"))}</small>`;
+    const input = d.querySelector("input");
+    input.value = (a.aliases || []).join(", ");
+    input.addEventListener("change", () => saveAliases(a, split(input.value)));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveAliases(a, split(input.value)); } });
+    if ((a.suggest || []).length) {
+      const box = d.appendChild(document.createElement("div"));
+      box.className = "mail-alias-sug";
+      const h = box.appendChild(document.createElement("small"));
+      h.className = "mail-note";
+      h.textContent = t("maSuggest");
+      for (const s of a.suggest) {
+        const b = btn(`${s.addr} · ${t("maCount", s.count)}`, () => saveAliases(a, [...(a.aliases || []), s.addr]));
+        b.classList.add("mail-alias-add");
+        b.dataset.addr = s.addr;
+        box.appendChild(b);
+      }
+    }
+    return d;
+  }
+
+  async function saveAliases(a, list) {
+    if (JSON.stringify(list) === JSON.stringify(a.aliases || [])) return;
+    aliasOpen.add(a.id);
+    const r = await api("/api/mail/accounts/aliases", { id: a.id, aliases: list });
+    if (apply(r)) toast(t("maSaved"));
   }
 
   function btn(label, fn, cls = "") {

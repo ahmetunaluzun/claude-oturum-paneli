@@ -916,11 +916,18 @@ fieldset.mail-set > .btn, .mail-client .btn, .mail-wait .btn { justify-self: sta
 .mail-acct-src { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .mail-acct-src .btn:first-of-type { margin-left: auto; }
 .mail-none { color: var(--muted); font-size: 12px; }
+.mail-alias { display: grid; gap: 6px; min-width: 0; }
+.mail-alias > summary { cursor: pointer; font-size: 12px; color: var(--muted); min-height: 24px; }
+.mail-alias[open] > summary { margin-bottom: 6px; }
+.mail-alias-sug { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; min-width: 0; }
+.mail-alias-sug > small { flex-basis: 100%; }
+.mail-alias-add { overflow-wrap: anywhere; text-align: left; }
 .mail-sub { margin: 4px 0 0; font-size: 13px; color: var(--text); font-weight: 600; }
 dialog label.mail-field { display: grid; gap: 4px; font-size: 12px; }
 @media (max-width: 640px) {
   .mail-acct-src .btn, fieldset.mail-set > .btn, .mail-client .btn, .mail-wait .btn { min-height: 44px; }
   .mail-acct-src label.check { min-height: 44px; }
+  .mail-alias > summary, .mail-alias-add { min-height: 44px; }
 }
 
 /* Paneli yeniden başlat (restart.js): Ayarlar'daki düğme çifti, "Yeni sürüm hazır" notu, tam ekran bekleme/hata katmanı */

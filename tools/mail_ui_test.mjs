@@ -91,7 +91,7 @@ const setFile = async (path) => {
   await sleep(900);
 };
 const acct = () => ev(`[...document.querySelectorAll("#smAccounts .mail-acct")].map(li => ({ ad: li.querySelector("b").textContent, durum: li.querySelector("small").textContent,
-  kutu: [...li.querySelectorAll("input")].map(i => [i.dataset.src, i.checked, i.disabled]), dugme: [...li.querySelectorAll(".btn")].map(b => b.textContent) }))`);
+  kutu: [...li.querySelectorAll("input[data-src]")].map(i => [i.dataset.src, i.checked, i.disabled]), dugme: [...li.querySelectorAll(".btn")].map(b => b.textContent) }))`);
 const vis = (id) => ev(`(() => { const e = document.getElementById(${J(id)}); return !!e && !!e.offsetWidth; })()`);
 const visible = (sel) => ev(`!!document.querySelector(${J(sel)})?.offsetWidth`);
 // Ayarlar ölçümü: mail kutusundan dışarı taşan öğe, kırpılan düğme; Ayarlar'daki TÜM onay satırları ezilmemiş (§BB); telefonda ≥ 44 px.
