@@ -2,6 +2,8 @@ namespace ClaudePanel;
 
 public sealed record MailClientRequest(string? Json);
 public sealed record MailAddRequest(bool? Mail, bool? Cal, string? Id);
+public sealed record MailImapRequest(string? Email, string? Password, string? Ical);
+public sealed record MailOpenRequest(string? Target, string? Email);
 public sealed record MailAccountRequest(string? Id, bool? Mail, bool? Cal);
 public sealed record MailFilterRequest(bool? Direct, bool? Cc, bool? Awaiting, string[]? Senders, string[]? Keywords, string[]? Labels);
 
@@ -11,6 +13,8 @@ public sealed record MailFilterRequest(bool? Direct, bool? Cc, bool? Awaiting, s
 /// Süzgeç (Ayarlar) telefondan da değiştirilebilir: yerel kural, izin ya da belirteç gerektirmez.
 ///   GET  /api/mail                   → istemci var mı, hesaplar, süzgeç, süren giriş
 ///   POST /api/mail/client            → istemci JSON'u (içerik doğrulanır, şifreli saklanır; içerik loga/yanıta yazılmaz)
+///   POST /api/mail/imap/add          → Gmail/Workspace hesabı: e-posta + uygulama şifresi (IMAP girişi denenir) + isteğe bağlı iCal adresi (okunup doğrulanır).
+///                                      Parola boşsa ve hesap varsa yalnız iCal adresi güncellenir. Gizli değerler şifreli saklanır; yanıta/loga yazılmaz.
 ///   POST /api/mail/accounts/add      → Google girişi başlatır (yeni hesap ya da Id ile var olan hesaba kaynak ekleme)
 ///   POST /api/mail/accounts/cancel   → süren girişi iptal eder
 ///   POST /api/mail/accounts/sources  → kaynak kapatma (açma izin istiyorsa 409 "needauth": istemci girişi başlatır)
@@ -35,6 +39,88 @@ public static class MailEndpoints
             if (!s.SaveClient(client)) return Results.Json(new { error = "client_store" }, statusCode: 500);
             watch.Poke();
             return Results.Json(Brief(s, login, watch));
+        });
+
+        app.MapPost("/api/mail/imap/add", async (HttpContext ctx, MailSettings s, MailLogin login, MailWatch watch, ILogger<MailSettings> log) =>
+        {
+            if (!Admin(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<MailImapRequest>();
+            var email = MailRules.Addresses(req?.Email).FirstOrDefault();
+            if (email is null || email.Length > 254 || !email.Any(c => c == '@') || (req?.Email ?? "").Trim().Length != email.Length || email.Any(c => c > 126 || char.IsControl(c)))
+                return Results.Json(new { error = "imap_email" }, statusCode: 400);
+            var existing = s.Accounts.FirstOrDefault(a => a.Provider == "imap" && string.Equals(a.Email, email, StringComparison.OrdinalIgnoreCase));
+            var pass = new string((req?.Password ?? "").Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var ical = (req?.Ical ?? "").Trim();
+            if (pass.Length == 0 && existing is null) return Results.Json(new { error = "imap_format" }, statusCode: 400);
+            if (pass.Length > 0 && !(pass.Length == 16 && pass.All(char.IsAsciiLetter))) return Results.Json(new { error = "imap_format" }, statusCode: 400);
+            if (ical.Length > 0 && !IcalProvider.ValidUrl(ical)) return Results.Json(new { error = "ical_invalid" }, statusCode: 400);
+            if (existing is null && s.Full) return Results.Json(new { error = "mail_full" }, statusCode: 400);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+            int? unseen = null, eventCount = null;
+            if (pass.Length > 0)
+            {
+                try { unseen = await ImapProvider.Check(email, pass, cts.Token); }
+                catch (ImapException ex)
+                {
+                    log.LogInformation("IMAP girişi denendi, olmadı ({Kind})", ex.Kind);
+                    return Results.Json(new { error = "imap_" + (ex.Kind is "auth" or "disabled" or "domain" or "tls" ? ex.Kind : "net") }, statusCode: 400);
+                }
+            }
+            if (ical.Length > 0)
+            {
+                try { eventCount = (await IcalProvider.Events(ical, cts.Token)).Count; }
+                catch (IcalException ex)
+                {
+                    log.LogInformation("iCal adresi denendi, olmadı ({Kind})", ex.Kind);
+                    return Results.Json(new { error = "ical_" + (ex.Kind is "denied" or "parse" ? ex.Kind : "net") }, statusCode: 400);
+                }
+            }
+            var id = s.UpsertImap(email, ical.Length > 0);
+            if ((pass.Length > 0 && !TokenStore.Save(MailSettings.TokenName(id), pass)) || (ical.Length > 0 && !TokenStore.Save(MailSettings.IcalName(id), ical)))
+            {
+                if (existing is null) { s.Remove(id); watch.Forget(id); }
+                return Results.Json(new { error = "imap_store" }, statusCode: 500);
+            }
+            log.LogInformation("Gmail IMAP hesabı eklendi/güncellendi (parola {P}, takvim adresi {C}); gizli değerler şifreli saklandı", pass.Length > 0 ? "yeni" : "aynı", ical.Length > 0 ? "var" : "yok");
+            watch.Poke();
+            return Results.Json(Brief(s, login, watch, unseen, eventCount));
+        });
+
+        // Alan adı Google mı (gmail.com ya da MX'i Google)? "google" | "other" | "unknown" (denetlenemedi: kullanıcı yine de deneyebilir).
+        app.MapPost("/api/mail/imap/provider", async (HttpContext ctx) =>
+        {
+            if (!Admin(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<MailImapRequest>();
+            if (MailRules.Addresses(req?.Email).FirstOrDefault() is not { } addr) return Results.Json(new { error = "imap_email" }, statusCode: 400);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            return Results.Json(new { provider = await MailDomain.Provider(addr, cts.Token) });
+        });
+
+        // Google'ın sabit sayfalarını varsayılan tarayıcıda açar. Yalnız bu üç adres; istemciden adres alınmaz (hedef adı + e-posta).
+        app.MapPost("/api/mail/open", async (HttpContext ctx) =>
+        {
+            if (!Admin(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<MailOpenRequest>();
+            if (MailRules.Addresses(req?.Email).FirstOrDefault() is not { } addr || addr.Length > 254 || addr.Any(c => c > 126 || char.IsControl(c)))
+                return Results.Json(new { error = "imap_email" }, statusCode: 400);
+            var q = "?authuser=" + Uri.EscapeDataString(addr);
+            var url = req?.Target switch
+            {
+                "apppasswords" => "https://myaccount.google.com/apppasswords" + q,
+                "twosv" => "https://myaccount.google.com/signinoptions/twosv" + q,
+                "calendar" => "https://calendar.google.com/calendar/r/settings" + q,
+                _ => null
+            };
+            if (url is null) return Results.BadRequest();
+            // Test: CLAUDE_PANEL_MAIL_OPEN_LOG dosyaya yazar (tarayıcı açılmaz); CLAUDE_PANEL_MAIL_NO_BROWSER=1 hiçbir şey yapmaz.
+            if (Environment.GetEnvironmentVariable("CLAUDE_PANEL_MAIL_OPEN_LOG") is { Length: > 0 } logFile)
+                await File.AppendAllTextAsync(logFile, url + "\n");
+            else if (Environment.GetEnvironmentVariable("CLAUDE_PANEL_MAIL_NO_BROWSER") != "1")
+            {
+                try { TokenStore.OpenBrowser(url); }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return Results.Json(new { url, opened = false }); }
+            }
+            return Results.Json(new { url, opened = true });
         });
 
         app.MapPost("/api/mail/accounts/add", async (HttpContext ctx, MailSettings s, MailLogin login, MailWatch watch) =>
@@ -99,7 +185,9 @@ public static class MailEndpoints
         });
     }
 
-    static object Brief(MailSettings s, MailLogin login, MailWatch watch)
+    /// <param name="unseen">Yalnız IMAP girişi denemesinde: gelen kutusundaki okunmamış sayısı (kanıt).</param>
+    /// <param name="events">Yalnız iCal denemesinde: önümüzdeki 24 saatte bulunan etkinlik sayısı.</param>
+    static object Brief(MailSettings s, MailLogin login, MailWatch watch, int? unseen = null, int? events = null)
     {
         var snap = watch.Snapshot();
         var f = s.Filter;
@@ -109,10 +197,15 @@ public static class MailEndpoints
             accounts = s.Accounts.Select(a => new
             {
                 id = a.Id, email = a.Email, provider = a.Provider, mail = a.Mail, cal = a.Cal, mailGranted = a.MailGranted, calGranted = a.CalGranted,
-                state = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.State ?? "pending"
+                state = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.State ?? "pending",
+                awaitingOk = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.AwaitingOk ?? true,
+                gmailLink = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.GmailLink ?? true,
+                okAt = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.OkAt ?? 0,
+                triedAt = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.TriedAt ?? 0
             }),
             filter = new { f.Direct, f.Cc, f.Awaiting, senders = f.Senders ?? [], keywords = f.Keywords ?? [], labels = f.Labels ?? [] },
-            login = login.State
+            login = login.State,
+            result = new { unseen, events }
         };
     }
 }

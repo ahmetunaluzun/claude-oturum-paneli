@@ -46,6 +46,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Ical.Net" Version="5.2.4" />
     <PackageReference Include="QRCoder" Version="1.8.1" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />

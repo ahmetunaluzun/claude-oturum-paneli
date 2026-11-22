@@ -59,6 +59,34 @@ public sealed partial class MailSettings(ILogger<MailSettings> log)
         return id;
     }
 
+    public static string IcalName(string accountId) => "mail-ical-" + accountId;
+
+    /// <summary>
+    /// IMAP (uygulama şifresi) hesabı: aynı adres varsa günceller. Mail her zaman açık/izinli; takvim yalnız iCal adresi verildiyse açılır
+    /// (adres önceden kayıtlıysa korunur). Dönen: kaydın kimliği.
+    /// </summary>
+    public string UpsertImap(string email, bool newIcal)
+    {
+        string id = "";
+        Update(s =>
+        {
+            var list = (s.Accounts ?? []).ToList();
+            var i = list.FindIndex(a => a.Provider == "imap" && string.Equals(a.Email, email, StringComparison.OrdinalIgnoreCase));
+            if (i >= 0)
+            {
+                id = list[i].Id;
+                list[i] = list[i] with { Email = email, Mail = true, MailGranted = true, Cal = newIcal || list[i].Cal, CalGranted = newIcal || list[i].CalGranted };
+            }
+            else
+            {
+                id = Guid.NewGuid().ToString("N")[..12];
+                list.Add(new MailAccount(id, "imap", email, true, newIcal, true, newIcal, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+            }
+            return s with { Accounts = list };
+        });
+        return id;
+    }
+
     public MailAccount? Find(string? id) => Accounts.FirstOrDefault(a => a.Id == id);
 
     /// <summary>Kaynağı kapatır (izin istenmeden). Açma izin gerektiriyorsa giriş akışından geçer (<see cref="MailLogin"/>).</summary>
@@ -74,6 +102,7 @@ public sealed partial class MailSettings(ILogger<MailSettings> log)
         if (a is null) return null;
         Update(s => s with { Accounts = (s.Accounts ?? []).Where(x => x.Id != id).ToList() });
         TokenStore.Delete(TokenName(id));
+        TokenStore.Delete(IcalName(id));
         log.LogInformation("Mail hesabı kaldırıldı ({Provider}), belirteç silindi", a.Provider);
         return a;
     }

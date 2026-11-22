@@ -47,19 +47,21 @@ public sealed record MailItem(string Account, string Id, string ThreadId, string
 
 public sealed record CalItem(string Account, string Id, string Title, long Start, long End, bool AllDay, string? Location, string? Join, string Url, long Updated);
 
-/// <param name="State">"ok" | "pending" (henüz denenmedi) | "reauth" (yeniden giriş gerekli) | "net" (son deneme ağ hatası) | "noclient".</param>
-public sealed record MailAccountState(string Id, string Email, bool Mail, bool Cal, bool MailGranted, bool CalGranted, string State, long OkAt, long TriedAt);
+/// <param name="State">"ok" | "pending" (henüz denenmedi) | "reauth" (yeniden giriş / şifre kabul edilmedi) | "net" (son deneme ağ hatası) | "noclient" (Google, istemci dosyası yok) | "disabled" (IMAP hesapta kapalı) | "domain" (yönetici alan adı düzeyinde kapatmış) | "icaldenied" (takvim adresi artık geçerli değil / dışa paylaşım kapalı).
+/// AwaitingOk: "cevap bekleyen" bu hesapta çalışır; GmailLink: "Gmail'de aç" bağlantısı kurulabilir (IMAP: sunucu Gmail uzantılarını veriyor).</param>
+public sealed record MailAccountState(string Id, string Email, bool Mail, bool Cal, bool MailGranted, bool CalGranted, string State, long OkAt, long TriedAt,
+    string Provider, bool AwaitingOk, bool GmailLink);
 
 /// <param name="State">"off" (hesap yok) | "noclient" | "ok".</param>
 /// <param name="CheckedAt">En son başarılı alınma (Unix ms); hiç alınmadıysa 0.</param>
 /// <param name="Stale">En az bir hesabın son denemesi başarısız: liste son bilinen durumdur.</param>
 public sealed record MailSnapshot(string State, IReadOnlyList<MailAccountState> Accounts, IReadOnlyList<MailItem> Mails, IReadOnlyList<CalItem> Events,
-    long CheckedAt, bool Stale, bool Fetching, bool MailOn, bool CalOn, bool FilterEmpty)
+    long CheckedAt, bool Stale, bool Fetching, bool MailOn, bool CalOn, bool FilterEmpty, bool FilterAwaiting = false)
 {
     public static readonly MailSnapshot Off = new("off", [], [], [], 0, false, false, false, false, false);
 }
 
-/// <summary>Mail/takvim sağlayıcısı (ilk: Google). İleride Microsoft 365 / IMAP aynı arayüzle eklenir.</summary>
+/// <summary>Google (OAuth) sağlayıcısı arayüzü. IMAP (uygulama şifresi) ve iCal için ImapProvider / IcalProvider.</summary>
 public interface IMailProvider
 {
     string Name { get; }

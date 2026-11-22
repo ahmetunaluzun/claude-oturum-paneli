@@ -16,12 +16,16 @@ public sealed class MailWatch
     static readonly TimeSpan Every = TimeSpan.FromMinutes(10), RetryAfter = TimeSpan.FromMinutes(2), TickEvery = TimeSpan.FromSeconds(30);
     const int FirstTickMs = 5000, MaxMails = 60;
 
-    /// <param name="Fail">"" (başarılı) | "net" | "reauth" | "noclient".</param>
-    sealed record Acct(long TriedAt = 0, long OkAt = 0, string Fail = "", List<MailMeta>? Mails = null, List<CalEvent>? Events = null);
+    /// <param name="Fail">"" (başarılı) | "net" | "reauth" | "noclient" | "disabled" | "domain" | "icaldenied".</param>
+    /// <param name="AwaitingOk">"Cevap bekleyen" kuralı bu hesapta çalışır (IMAP: Gmail uzantısı + Gönderilmiş klasörü bulundu).</param>
+    /// <param name="GmailLink">"Gmail'de aç" bağlantısı kurulabilir.</param>
+    sealed record Acct(long TriedAt = 0, long OkAt = 0, string Fail = "", List<MailMeta>? Mails = null, List<CalEvent>? Events = null,
+        bool AwaitingOk = true, bool GmailLink = true);
 
     readonly MailSettings _settings;
     readonly ILogger<MailWatch> _log;
     readonly IMailProvider _google = new GoogleProvider();
+    readonly ImapProvider _imap = new();
     readonly ConcurrentDictionary<string, (string Access, long Expires)> _access = new();
     readonly object _gate = new();
     volatile Dictionary<string, Acct> _s = Load();
@@ -70,23 +74,27 @@ public sealed class MailWatch
         foreach (var a in accounts)
         {
             var st = s.GetValueOrDefault(a.Id) ?? new Acct();
-            var state = noClient ? "noclient" : st.Fail is "reauth" or "net" ? st.Fail : st.OkAt == 0 ? "pending" : "ok";
-            states.Add(new MailAccountState(a.Id, a.Email, a.Mail, a.Cal, a.MailGranted, a.CalGranted, state, st.OkAt, st.TriedAt));
+            var google = a.Provider == "google";
+            var state = google && noClient ? "noclient" : st.Fail.Length > 0 ? st.Fail : st.OkAt == 0 ? "pending" : "ok";
+            states.Add(new MailAccountState(a.Id, a.Email, a.Mail, a.Cal, a.MailGranted, a.CalGranted, state, st.OkAt, st.TriedAt, a.Provider, st.AwaitingOk, st.GmailLink));
+            // Cevap bekleyen bu hesapta çalışmıyorsa (Gmail dışı sunucu / Gönderilmiş klasörü yok) kural bu hesapta pasif: yanlış "bekliyor" gösterilmez.
+            var f = st.AwaitingOk ? filter : filter with { Awaiting = false };
             if (a.Mail)
                 foreach (var m in st.Mails ?? [])
-                    if (MailRules.Match(m, filter) is { Count: > 0 } rules)
-                        mails.Add(new MailItem(a.Email, m.Id, m.ThreadId, m.Subject, m.FromName, m.FromAddr, m.Date, rules, rules.Contains("awaiting"), GmailUrl(a.Email, m.ThreadId)));
+                    if (MailRules.Match(m, f) is { Count: > 0 } rules)
+                        mails.Add(new MailItem(a.Email, m.Id, m.ThreadId, m.Subject, m.FromName, m.FromAddr, m.Date, rules, rules.Contains("awaiting"),
+                            st.GmailLink && m.ThreadId.Length > 0 ? GmailUrl(a.Email, m.ThreadId) : ""));
             if (a.Cal)
                 foreach (var e in st.Events ?? [])
                     if ((e.End > 0 ? e.End : e.Start) > now && e.Start < now + 86_400_000)
                         events.Add(new CalItem(a.Email, e.Id, e.Title, e.Start, e.End, e.AllDay, e.Location, e.Join, e.Url, e.Updated));
         }
         var known = accounts.Select(a => s.GetValueOrDefault(a.Id)).OfType<Acct>().ToList();
-        return new MailSnapshot(noClient ? "noclient" : "ok", states,
+        return new MailSnapshot("ok", states,
             mails.OrderByDescending(m => m.Awaiting).ThenByDescending(m => m.Date).Take(MaxMails).ToList(),
             events.OrderBy(e => e.Start).ToList(),
             known.Count == 0 ? 0 : known.Max(k => k.OkAt), known.Any(k => k.Fail.Length > 0 && k.OkAt > 0), _running == 1,
-            accounts.Any(a => a.Mail), accounts.Any(a => a.Cal), filter.Empty);
+            accounts.Any(a => a.Mail), accounts.Any(a => a.Cal), filter.Empty, filter.Awaiting);
     }
 
     /// <summary>Gmail'de konuşmayı açan adres (hesap seçili). Konuşma kimliği sağlayıcıda doğrulandı (harf/rakam).</summary>
@@ -113,6 +121,7 @@ public sealed class MailWatch
     async Task Fetch(MailAccount a)
     {
         var now = Now();
+        if (a.Provider == "imap") { await FetchImap(a, now); return; }
         if (_settings.Client is not { } client) { Update(a.Id, s => s with { TriedAt = now, Fail = "noclient" }); return; }
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         try
@@ -145,6 +154,54 @@ public sealed class MailWatch
             _log.LogInformation("Mail/takvim alınamadı: {Msg}", ex.Message);
             Update(a.Id, s => s with { TriedAt = now, Fail = "net" });
         }
+    }
+
+    /// <summary>
+    /// IMAP hesabı: mail (uygulama şifresiyle) ve takvim (iCal adresi) ayrı denenir; biri başarısızsa öteki yine kaydedilir, son bilinen
+    /// liste silinmez. Hata önceliği: şifre/IMAP (reauth, disabled, domain) > takvim adresi (icaldenied) > ağ.
+    /// Parola ve iCal adresi yalnız bellekte, bu yöntemin içinde tutulur; loga yazılmaz.
+    /// </summary>
+    async Task FetchImap(MailAccount a, long now)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        string fail = "";
+        List<MailMeta>? mails = null;
+        List<CalEvent>? events = null;
+        ImapInfo? info = null;
+        if (a.Mail)
+        {
+            try
+            {
+                var pass = TokenStore.Load(MailSettings.TokenName(a.Id)) ?? throw new ImapException("auth", "parola kaydı yok");
+                (mails, info) = await _imap.Mails(pass, a.Email, cts.Token);
+            }
+            catch (ImapException ex)
+            {
+                _log.LogInformation("IMAP alınamadı ({Kind}): {Msg}", ex.Kind, ex.Message);
+                fail = ex.Kind switch { "auth" => "reauth", "disabled" => "disabled", "domain" => "domain", _ => "net" };
+            }
+            catch (Exception ex) when (ex is IOException or TaskCanceledException) { fail = "net"; }
+        }
+        if (a.Cal)
+        {
+            try
+            {
+                var url = TokenStore.Load(MailSettings.IcalName(a.Id)) ?? throw new IcalException("invalid", "adres kaydı yok");
+                events = await IcalProvider.Events(url, cts.Token);
+            }
+            catch (IcalException ex)
+            {
+                _log.LogInformation("iCal alınamadı ({Kind}): {Msg}", ex.Kind, ex.Message);
+                if (fail.Length == 0) fail = ex.Kind is "denied" or "invalid" or "parse" ? "icaldenied" : "net";
+            }
+            catch (Exception ex) when (ex is IOException or TaskCanceledException) { if (fail.Length == 0) fail = "net"; }
+        }
+        Update(a.Id, s => s with
+        {
+            TriedAt = now, OkAt = fail.Length == 0 ? now : s.OkAt, Fail = fail, Mails = mails ?? s.Mails, Events = events ?? s.Events,
+            AwaitingOk = info?.AwaitingOk ?? s.AwaitingOk, GmailLink = info?.GmailExt ?? s.GmailLink
+        });
+        if (fail.Length == 0) _log.LogInformation("Mail/takvim denetlendi (IMAP): {M} konuşma, {E} etkinlik", mails?.Count ?? 0, events?.Count ?? 0);
     }
 
     async Task<string> Access(string id, GoogleClient client, CancellationToken ct)

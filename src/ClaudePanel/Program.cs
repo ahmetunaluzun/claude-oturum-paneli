@@ -637,7 +637,7 @@ static class Remote
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
         "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable", "/api/schedule/run", "/api/schedule/log",
-        "/api/mail/client", "/api/mail/accounts", // mail hesabı ekleme/kaldırma, istemci dosyası: yalnız bilgisayardan
+        "/api/mail/client", "/api/mail/accounts", "/api/mail/imap", "/api/mail/open", // mail hesabı ekleme/kaldırma, istemci dosyası, uygulama şifresi: yalnız bilgisayardan
         "/api/codex/open-folder" // Codex oturumunun klasörünü bilgisayarda açar
     ];
 
