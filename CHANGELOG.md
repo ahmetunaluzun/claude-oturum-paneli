@@ -2,7 +2,7 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
-## Yayınlanmamış
+## 0.18.0 — 2026-11-22
 - **Arka plan işi görünürlüğü: yeniden başlatma/kapatma artık arka plandaki işi kesmez.** Panelde barındırılan bir oturum cevabını bitirince "boşta" görünür ama içinde arka planda çalışan alt ajan ya da arka plan komutu sürebilir; Yeniden başlat ve Kapat yalnız çalışan oturumlara baktığı için bunları sessizce kesiyordu, kullanıcı da bunu göremiyordu.
   - **Tespit (yalnız okur):** oturumun konuşma kaydından, artımlı: alt ajan (`isAsync` + `agentId`) ve arka plan komutu (`backgroundTaskId`) başlangıcı, eşleşen bitiş bildirimi (completed / failed / killed / stopped) gelmemişse iş sürüyor sayılır. Ek güvence: alt ajanın kaydı son 2 dakikada yazıldıysa çalışıyor sayılır; bildirim yok ve 6 saattir iz yoksa "takılmış olabilir" (bitti sayılmaz, uyarıda gösterilir). Eşzamanlı alt ajan sayılmaz.
   - **Kartta ve alt bilgide:** kartta (boşta/bekleyen kartta da) "arka planda: 1 alt ajan, 1 komut" rozeti, çekmece başlığında aynı bilgi; alt bilgide tüm panel için tek gösterge ("arka plan işi yok" / "arka planda N iş", takılmış olanlar ayrıca).
