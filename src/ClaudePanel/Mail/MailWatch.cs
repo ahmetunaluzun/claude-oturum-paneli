@@ -14,13 +14,13 @@ public sealed class MailWatch
 {
     static readonly string StateFile = Path.Combine(Handoff.DataDir, "mail-watch.json");
     static readonly TimeSpan Every = TimeSpan.FromMinutes(10), RetryAfter = TimeSpan.FromMinutes(2), TickEvery = TimeSpan.FromSeconds(30);
-    const int FirstTickMs = 5000, MaxMails = 60;
+    const int FirstTickMs = 5000, MaxMails = 60, MaxSuggest = 8;
 
     /// <param name="Fail">"" (başarılı) | "net" | "reauth" | "noclient" | "disabled" | "domain" | "icaldenied".</param>
     /// <param name="AwaitingOk">"Cevap bekleyen" kuralı bu hesapta çalışır (IMAP: Gmail uzantısı + Gönderilmiş klasörü bulundu).</param>
     /// <param name="GmailLink">"Gmail'de aç" bağlantısı kurulabilir.</param>
     sealed record Acct(long TriedAt = 0, long OkAt = 0, string Fail = "", List<MailMeta>? Mails = null, List<CalEvent>? Events = null,
-        bool AwaitingOk = true, bool GmailLink = true);
+        bool AwaitingOk = true, bool GmailLink = true, int Truncated = 0, List<MailSuggest>? Suggest = null);
 
     readonly MailSettings _settings;
     readonly ILogger<MailWatch> _log;
@@ -76,7 +76,7 @@ public sealed class MailWatch
             var st = s.GetValueOrDefault(a.Id) ?? new Acct();
             var google = a.Provider == "google";
             var state = google && noClient ? "noclient" : st.Fail.Length > 0 ? st.Fail : st.OkAt == 0 ? "pending" : "ok";
-            states.Add(new MailAccountState(a.Id, a.Email, a.Mail, a.Cal, a.MailGranted, a.CalGranted, state, st.OkAt, st.TriedAt, a.Provider, st.AwaitingOk, st.GmailLink));
+            states.Add(new MailAccountState(a.Id, a.Email, a.Mail, a.Cal, a.MailGranted, a.CalGranted, state, st.OkAt, st.TriedAt, a.Provider, st.AwaitingOk, st.GmailLink, st.Truncated));
             // Cevap bekleyen bu hesapta çalışmıyorsa (Gmail dışı sunucu / Gönderilmiş klasörü yok) kural bu hesapta pasif: yanlış "bekliyor" gösterilmez.
             var f = st.AwaitingOk ? filter : filter with { Awaiting = false };
             if (a.Mail)
@@ -95,6 +95,13 @@ public sealed class MailWatch
             events.OrderBy(e => e.Start).ToList(),
             known.Count == 0 ? 0 : known.Max(k => k.OkAt), known.Any(k => k.Fail.Length > 0 && k.OkAt > 0), _running == 1,
             accounts.Any(a => a.Mail), accounts.Any(a => a.Cal), filter.Empty, filter.Awaiting);
+    }
+
+    /// <summary>Hesap için grup adresi önerileri: son taramadaki sayılar; şu an listede olanlar ve hesabın kendi adresi elenir. En çok 8.</summary>
+    public List<MailSuggest> Suggestions(MailAccount a)
+    {
+        var have = new HashSet<string>((a.Aliases ?? []).Append(a.Email).Select(x => x.ToLowerInvariant()));
+        return (_s.GetValueOrDefault(a.Id)?.Suggest ?? []).Where(x => !have.Contains(x.Addr)).Take(MaxSuggest).ToList();
     }
 
     /// <summary>Gmail'de konuşmayı açan adres (hesap seçili). Konuşma kimliği sağlayıcıda doğrulandı (harf/rakam).</summary>
@@ -133,7 +140,7 @@ public sealed class MailWatch
                 var token = await Access(a.Id, client, cts.Token);
                 try
                 {
-                    if (a.Mail) mails = await _google.Mails(token, a.Email, cts.Token);
+                    if (a.Mail) mails = await _google.Mails(token, a.Email, a.Aliases ?? [], cts.Token);
                     if (a.Cal) events = await _google.Events(token, cts.Token);
                     break;
                 }
@@ -173,7 +180,7 @@ public sealed class MailWatch
             try
             {
                 var pass = TokenStore.Load(MailSettings.TokenName(a.Id)) ?? throw new ImapException("auth", "parola kaydı yok");
-                (mails, info) = await _imap.Mails(pass, a.Email, cts.Token);
+                (mails, info) = await _imap.Mails(pass, a.Email, a.Aliases ?? [], cts.Token);
             }
             catch (ImapException ex)
             {
@@ -199,7 +206,8 @@ public sealed class MailWatch
         Update(a.Id, s => s with
         {
             TriedAt = now, OkAt = fail.Length == 0 ? now : s.OkAt, Fail = fail, Mails = mails ?? s.Mails, Events = events ?? s.Events,
-            AwaitingOk = info?.AwaitingOk ?? s.AwaitingOk, GmailLink = info?.GmailExt ?? s.GmailLink
+            AwaitingOk = info?.AwaitingOk ?? s.AwaitingOk, GmailLink = info?.GmailExt ?? s.GmailLink,
+            Truncated = info?.Cap ?? s.Truncated, Suggest = info?.Suggest ?? s.Suggest
         });
         if (fail.Length == 0) _log.LogInformation("Mail/takvim denetlendi (IMAP): {M} konuşma, {E} etkinlik", mails?.Count ?? 0, events?.Count ?? 0);
     }

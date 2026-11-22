@@ -256,6 +256,54 @@ yenile; check "yeniden başlatma sonrası kayıtlı şifre + adresle denetlendi"
 check "kaldır: 200, iki gizli dosya silindi" "$(post /api/mail/accounts/remove "{\"id\":\"$ACC2\"}") $([ -e "$DATA/secrets/mail-token-$ACC2.bin" ] && echo var || echo yok) $([ -e "$DATA/secrets/mail-ical-$ACC2.bin" ] && echo var || echo yok)" "200 yok yok"
 snap; check "kaldırılan hesabın satırı ve etkinliği yok" "$(q "sorted({m['account'] for m in M['mails']}), sorted({e['account'] for e in EV})")" "['test.kul@ornek.com'] ['test.kul@ornek.com']"
 check "kalan hesabın gizli dosyaları duruyor" "$([ -s "$DATA/secrets/mail-token-$ACC.bin" ] && echo var) $([ -s "$DATA/secrets/mail-ical-$ACC.bin" ] && echo var)" "var var"
+# ================= 11. Grup/liste adresleri, 14 günün tamamı, parçalı getirme, öneri =================
+# Şirket hesabı "grup" setiyle: 120 grup postası (Kime/CC'de kullanıcı YOK), 2 doğrudan mail, 1 cevap. Önceki sınır (son 40) kalktı.
+sen_grup() { sen "{\"hesaplar\":{\"$KISI\":{\"parola\":\"$PW1S\",\"mod\":\"ok\",\"set\":\"kisisel\"},\"$SIRK\":{\"parola\":\"$PW2S\",\"mod\":\"ok\",\"set\":\"$1\"}},\"ical\":{\"kisisel-ICALGIZLI1\":{\"durum\":200,\"icerik\":\"kisisel\"}}}"; }
+fetchler() { tail -n +$((N1+1)) "$T/imap.log" | grep -P "^IMAP\t$SIRK\tUID FETCH" ; }
+uidmax() { fetchler | awk -F'\t' '{split($3,a," "); n=split(a[3],u,","); if(n>m)m=n} END{print m+0}'; }
+sen_grup grup
+N1=$(wc -l < "$T/imap.log")
+check "grup hesabı eklendi" "$(imap_ekle $SIRK "$PW2") $(j "len(d['accounts'])")" "200 2"
+ACC3=$(j "[a['id'] for a in d['accounts'] if a['email']=='$SIRK'][0]")
+for _ in $(seq 1 80); do snap; [ "$(q "A.get('$SIRK',{}).get('state'), M['fetching']")" = "ok False" ] && break; sleep 0.3; done
+check "grup: Kime/CC'de olmayan 120 mail: yalnız doğrudan (9500) ve CC'li (9501) listelenir" "$(konular '{"direct":true,"cc":false,"awaiting":false}' >/dev/null; q "sorted(m['threadId'] for m in M['mails'] if m['account']=='$SIRK')")" "['251c']"
+check "grup: öneri = kendi alan adındaki adresler, sayıyla, kendim ve başka alan adları hariç" "$(mailget; j "[(x['addr'], x['count']) for a in d['accounts'] if a['email']=='$SIRK' for x in a['suggest']]" "$T/mail.json")" "[('ekip@sirket.com.tr', 49), ('destek@sirket.com.tr', 24), ('ece@sirket.com.tr', 24)]"
+check "öneride mail konusu/gövdesi yok (yalnız adres+sayı)" "$(j "sorted(set(k for a in d['accounts'] for x in a['suggest'] for k in x))" "$T/mail.json")" "['addr', 'count']"
+check "gmail.com benzeri genel alan adı olmayan kişisel hesapta kendi alan adı adresi yok → öneri boş" "$(j "[a['suggest'] for a in d['accounts'] if a['email']=='$KISI']" "$T/mail.json")" "[[]]"
+check "bir tarama: gelen kutusu 122 ileti tek parça, gönderilmiş 1 parça (2 FETCH)" "$(fetchler | wc -l)" 2
+check "grup: bana CC'li mail (9501) yine bekleyen" "$(konular '{"direct":true,"cc":false,"awaiting":true}' >/dev/null; q "K['251d']['rules'], K['251c']['rules']")" "['awaiting'] ['awaiting', 'direct']"
+# Adres ekleme: temizlik (büyük harf, kötü adres, kendi adresim, tekrar)
+check "adres ekle: temizlenir (küçük harf, kötü adres/kendi adresim/tekrar atılır)" "$(post /api/mail/accounts/aliases "{\"id\":\"$ACC3\",\"aliases\":[\"EKIP@sirket.com.tr\",\"destek@sirket.com.tr\",\"kötü adres\",\"$SIRK\",\"ekip@sirket.com.tr\",\"a@b.com, c@d.com\"]}") $(j "[a['aliases'] for a in d['accounts'] if a['id']=='$ACC3']")" "200 [['ekip@sirket.com.tr', 'destek@sirket.com.tr']]"
+check "bilinmeyen hesap: 404" "$(post /api/mail/accounts/aliases '{"id":"yok","aliases":[]}')" 404
+for _ in $(seq 1 80); do snap; [ "$(q "M['fetching']")" = False ] && [ "$(q "len([m for m in M['mails'] if m['account']=='$SIRK'])")" -gt 2 ] && break; sleep 0.3; done
+check "eklenince hemen yeniden tarandı; öneri artık yalnız eklenmemiş adres" "$(mailget; j "[(x['addr'], x['count']) for a in d['accounts'] if a['email']=='$SIRK' for x in a['suggest']]" "$T/mail.json")" "[('ece@sirket.com.tr', 24)]"
+check "grup adresi Kime'de = direct (48 grup postası + 9500 + 9501'in Kime'sindeki ekip@); cevap yazdığım konuşma da direct" "$(konular '{"direct":true,"cc":false,"awaiting":false}' >/dev/null; q "sum(1 for m in M['mails'] if m['account']=='$SIRK'), K['2329']['rules'], K['2328']['rules']")" "50 ['direct'] ['direct']"
+check "grup adresi CC'de = cc (24 grup postası + 9501)" "$(konular '{"direct":false,"cc":true,"awaiting":false}' >/dev/null; q "sum(1 for m in M['mails'] if m['account']=='$SIRK'), set(tuple(m['rules']) for m in M['mails'] if m['account']=='$SIRK')")" "25 {('cc',)}"
+post /api/mail/accounts/aliases "{\"id\":\"$ACC3\",\"aliases\":[\"destek@sirket.com.tr\"]}" >/dev/null; yenile
+check "grup adresi alıcı sayılır: 'cevap bekleyen' (yalnız destek@ eklenmişken: cevapladığım 2329 hariç, cevapsız 2333 dahil; ekip@ eklenmedi: 2328 yok)" "$(konular '{"direct":false,"cc":false,"awaiting":true}' >/dev/null; q "'2329' in K, K['2333']['rules'], '2328' in K")" "False ['awaiting'] False"
+post /api/mail/accounts/aliases "{\"id\":\"$ACC3\",\"aliases\":[\"ekip@sirket.com.tr\",\"destek@sirket.com.tr\"]}" >/dev/null; yenile
+post /api/mail/filter '{"direct":true,"cc":false,"awaiting":true,"senders":[],"keywords":[],"labels":[]}' >/dev/null
+# Yeniden başlatma: kalıcılık
+kapat; baslat
+mailget; check "yeniden başlatma: grup adresleri kalıcı" "$(j "[a['aliases'] for a in d['accounts'] if a['email']=='$SIRK']" "$T/mail.json")" "[['ekip@sirket.com.tr', 'destek@sirket.com.tr']]"
+check "yeniden başlatma: öneri listesi diskten (eklenenler yok)" "$(j "[[x['addr'] for x in a['suggest']] for a in d['accounts'] if a['email']=='$SIRK']" "$T/mail.json")" "[['ece@sirket.com.tr']]"
+check "ayar dosyasında adresler var, gizli değer yok" "$(grep -c 'ekip@sirket.com.tr' "$DATA/mail-settings.json") $(grep -cE 'zxcv|ICAL' "$DATA/mail-settings.json")" "1 0"
+yenile; check "yeniden başlatma sonrası taramada da aynı eşleşme" "$(konular '{"direct":true,"cc":false,"awaiting":false}' >/dev/null; q "sum(1 for m in M['mails'] if m['account']=='$SIRK')")" 50
+# Adresleri sil
+check "adresleri boşalt" "$(post /api/mail/accounts/aliases "{\"id\":\"$ACC3\",\"aliases\":[]}") $(j "[a['aliases'] for a in d['accounts'] if a['id']=='$ACC3']")" "200 [[]]"
+for _ in $(seq 1 80); do snap; [ "$(q "M['fetching']")" = False ] && [ "$(q "len([m for m in M['mails'] if m['account']=='$SIRK'])")" -le 2 ] && break; sleep 0.3; done
+check "boşaltınca eşleşme geri gitti (yalnız doğrudan 9500)" "$(konular '{"direct":true,"cc":false,"awaiting":false}' >/dev/null; q "sorted(m['threadId'] for m in M['mails'] if m['account']=='$SIRK')")" "['251c']"
+# 1100 ileti: üst sınır 1000, 200'lük parçalar, Takip'te not
+sen_grup cok
+N1=$(wc -l < "$T/imap.log")
+yenile
+check "1100 ileti: gelen kutusu 5 parça (1000 ileti) + gönderilmiş 1 = 6 FETCH, en çok 200 UID/komut" "$(fetchler | wc -l) $(uidmax)" "6 200"
+check "üst sınır aşıldı: hesap 'truncated' = 1000" "$(q "A['$SIRK']['truncated'], A['$KISI']['truncated']")" "1000 0"
+check "1100 ileti: 14 günün tamamı (40 sınırı kalktı): öneri sayıları 40'ı aşıyor" "$(mailget; j "[a['suggest'][0]['count'] > 100 for a in d['accounts'] if a['email']=='$SIRK']" "$T/mail.json")" "[True]"
+sen_grup grup
+yenile
+check "sınır altına inince not kalktı" "$(q "A['$SIRK']['truncated']")" 0
+
 check "test boyunca: yazma komutu yok, düz şifre/adres hiçbir yerde yok" "$(sayi '^YASAK') $(grep -rlE "$PW1S|$PW2S|ICALGIZLI" "$DATA" 2>/dev/null | wc -l) $(grep -cE "$PW1S|$PW2S|ICALGIZLI" "$T/tum_yanitlar.txt") $(grep -cE "$PW1S|$PW2S" "$T/imap.log")" "0 0 0 0"
 kapat
 

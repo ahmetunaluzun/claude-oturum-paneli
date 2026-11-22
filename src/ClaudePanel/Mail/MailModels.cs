@@ -22,7 +22,12 @@ public sealed record MailFilter(bool Direct = true, bool Cc = false, bool Awaiti
 /// <param name="Cal">Takvim kaynağı açık.</param>
 /// <param name="MailGranted">Mail okuma izni verilmiş (son girişte).</param>
 /// <param name="CalGranted">Takvim okuma izni verilmiş (son girişte).</param>
-public sealed record MailAccount(string Id, string Provider, string Email, bool Mail, bool Cal, bool MailGranted, bool CalGranted, long AddedAt);
+/// <param name="Aliases">"Benim adreslerim / gruplarım": bu adreslerden biri Kime'de geçerse "direct", CC'de geçerse "cc" sayılır (tam adres, küçük harf).</param>
+public sealed record MailAccount(string Id, string Provider, string Email, bool Mail, bool Cal, bool MailGranted, bool CalGranted, long AddedAt,
+    List<string>? Aliases = null);
+
+/// <summary>Grup/liste adresi önerisi: adres ve geçtiği ileti sayısı (konu/gövde taşımaz).</summary>
+public sealed record MailSuggest(string Addr, int Count);
 
 /// <summary>Sağlayıcının döndürdüğü bir konuşmanın en yeni gelen mesajı (yalnız başlık meta verisi).</summary>
 /// <param name="ToMe">Kime alanında ben varım.</param>
@@ -48,9 +53,9 @@ public sealed record MailItem(string Account, string Id, string ThreadId, string
 public sealed record CalItem(string Account, string Id, string Title, long Start, long End, bool AllDay, string? Location, string? Join, string Url, long Updated);
 
 /// <param name="State">"ok" | "pending" (henüz denenmedi) | "reauth" (yeniden giriş / şifre kabul edilmedi) | "net" (son deneme ağ hatası) | "noclient" (Google, istemci dosyası yok) | "disabled" (IMAP hesapta kapalı) | "domain" (yönetici alan adı düzeyinde kapatmış) | "icaldenied" (takvim adresi artık geçerli değil / dışa paylaşım kapalı).
-/// AwaitingOk: "cevap bekleyen" bu hesapta çalışır; GmailLink: "Gmail'de aç" bağlantısı kurulabilir (IMAP: sunucu Gmail uzantılarını veriyor).</param>
+/// Truncated: gelen kutusunda üst sınır aşıldı, yalnız en yeni bu kadar iletiye bakıldı (0 = hepsine). AwaitingOk: "cevap bekleyen" bu hesapta çalışır; GmailLink: "Gmail'de aç" bağlantısı kurulabilir (IMAP: sunucu Gmail uzantılarını veriyor).</param>
 public sealed record MailAccountState(string Id, string Email, bool Mail, bool Cal, bool MailGranted, bool CalGranted, string State, long OkAt, long TriedAt,
-    string Provider, bool AwaitingOk, bool GmailLink);
+    string Provider, bool AwaitingOk, bool GmailLink, int Truncated = 0);
 
 /// <param name="State">"off" (hesap yok) | "noclient" | "ok".</param>
 /// <param name="CheckedAt">En son başarılı alınma (Unix ms); hiç alınmadıysa 0.</param>
@@ -66,7 +71,7 @@ public interface IMailProvider
 {
     string Name { get; }
     /// <summary>Gelen kutusundaki son konuşmalar (yalnız başlık meta verisi; gövde istenmez).</summary>
-    Task<List<MailMeta>> Mails(string accessToken, string me, CancellationToken ct);
+    Task<List<MailMeta>> Mails(string accessToken, string me, IReadOnlyCollection<string> aliases, CancellationToken ct);
     /// <summary>Şimdiden 24 saat sonrasına kadar başlayan etkinlikler.</summary>
     Task<List<CalEvent>> Events(string accessToken, CancellationToken ct);
 }

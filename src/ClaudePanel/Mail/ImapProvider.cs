@@ -6,7 +6,9 @@ namespace ClaudePanel;
 
 /// <param name="GmailExt">Sunucu Gmail IMAP uzantılarını (X-GM-EXT-1: konuşma kimliği, etiket) veriyor: "Gmail'de aç" bağlantısı kurulabilir.</param>
 /// <param name="AwaitingOk">"Cevap bekleyen" kuralı bu hesapta çalışır (Gmail uzantısı + Gönderilmiş klasörü bulundu).</param>
-public sealed record ImapInfo(bool GmailExt, bool AwaitingOk);
+/// <param name="Cap">Gelen kutusunda üst sınırı aşan ileti vardı: yalnız en yeni bu kadarına bakıldı (0 = hepsine bakıldı).</param>
+/// <param name="Suggest">Hesabın kendi alan adından, Kime/CC'de en sık geçen adresler (yalnız adres ve sayı; konu/gövde yok).</param>
+public sealed record ImapInfo(bool GmailExt, bool AwaitingOk, int Cap = 0, List<MailSuggest>? Suggest = null);
 
 /// <summary>
 /// Gmail / Google Workspace IMAP sağlayıcısı (imap.gmail.com:993, TLS) — Google uygulama şifresiyle. YALNIZ OKUR:
@@ -21,7 +23,9 @@ public sealed record ImapInfo(bool GmailExt, bool AwaitingOk);
 /// </summary>
 public sealed partial class ImapProvider
 {
-    const int ListMax = 40, Days = 14, SubjectMax = 200, TextMax = 200;
+    /// <summary>Bir taramada bakılan en çok ileti (yalnız başlık; aşılırsa en yenileri) ve tek UID FETCH komutundaki ileti sayısı.</summary>
+    internal const int ListMax = 1000, ChunkSize = 200;
+    const int Days = 14, SubjectMax = 200, TextMax = 200;
 
     static (string Host, int Port, bool Test) Target()
     {
@@ -49,9 +53,10 @@ public sealed partial class ImapProvider
         finally { await c.Logout(); }
     }
 
-    public async Task<(List<MailMeta> Mails, ImapInfo Info)> Mails(string pass, string me, CancellationToken ct)
+    public async Task<(List<MailMeta> Mails, ImapInfo Info)> Mails(string pass, string me, IReadOnlyCollection<string> aliases, CancellationToken ct)
     {
         me = me.ToLowerInvariant();
+        var mine = new HashSet<string>(aliases.Select(a => a.ToLowerInvariant())) { me };
         using var c = await Open(me, pass, ct);
         try
         {
@@ -60,7 +65,7 @@ public sealed partial class ImapProvider
             var inboxItems = "UID INTERNALDATE " + (gmail ? "X-GM-THRID X-GM-LABELS " : "") + "BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT)]";
 
             await c.Examine("INBOX", ct);
-            var inbox = await Fetch(c, since, inboxItems, ct);
+            var (inbox, cap) = await Fetch(c, since, inboxItems, ct);
 
             // Cevap bekleyen: Gönderilmiş klasöründeki konuşmaların en yeni gönderim zamanı.
             var sentNewest = new Dictionary<string, long>();
@@ -68,7 +73,7 @@ public sealed partial class ImapProvider
             if (gmail && (await c.List(ct)).FirstOrDefault(x => x.Attrs.Contains("\\Sent", StringComparer.OrdinalIgnoreCase)) is { Name.Length: > 0 } sent)
             {
                 await c.Examine(sent.Name, ct);
-                foreach (var m in await Fetch(c, since, "UID INTERNALDATE X-GM-THRID", ct))
+                foreach (var m in (await Fetch(c, since, "UID INTERNALDATE X-GM-THRID", ct)).Items)
                     if (Str(m, "X-GM-THRID") is { } th) sentNewest[th] = Math.Max(sentNewest.GetValueOrDefault(th), Date(m));
                 awaitingOk = true;
             }
@@ -88,17 +93,42 @@ public sealed partial class ImapProvider
                 var subject = h.GetValueOrDefault("subject", "");
                 if (subject.Length > SubjectMax) subject = subject[..SubjectMax] + "…";
                 result.Add(new MailMeta(Uid(m).ToString(CultureInfo.InvariantCulture), thread, subject, Clip(name), addr, date,
-                    MailRules.Addresses(h.GetValueOrDefault("to")).Contains(me), MailRules.Addresses(h.GetValueOrDefault("cc")).Contains(me), fromMe, replied, labels));
+                    MailRules.Addresses(h.GetValueOrDefault("to")).Any(mine.Contains), MailRules.Addresses(h.GetValueOrDefault("cc")).Any(mine.Contains), fromMe, replied, labels));
             }
-            return (result.OrderByDescending(m => m.Date).ToList(), new ImapInfo(gmail, awaitingOk));
+            return (result.OrderByDescending(m => m.Date).ToList(), new ImapInfo(gmail, awaitingOk, cap, Suggestions(inbox, me, mine)));
         }
         finally { await c.Logout(); }
     }
 
-    static async Task<List<Dictionary<string, object>>> Fetch(ImapClient c, DateTime since, string items, CancellationToken ct)
+    /// <summary>Son 14 günün iletileri: en yeni <see cref="ListMax"/> tanesi, <see cref="ChunkSize"/>'lık parçalarla (komut satırı uzamasın). Cap: üst sınır aşıldıysa sınır, değilse 0.</summary>
+    static async Task<(List<Dictionary<string, object>> Items, int Cap)> Fetch(ImapClient c, DateTime since, string items, CancellationToken ct)
     {
         var uids = await c.UidSearchSince(since, ct);
-        return uids.Count == 0 ? [] : await c.UidFetch(uids.TakeLast(ListMax), items, ct);
+        var take = uids.TakeLast(ListMax).ToList();
+        var res = new List<Dictionary<string, object>>();
+        foreach (var part in take.Chunk(ChunkSize)) res.AddRange(await c.UidFetch(part, items, ct));
+        return (res, uids.Count > ListMax ? ListMax : 0);
+    }
+
+    const int SuggestMax = 20;
+
+    /// <summary>
+    /// Gelen kutusunda Kime/CC'de en sık geçen, hesabın KENDİ alan adından adresler (kendim ve zaten eklenmiş olanlar hariç). İleti başına
+    /// bir adres bir kez sayılır. Genel posta alan adlarında (gmail.com) öneri yoktur: orada "kendi alan adı" bir kurum değildir.
+    /// </summary>
+    internal static List<MailSuggest> Suggestions(List<Dictionary<string, object>> inbox, string me, ICollection<string> mine)
+    {
+        var at = me.LastIndexOf('@');
+        if (at < 0 || MailDomain.IsConsumer(me[(at + 1)..])) return [];
+        var domain = me[at..];
+        var count = new Dictionary<string, int>();
+        foreach (var m in inbox)
+        {
+            var h = Headers(m);
+            foreach (var a in MailRules.Addresses(h.GetValueOrDefault("to")).Concat(MailRules.Addresses(h.GetValueOrDefault("cc"))).Distinct())
+                if (a.EndsWith(domain, StringComparison.Ordinal) && !mine.Contains(a)) count[a] = count.GetValueOrDefault(a) + 1;
+        }
+        return count.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Take(SuggestMax).Select(kv => new MailSuggest(kv.Key, kv.Value)).ToList();
     }
 
     static long Uid(Dictionary<string, object> m) => long.TryParse(Str(m, "UID"), out var u) ? u : 0;

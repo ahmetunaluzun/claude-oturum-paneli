@@ -5,6 +5,7 @@ public sealed record MailAddRequest(bool? Mail, bool? Cal, string? Id);
 public sealed record MailImapRequest(string? Email, string? Password, string? Ical);
 public sealed record MailOpenRequest(string? Target, string? Email);
 public sealed record MailAccountRequest(string? Id, bool? Mail, bool? Cal);
+public sealed record MailAliasRequest(string? Id, string[]? Aliases);
 public sealed record MailFilterRequest(bool? Direct, bool? Cc, bool? Awaiting, string[]? Senders, string[]? Keywords, string[]? Labels);
 
 /// <summary>
@@ -19,6 +20,7 @@ public sealed record MailFilterRequest(bool? Direct, bool? Cc, bool? Awaiting, s
 ///   POST /api/mail/accounts/cancel   → süren girişi iptal eder
 ///   POST /api/mail/accounts/sources  → kaynak kapatma (açma izin istiyorsa 409 "needauth": istemci girişi başlatır)
 ///   POST /api/mail/accounts/remove   → hesabı ve belirtecini siler
+///   POST /api/mail/accounts/aliases  → hesap başına "benim adreslerim / gruplarım" (tam adres listesi)
 ///   POST /api/mail/filter            → süzgeç
 ///   POST /api/mail/refresh           → şimdi denetle
 /// </summary>
@@ -177,6 +179,19 @@ public static class MailEndpoints
             return Results.Json(Brief(s, login, watch));
         });
 
+        // "Benim adreslerim / gruplarım": yerel kural (süzgeç gibi telefondan da değiştirilebilir). Kayıttan sonra hemen yeniden taranır
+        // (Kime/CC eşleşmesi tarama sırasında hesaplanır).
+        app.MapPost("/api/mail/accounts/aliases", async (HttpContext ctx, MailSettings s, MailLogin login, MailWatch watch) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<MailAliasRequest>();
+            if (req?.Id is not { } id || s.Find(id) is null) return Results.Json(new { error = "noaccount" }, statusCode: 404);
+            var before = s.Find(id)!.Aliases ?? [];
+            var now = s.SetAliases(id, req.Aliases) ?? [];
+            if (!before.SequenceEqual(now)) watch.Poke();
+            return Results.Json(Brief(s, login, watch));
+        });
+
         app.MapPost("/api/mail/refresh", (HttpContext ctx, MailWatch watch) =>
         {
             if (!authorized(ctx)) return Results.StatusCode(403);
@@ -198,6 +213,9 @@ public static class MailEndpoints
             {
                 id = a.Id, email = a.Email, provider = a.Provider, mail = a.Mail, cal = a.Cal, mailGranted = a.MailGranted, calGranted = a.CalGranted,
                 state = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.State ?? "pending",
+                aliases = a.Aliases ?? [],
+                suggest = a.Provider == "imap" ? watch.Suggestions(a) : [],
+                truncated = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.Truncated ?? 0,
                 awaitingOk = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.AwaitingOk ?? true,
                 gmailLink = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.GmailLink ?? true,
                 okAt = snap.Accounts.FirstOrDefault(x => x.Id == a.Id)?.OkAt ?? 0,

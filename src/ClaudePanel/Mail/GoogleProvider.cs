@@ -87,9 +87,10 @@ public sealed partial class GoogleProvider : IMailProvider
 
     // ---- Mail ----
 
-    public async Task<List<MailMeta>> Mails(string access, string me, CancellationToken ct)
+    public async Task<List<MailMeta>> Mails(string access, string me, IReadOnlyCollection<string> aliases, CancellationToken ct)
     {
         me = me.ToLowerInvariant();
+        var mine = new HashSet<string>(aliases.Select(a => a.ToLowerInvariant())) { me };
         var inbox = await List(access, $"in:inbox newer_than:{Days}d", ct);
         var sent = await List(access, $"in:sent newer_than:{Days}d", ct);
         var labels = await LabelNames(access, ct);
@@ -110,7 +111,7 @@ public sealed partial class GoogleProvider : IMailProvider
                 if (newestSent.TryGetValue(m.Thread, out var sid) && sid != m.Id && await Meta(access, sid, ct) is { } s) replied = s.Date >= h.Date;
                 var subject = h.Subject.Length > SubjectMax ? h.Subject[..SubjectMax] + "…" : h.Subject;
                 return new MailMeta(m.Id, m.Thread, subject, Clip(name), addr, h.Date,
-                    MailRules.Addresses(h.To).Contains(me), MailRules.Addresses(h.Cc).Contains(me), fromMe, replied,
+                    MailRules.Addresses(h.To).Any(mine.Contains), MailRules.Addresses(h.Cc).Any(mine.Contains), fromMe, replied,
                     h.Labels.Select(l => labels.GetValueOrDefault(l, l)).ToList());
             }
             finally { gate.Release(); }

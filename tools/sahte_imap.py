@@ -3,7 +3,7 @@
 # yönlendirilir. Python stdlib. Gmail davranışı: https://developers.google.com/workspace/gmail/imap/imap-extensions
 #   (X-GM-THRID/X-GM-MSGID/X-GM-LABELS; etiketler değiştirilmiş UTF-7), RFC 6154 (\Sent özniteliği), RFC 3501 (EXAMINE salt okunur).
 # Senaryo dosyası her istekte okunur (test çalışırken değiştirilebilir):
-#   {"hesaplar": {"<e-posta>": {"parola": "...", "mod": "ok" | "auth" | "disabled" | "domain" | "nogm" | "nosent", "set": "kisisel" | "sirket"}},
+#   {"hesaplar": {"<e-posta>": {"parola": "...", "mod": "ok" | "auth" | "disabled" | "domain" | "nogm" | "nosent", "set": "kisisel" | "sirket" | "grup" (120 grup postası) | "cok" (1100 grup postası)}},
 #    "ical": {"<anahtar>": {"durum": 200, "icerik": "kisisel" | "sirket" | "bozuk"}}}
 #   mod: auth = AUTHENTICATIONFAILED; disabled = "Your account is not enabled for IMAP use"; domain = "IMAP access is disabled for your domain";
 #        nogm = Gmail uzantısı (X-GM-EXT-1) yok; nosent = Gönderilmiş klasörü (\Sent) yok.
@@ -54,8 +54,26 @@ def rfc2047(s):
     return "=?UTF-8?B?" + base64.b64encode(s.encode("utf-8")).decode() + "?="
 
 
+def grup_seti(me, adet, adim):
+    """Grup/liste adresleriyle gelen mailler (Kime/CC'de kullanıcı YOK; Google Workspace saha tespiti). Hesabın alan adı: me'nin alanı.
+    i % 5: 0 → ekip@ (Kime), 1 → destek@ (Kime), 2 → ece@ (kişi, Kime), 3 → harici Kime + ekip@ CC, 4 → başka alan adındaki liste (öneri DEĞİL).
+    Ayrıca kullanıcıya doğrudan 2 mail (uid 1500, 1501) ve destek@ konuşmalarından birine (i=1) benim cevabım (uid 1600, gönderilmiş)."""
+    d = me.split("@")[1]
+    out = []
+    for i in range(adet):
+        k = i % 5
+        kime, cc = [(f"ekip@{d}", ""), (f"destek@{d}", ""), (f"ece@{d}", ""), ("dis@harici.com", f"ekip@{d}"), ("liste@baska.com", "")][k]
+        out.append((1000 + i, 9000 + i, f"Dış Kişi <dis{i % 7}@musteri.com>", kime, cc, f"Grup postası {i}", i * adim, ["\\Inbox"], "inbox"))
+    out.append((1500, 9500, "Müdür <mudur@musteri.com>", me, "", "Doğrudan bana", 1, ["\\Inbox"], "inbox"))
+    out.append((1501, 9501, "Ali <ali@musteri.com>", f"ekip@{d}", me, "CC ile bana", 3, ["\\Inbox"], "inbox"))
+    out.append((1600, 9001, f"Ben <{me}>", "dis1@musteri.com", "", "Re: Grup postası 1", 0.5, ["\\Sent"], "sent"))
+    return out
+
+
 def iletiler(set_adi, me):
     """(uid, thrid, kimden, kime, cc, konu, saat önce, etiketler, klasör). Konu/etiket örnekleri: RFC 2047, katlanmış başlık, mUTF-7."""
+    if set_adi in ("grup", "cok"):
+        return grup_seti(me, 120 if set_adi == "grup" else 1100, 2.0 if set_adi == "grup" else 0.3)
     if set_adi == "sirket":
         return [
             (201, 7001, "Müdür <mudur@sirket.com.tr>", me, "", "Bütçe onayı", 1, ["\\Inbox", "\\Important"], "inbox"),

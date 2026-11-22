@@ -19,6 +19,9 @@ public static partial class MailDomain
     [GeneratedRegex(@"=\s*(?:\d+\s+)?([a-z0-9.-]*\.?(?:aspmx\.l\.google\.com|googlemail\.com|smtp\.google\.com|google\.com))\.?\s*$", RegexOptions.IgnoreCase | RegexOptions.Multiline)] private static partial Regex GoogleMxRx();
     [GeneratedRegex(@"mail exchanger|\bMX\b", RegexOptions.IgnoreCase)] private static partial Regex AnyMxRx();
 
+    /// <summary>Genel posta alan adı: "kendi alan adındaki adresler" bir kurumu göstermez (grup önerisi yapılmaz).</summary>
+    public static bool IsConsumer(string domain) => domain.ToLowerInvariant() is "gmail.com" or "googlemail.com";
+
     /// <returns>"google" | "other" | "unknown" (MX denetlenemedi: ağ yok / komut yok).</returns>
     public static async Task<string> Provider(string email, CancellationToken ct)
     {

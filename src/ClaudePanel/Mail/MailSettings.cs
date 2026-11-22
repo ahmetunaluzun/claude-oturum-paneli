@@ -87,6 +87,24 @@ public sealed partial class MailSettings(ILogger<MailSettings> log)
         return id;
     }
 
+    /// <summary>
+    /// "Benim adreslerim / gruplarım": yalnız tam adres (küçük harf), hesabın kendi adresi hariç, <see cref="MailRules.Clean"/> sınırlarıyla.
+    /// Yerel kuraldır; belirteç/izin gerektirmez. Dönen: kaydedilen liste (hesap yoksa null).
+    /// </summary>
+    public List<string>? SetAliases(string id, IEnumerable<string?>? raw)
+    {
+        var own = Find(id)?.Email.ToLowerInvariant();
+        if (own is null) return null;
+        var list = CleanAddresses(raw, own);
+        Update(s => s with { Accounts = (s.Accounts ?? []).Select(a => a.Id == id ? a with { Aliases = list } : a).ToList() });
+        return list;
+    }
+
+    public static List<string> CleanAddresses(IEnumerable<string?>? raw, string own) =>
+        MailRules.Clean(raw).Select(x => x.ToLowerInvariant())
+            .Where(x => x != own && x.All(c => c is > ' ' and < (char)127) && MailRules.Addresses(x) is [var a] && a == x)
+            .Distinct().ToList();
+
     public MailAccount? Find(string? id) => Accounts.FirstOrDefault(a => a.Id == id);
 
     /// <summary>Kaynağı kapatır (izin istenmeden). Açma izin gerektiriyorsa giriş akışından geçer (<see cref="MailLogin"/>).</summary>
