@@ -462,4 +462,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     }
 
     public bool AnyBusy => _sessions.Values.Any(h => h.Status == "busy");
+
+    /// <summary>Çalışan panel oturumlarının adları (ad yoksa klasör adı); yeniden başlatma reddinde gösterilir.</summary>
+    public IReadOnlyList<string> BusyNames => _sessions.Values.Where(h => h.Status == "busy")
+        .Select(h => h.Name is { Length: > 0 } n ? n : Path.GetFileName(h.Cwd.TrimEnd('\\', '/'))).ToList();
 }

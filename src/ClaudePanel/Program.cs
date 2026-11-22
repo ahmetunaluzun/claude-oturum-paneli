@@ -23,7 +23,13 @@ var baseUrl = $"http://127.0.0.1:{port}";
 
 // Tek kopya: panel zaten açıksa yalnız pencereyi aç ve çık.
 // Açık olan daha eski sürümse kullanıcıya sorulur; onaylarsa eski kapatılır ve bu sürüm açılır.
-if (await PanelAlreadyRunning(baseUrl) && !await Handoff.TryReplaceOlder(baseUrl, port))
+// Paneli yeniden başlat (Restart.cs): eski panel bu süreci başlattı; sormadan devral, olmazsa eski açık kalsın.
+if (Restart.FromPid(args) is { } restartFrom)
+{
+    var rc = await Restart.TakeOver(baseUrl, port, restartFrom, args.Contains(Restart.ForceArg));
+    if (rc != 0) Environment.Exit(rc);
+}
+else if (await PanelAlreadyRunning(baseUrl) && !await Handoff.TryReplaceOlder(baseUrl, port))
 {
     Launcher.OpenAppWindow(baseUrl);
     return;
@@ -194,7 +200,12 @@ app.MapPost("/api/remote/forget", (HttpContext ctx) =>
 });
 app.MapGet("/assets/{file}", (string file) => Web.Serve(file));
 app.MapGet("/api/ping", () => Results.Text("claude-panel"));
-app.MapGet("/api/version", () => Results.Json(new { version = typeof(Web).Assembly.GetName().Version?.ToString(3) }));
+// pid + boot: yeniden başlatmada sayfa yeni süreci tanır; diskVersion: diskteki exe daha yeniyse (Restart.DiskVersion).
+app.MapGet("/api/version", () => Results.Json(new
+{
+    version = typeof(Web).Assembly.GetName().Version?.ToString(3), pid = Environment.ProcessId, boot,
+    diskVersion = Restart.DiskVersion(), restartError = Restart.LastError
+}));
 
 app.MapGet("/api/state", async (SessionStore store, HostedSessions hosted, Tray tray, NightMode night,
     Transcripts transcripts, ContextWindows windows) =>
@@ -372,8 +383,15 @@ app.MapPost("/api/quit", (HttpContext ctx, IHostApplicationLifetime life, Hosted
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
     if (hosted.AnyBusy && ctx.Request.Query["force"] != "1") return Results.Json(new { error = "busy" }, statusCode: 409);
+    Restart.MarkHandingOver(); // yeniden başlatma sürüyorsa bu istek yeni süreçten: uygulama penceresi açık kalır
     _ = Task.Delay(300).ContinueWith(_ => life.StopApplication());
     return Results.Ok();
+});
+// Paneli yeniden başlat: telefondan da (Blocked'da değil) ama zorlama yalnız bilgisayardan.
+app.MapPost("/api/restart", async (HttpContext ctx, HostedSessions hosted) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    return await Restart.Begin(hosted.BusyNames, force: IsLocal(ctx) && ctx.Request.Query["force"] == "1");
 });
 
 // Klasör seçme penceresi (işletim sisteminin kendi penceresi).
@@ -560,7 +578,7 @@ await app.StartAsync();
 Handoff.WriteToken(port, token); // yeni sürüm açılınca bu paneli kapatabilsin
 app.Lifetime.ApplicationStopping.Register(() => Handoff.DeleteToken(port));
 // Paneli kapat / yeni sürüme devir: pencere de kapanır (sayfanın window.close()'u Edge uygulama penceresinde yetmiyordu).
-app.Lifetime.ApplicationStopping.Register(() => Launcher.CloseAppWindow(baseUrl));
+app.Lifetime.ApplicationStopping.Register(() => { if (!Restart.HandingOver) Launcher.CloseAppWindow(baseUrl); });
 app.Services.GetRequiredService<HostedSessions>().Restore();
 app.Services.GetRequiredService<Tray>().Start();
 app.Services.GetRequiredService<NightMode>().Start();

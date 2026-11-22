@@ -22,6 +22,13 @@ static class Handoff
         File.WriteAllText(TokenFile(port), token);
     }
 
+    /// <summary>Çalışan panelin oturum anahtarı (yoksa null).</summary>
+    public static string? ReadToken(int port)
+    {
+        try { return File.ReadAllText(TokenFile(port)).Trim(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
     public static void DeleteToken(int port)
     {
         try { File.Delete(TokenFile(port)); }
@@ -45,9 +52,7 @@ static class Handoff
         if (running is null || running >= Mine) return false;
 
         string old = running.ToString(3), mine = Mine.ToString(3);
-        string? token = null;
-        try { token = File.ReadAllText(TokenFile(port)).Trim(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        var token = ReadToken(port);
 
         if (string.IsNullOrEmpty(token))
         {
@@ -85,7 +90,7 @@ static class Handoff
         return false;
     }
 
-    static async Task<Version?> RunningVersion(HttpClient http, string baseUrl)
+    public static async Task<Version?> RunningVersion(HttpClient http, string baseUrl)
     {
         try
         {
@@ -100,7 +105,7 @@ static class Handoff
         }
     }
 
-    static async Task<System.Net.HttpStatusCode?> Quit(HttpClient http, string baseUrl, string token, bool force)
+    public static async Task<System.Net.HttpStatusCode?> Quit(HttpClient http, string baseUrl, string token, bool force)
     {
         try
         {
