@@ -41,10 +41,9 @@ window.PanelFollowUp = function (d) {
       if (i.committed) return t("fuDoneCommit", i.committed);
       return t(i.code === "nothing" ? "fuDoneNothing" : "fuDoneNoChange");
     }
+    // Gizli bilgi bulguları ayrı listede (followup-pushguard.js), metne eklenmez.
     let s = t("fuFail_" + (["secret", "rejected", "auth", "timeout", "noremote", "nogit", "insession", "busy", "unchanged"].includes(i.code) ? i.code : "failed"));
-    if (i.code === "secret" && i.findings?.length)
-      s += ": " + i.findings.map(f => `${f.file || "?"} (${t("fuSec_" + f.what)})`).join("; ");
-    else if (i.detail && i.code !== "secret") s += ` (${i.detail})`;
+    if (i.detail && i.code !== "secret") s += ` (${i.detail})`;
     if (i.committed && i.state === "failed") s = t("fuDoneCommit", i.committed) + " · " + s;
     return s;
   }
@@ -64,10 +63,11 @@ window.PanelFollowUp = function (d) {
     if (btn) btn.disabled = true;
     let r;
     try { r = await api(path, { ...body, lang: lang() }); } catch { r = { ok: false, data: null }; }
-    if (!r.ok) { if (btn) btn.disabled = false; toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
+    if (!r.ok) { if (btn) btn.disabled = false; toast(t(`err_${r.data?.error || "generic"}`), "warn"); return r; }
     toast(t("fuJobStarted"));
     jobsWereActive = true;
     loadJobs();
+    return r;
   }
 
   /** "Commit et ve gönder" toplu işi: onay listesi → tek arka plan işi. → başlatıldı mı. */
@@ -250,7 +250,10 @@ window.PanelFollowUp = function (d) {
     }
     // İş bittiyse ama depo henüz yeniden taranmadıysa satırdaki sayılar eskidir: düğme tarama gelene kadar gösterilmez.
     const stale = job?.state === "done" && job.updatedAt > snap.checkedAt;
-    if (it.type === "git" && !(job && isActive(job)) && !stale)
+    // Gizli bilgi engeli: "Claude'a incelet" (+ yalnız kalıp bulgularında "Test verisi, yine de gönder"); aynı nedenle yine
+    // başarısız olacak "Gönder" konmaz. Commit de gerekiyorsa plan düğmesi ikincil kalır.
+    const secret = X.side(it, side);
+    if (it.type === "git" && !(job && isActive(job)) && !stale && !(secret && it.plan.path === "/api/follow/push"))
       side.appendChild(button(it.plan.label, (b) => runJob(b, it.plan.path, it.plan.body), !job || job.state === "done"));
     if (it.type === "job" && !isActive(job))
       side.appendChild(button(t("fuDismiss"), () => { state.dismissed = [...state.dismissed.slice(-49), job.jobId + "|" + it.root]; S.save(); render(); }));
@@ -298,7 +301,7 @@ window.PanelFollowUp = function (d) {
     const marks = (it.kind ? `<span class="fu-kind">${esc(it.kind)}</span>` : "") + (it.tags || "") + (mode === "session" ? tag(t("fuInSessionTag")) : "")
       + (mode === "aside" ? tag(t("fuAside_" + it.aside)) : "") + (!mode && S.isNew(it.id) ? `<span class="fu-new">${esc(t("fuNew"))}</span>` : "");
     r.appendChild(el("div", "fu-main", `<span class="fu-title"><b>${esc(it.title)}</b>${marks}</span>`
-      + (it.what ? `<span class="fu-what">${esc(it.what)}</span>` : "") + jobLine + (it.sub ? `<small title="${esc(it.sub)}">${esc(it.sub)}</small>` : "")));
+      + (it.what ? `<span class="fu-what">${esc(it.what)}</span>` : "") + jobLine + X.list(job) + (it.sub ? `<small title="${esc(it.sub)}">${esc(it.sub)}</small>` : "")));
     const tog = r.appendChild(el("button", "fu-tog", `<span class="fu-chev" aria-hidden="true"></span>`));
     tog.type = "button";
     tog.setAttribute("aria-expanded", String(open));
@@ -374,6 +377,7 @@ window.PanelFollowUp = function (d) {
     reload: () => render() });
   const G = window.PanelFollowGithub({ t, api, getJson, toast, dur, now, low, tag, button, startHosted, setView, reload: () => load(false) });
   const M = window.PanelFollowMail({ t, api, dur, now, low, tag, lang });
+  const X = window.PanelFollowSecret({ t, esc, api, toast, confirmBox, button, startHosted, setView, lang, runJob });
   const V = window.PanelFollowView({ t, esc, S, el, button, row, drawSection, note, toast, isActive, commitAll, openMenu, folder,
     sessions: () => items(), rerender: () => render() });
 

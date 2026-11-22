@@ -139,9 +139,11 @@ await click(`${rowOf("Gizli Depo")}.querySelector(".fu-side .btn")`);
 await until(`(${rowOf("Gizli Depo")})?.querySelector(".fu-job.warn")`);
 const gizli = await rowInfo("Gizli Depo");
 check("Gönder reddedildi, neden satırda (dosya + kalıp adı)", gizli.is,
-  "Gönderilmedi: gönderilecek commit'lerde depoya girmemesi gereken içerik var: .claude/settings.local.json (Claude Code izin dosyası); ayar.txt (GitHub belirteci)");
+  "Gönderilmedi: gönderilecek commit'lerde depoya girmemesi gereken içerik var");
+check("bulgular satırda listeli (dosya, satır, kural, maskeli ipucu)", await ev(`[...(${rowOf("Gizli Depo")}).querySelectorAll(".fu-secret-list li")].map(l => l.textContent)`),
+  [".claude/settings.local.json Claude Code izin dosyası", "ayar.txt:1 GitHub belirteci ghp_***"]);
 check("belirteç değeri sayfada yok", await ev(`/gh[pousr]_[A-Za-z0-9]{20,}/.test(document.body.innerText)`), false);
-check("reddedilen depoda düğme duruyor (düzeltip yeniden denenebilir)", gizli.dugme, ["Gönder"]);
+check("izin dosyası bulgusunda yalnız inceletme (yine de gönder ve aynı nedenle düşecek Gönder yok)", gizli.dugme, ["Claude'a incelet"]);
 
 // ---- Gönder: başarılı, oturum açılmaz ----
 await click(`${rowOf("Örnek API")}.querySelector(".fu-side .btn")`);
