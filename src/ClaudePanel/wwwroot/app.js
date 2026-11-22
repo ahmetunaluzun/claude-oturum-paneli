@@ -126,7 +126,7 @@
       id: "h:" + h.key, kind: "panel", key: h.key, sessionId: h.sessionId, name: h.name || folderName(h.cwd),
       cwd: h.cwd, status: h.status, lane: h.status === "busy" || h.status === "starting" ? "busy" : "idle",
       since: h.statusSince, started: h.startedAt, cost: h.costUsd, error: h.lastError, model: h.model,
-      task: h.task, night: h.night, stats: st.stats?.[h.sessionId]
+      task: h.task, night: h.night, stats: st.stats?.[h.sessionId], bgjobs: h.background || []
     }));
     const hostedIds = new Set(hosted.map(h => h.sessionId).filter(Boolean));
     // surface: oturum nerede açık (Claude Code'un entrypoint alanı): masaüstü uygulaması, VS Code ya da terminal.
@@ -164,6 +164,7 @@
       render();
       renderUsage(st.usage);
       renderNightPill(st.night);
+      B.paintFoot(items, st);
       refreshDrawerHeader();
       setConn(true);
     } catch {
@@ -200,8 +201,10 @@
   // Kart ve konuşma ekranı eylemleri, toplu seçim (actions.js)
   const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
+  // Arka plan işi görünürlüğü (bgjobs.js): kart rozeti, alt bilgi, yeniden başlat/kapat uyarı listesi
+  const B = window.PanelBgJobs({ t, api, toast, restartError: (code) => R.errText(code) });
   // Paneli yeniden başlat (restart.js): Ayarlar düğmesi + Takip'teki "Yeni sürüm hazır" satırı
-  const R = window.PanelRestart({ t, api, getJson, confirmBox, ask, REMOTE });
+  const R = window.PanelRestart({ t, api, getJson, confirmBox, ask, REMOTE, bg: B, toast });
   // Takip sekmesi (followup.js)
   const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask, REMOTE, openMenu: A.openMenu, restart: R,
     lang: () => settings.lang, items: () => items,
@@ -283,6 +286,7 @@
     el.innerHTML = `
       <div class="card-top"><span class="status-dot"></span><span class="sel-box" aria-hidden="true"></span><h3 class="name"></h3><span class="model-slot"></span><span class="badge night-badge" hidden></span><span class="badge kind-badge"></span></div>
       <p class="path"></p>
+      <p class="abj-chip" hidden></p>
       <button type="button" class="proj-multi" hidden></button>
       <div class="meta"><span class="state-time"></span><span class="reason"></span><span class="age"></span></div>
       <p class="last" hidden></p>
@@ -344,6 +348,7 @@
     nb.hidden = !s.night;
     nb.dataset.night = s.night || "";
     nb.title = s.night === "decision" ? t("nightDecisionHint") : "";
+    B.paintCard(card, s);
     updateCardDetails(card, s);
   }
 
@@ -613,6 +618,7 @@
     if (stats) meta.push(stats);
     if (live?.cost) meta.push(t("cost", live.cost.toFixed(2)));
     if (live?.error) meta.push("⚠ " + live.error);
+    if (live?.bgjobs?.length) meta.push(B.chip(live.bgjobs));
     $("dMeta").textContent = meta.join(" · ");
     const dModel = live?.stats?.model || live?.model || "";
     if ($("dModel").dataset.model !== dModel) {
@@ -1865,7 +1871,13 @@
   $("btnQuit").addEventListener("click", async () => {
     if (items.some(s => s.kind === "panel") && !await confirmBox({ title: t("quitTitle"), text: t("quitWarn"), okText: t("quit"), danger: true })) return;
     let r = await api("/api/quit");
-    if (r.status === 409 && await confirmBox({ title: t("quitBusyTitle"), text: t("quitBusy"), okText: t("quitBusyGo"), danger: true })) r = await api("/api/quit?force=1");
+    if (r.status === 409) {
+      // Çalışan oturum ve/veya "boşta" oturumda süren arka plan işi: uyarı + "Yine de kapat" (bekle seçeneği yok).
+      const list = [...(r.data?.sessions || []), ...B.lines(r.data?.background)];
+      const bgOnly = !(r.data?.sessions || []).length;
+      if (!await confirmBox({ title: t(bgOnly ? "quitBgTitle" : "quitBusyTitle"), text: t(bgOnly ? "quitBg" : "quitBusy"), list, okText: t("quitBusyGo"), danger: true })) return;
+      r = await api("/api/quit?force=1");
+    }
     if (!r.ok) return;
     panelQuit = true;
     window.close();

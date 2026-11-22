@@ -1007,3 +1007,19 @@ html.selecting .codex-card { opacity: .5; }
   .mw-body .btn, .mw-more summary, .mw-adv summary, .mw-adv .btn { min-height: 44px; }
   .mw-body .btn { width: 100%; }
 }
+
+/* Arka plan işi görünürlüğü (bgjobs.js): kartta rozet, alt bilgide gösterge, bekleyen yeniden başlatma notu */
+.abj-chip { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--idle); overflow-wrap: anywhere; }
+.abj-chip[data-stale="1"] { color: var(--danger); }
+[data-theme="light"] .abj-chip { color: #9A6400; }
+[data-theme="light"] .abj-chip[data-stale="1"] { color: #B3261E; }
+.abj-foot { white-space: nowrap; }
+.abj-foot[data-has="1"] { color: var(--idle); font-weight: 600; }
+[data-theme="light"] .abj-foot[data-has="1"] { color: #9A6400; }
+.abj-wait { color: var(--accent); font-weight: 600; }
+.abj-wait[hidden] { display: none; }
+.abj-wait .link { font: inherit; }
+@media (max-width: 640px) {
+  footer.bottom { flex-wrap: wrap; row-gap: 4px; }
+  .abj-wait .link { min-height: 32px; padding: 0 6px; }
+}

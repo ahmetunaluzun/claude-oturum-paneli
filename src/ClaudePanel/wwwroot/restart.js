@@ -12,6 +12,10 @@
     rsBusyTitle: "Panelde çalışan oturum var",
     rsBusy: "Şu oturumlar şu an çalışıyor. Yeniden başlatırsanız işleri yarıda kalır (konuşma kaybolmaz, panel açılınca geri gelir).",
     rsBusyGo: "Yine de yeniden başlat",
+    rsBgTitle: "Arka planda iş sürüyor",
+    rsBg: "Oturumlar cevabını bitirmiş görünüyor ama arka planda çalışan iş var. Şimdi yeniden başlatırsanız bu işler yarıda kalır; \"İşler bitince yeniden başlat\" derseniz panel beklemeye alınır, iş kalmayınca kendisi yeniden başlar.",
+    rsBgBusy: "Çalışan oturum ve arka plan işi var. Şimdi yeniden başlatırsanız yarıda kalır; \"İşler bitince yeniden başlat\" derseniz panel beklemeye alınır, iş kalmayınca kendisi yeniden başlar.",
+    rsWhenIdle: "İşler bitince yeniden başlat", rsNow: "Yine de şimdi", rsWaiting: "İşler bitince panel yeniden başlatılacak.",
     rsBusyPhone: "Şu oturumlar şu an çalışıyor. İşleri bitince yeniden deneyin.",
     rsReady: "Yeni sürüm hazır (v{0}). Yeniden başlatınca açılır.",
     rsReadyTitle: "Yeni sürüm hazır: v{0}", rsReadyWhat: "Çalışan v{0} · yeniden başlatınca yeni sürüm açılır",
@@ -35,6 +39,10 @@
     rsBusyTitle: "A panel session is working",
     rsBusy: "These sessions are working right now. Restarting interrupts them (conversations are kept and come back when the panel opens).",
     rsBusyGo: "Restart anyway",
+    rsBgTitle: "Background work is running",
+    rsBg: "The sessions look finished but work is still running in the background. Restarting now interrupts it; choose \"Restart when the work finishes\" and the panel waits, then restarts by itself.",
+    rsBgBusy: "A session is working and there is background work. Restarting now interrupts it; choose \"Restart when the work finishes\" and the panel waits, then restarts by itself.",
+    rsWhenIdle: "Restart when the work finishes", rsNow: "Restart anyway", rsWaiting: "The panel will restart when the work finishes.",
     rsBusyPhone: "These sessions are working right now. Try again when they finish.",
     rsReady: "New version ready (v{0}). It opens when you restart.",
     rsReadyTitle: "New version ready: v{0}", rsReadyWhat: "Running v{0} · restart to open the new version",
@@ -54,7 +62,7 @@
 
 window.PanelRestart = function (d) {
   "use strict";
-  const { t, api, getJson, confirmBox, ask, REMOTE } = d;
+  const { t, api, getJson, confirmBox, ask, REMOTE, bg, toast } = d;
   const WAIT_MS = 60_000, POLL_MS = 800, CHECK_MS = 5 * 60_000;
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const subs = [];
@@ -82,6 +90,20 @@ window.PanelRestart = function (d) {
     if (r.status === 409 && r.data?.error === "busy") {
       hide();
       const list = r.data.sessions || [];
+      const bgList = bg.lines(r.data.background);
+      // Arka plan işi var: "işler bitince yeniden başlat" (sunucu bekler, kendisi yeniden başlatır) ya da "yine de şimdi".
+      if (bgList.length) {
+        const buttons = [{ value: "idle", label: t("rsWhenIdle"), cls: "primary" }];
+        if (!REMOTE) buttons.push({ value: "yes", label: t("rsNow"), cls: "cbox-danger" });
+        const v = await ask(t("rsBgTitle"), t(list.length ? "rsBgBusy" : "rsBg"), [...list, ...bgList], buttons, { cbox: true, focus: "idle" });
+        if (v === "idle") {
+          const w = await api("/api/restart?when=idle");
+          if (w.ok) toast(t("rsWaiting")); else toast(errText(w.data?.error || "exited"), "warn");
+          return;
+        }
+        if (v === "yes") return start(true);
+        return;
+      }
       if (REMOTE) { await ask(t("rsBusyTitle"), t("rsBusyPhone"), list, [{ value: "ok", label: t("ok"), cls: "primary" }]); return; }
       if (!await confirmBox({ title: t("rsBusyTitle"), text: t("rsBusy"), list, okText: t("rsBusyGo"), danger: true })) return;
       return start(true);
@@ -150,5 +172,5 @@ window.PanelRestart = function (d) {
   check();
   setInterval(check, CHECK_MS);
 
-  return { run, check, disk, current: () => info?.version || null, subscribe: (f) => subs.push(f), paintSettings };
+  return { run, check, disk, errText, current: () => info?.version || null, subscribe: (f) => subs.push(f), paintSettings };
 };
