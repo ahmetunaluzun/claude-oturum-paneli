@@ -6,13 +6,14 @@ using System.Text.Json;
 namespace ClaudePanel;
 
 public sealed record HostedInfo(string Key, string? SessionId, string Cwd, string? Name, string Status,
-    long StartedAt, long StatusSince, string? Model, string? LastError, double CostUsd, string? Task, string? Night);
+    long StartedAt, long StatusSince, string? Model, string? LastError, double CostUsd, string? Task, string? Night,
+    IReadOnlyList<BgJob>? Background = null);
 
 /// <summary>
 /// Panelin kendi içinde çalıştırdığı oturumlar: claude -p --input-format stream-json ile açık kalan süreç.
 /// Mesaj stdin'e satır olarak yazılır; durum stdout akışından (init / result) izlenir.
 /// </summary>
-public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextWindows windows) : IDisposable
+public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextWindows windows, BackgroundWork background) : IDisposable
 {
     static readonly UTF8Encoding Utf8 = new(false);
     static readonly HashSet<string> Models = ["", "opus", "sonnet", "haiku", "fable"];
@@ -62,13 +63,13 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         _sessions.TryGetValue(key, out var h) ? h.Commands : null;
 
     /// <summary>Görünen oturumlar (arka plan işleri hariç).</summary>
-    public IReadOnlyList<HostedInfo> List() => ListAll(includeHidden: false);
+    public IReadOnlyList<HostedInfo> List() => ListAll(includeHidden: false, withBackground: true);
 
     /// <summary>Arka plan işleri dahil: aynı projede çalışan oturum denetimi için (ProjectGuard).</summary>
-    public IReadOnlyList<HostedInfo> ListAll(bool includeHidden = true) => _sessions.Values
+    public IReadOnlyList<HostedInfo> ListAll(bool includeHidden = true, bool withBackground = false) => _sessions.Values
         .Where(h => includeHidden || !h.Hidden)
         .Select(h => new HostedInfo(h.Key, h.SessionId, h.Cwd, h.Name, h.Status, h.StartedAt, h.StatusSince,
-            h.Model, h.LastError, h.Cost, h.Task, h.Night))
+            h.Model, h.LastError, h.Cost, h.Task, h.Night, withBackground ? background.Of(h.SessionId) : null))
         .OrderBy(h => h.StartedAt).ToList();
 
     public static string? Validate(string? cwd, string? prompt, string? model)
@@ -464,6 +465,14 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     public bool AnyBusy => _sessions.Values.Any(h => h.Status == "busy");
 
     /// <summary>Çalışan panel oturumlarının adları (ad yoksa klasör adı); yeniden başlatma reddinde gösterilir.</summary>
-    public IReadOnlyList<string> BusyNames => _sessions.Values.Where(h => h.Status == "busy")
-        .Select(h => h.Name is { Length: > 0 } n ? n : Path.GetFileName(h.Cwd.TrimEnd('\\', '/'))).ToList();
+    public IReadOnlyList<string> BusyNames => _sessions.Values.Where(h => h.Status == "busy").Select(NameOf).ToList();
+
+    static string NameOf(Hosted h) => h.Name is { Length: > 0 } n ? n : Path.GetFileName(h.Cwd.TrimEnd('\\', '/'));
+
+    /// <summary>
+    /// Oturumların "boşta" olsa da içlerinde süren arka plan işleri (alt ajan, arka plan komutu): yeniden başlatma/kapatma bunları da keser.
+    /// Gizli (planlı iş vb.) oturumlar da dahil: onların süreci de kapanır.
+    /// </summary>
+    public IReadOnlyList<BgJobOf> BackgroundJobs() => _sessions.Values
+        .SelectMany(h => background.Of(h.SessionId).Select(j => new BgJobOf(NameOf(h), j))).ToList();
 }

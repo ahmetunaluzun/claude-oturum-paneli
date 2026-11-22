@@ -64,10 +64,17 @@ static class Restart
         }
     }
 
-    /// <summary>POST /api/restart. busy: çalışan panel oturumlarının adları; force yalnız bilgisayardan (çağıran karar verir).</summary>
-    public static async Task<IResult> Begin(IReadOnlyList<string> busy, bool force)
+    /// <summary>"Çalışıyor" yanıtının gövdesi: çalışan oturum adları + oturum "boşta" olsa da süren arka plan işleri (Kapat ve Yeniden başlat ortak).</summary>
+    public static object BusyBody(IReadOnlyList<string> busy, IReadOnlyList<BgJobOf> background) => new
     {
-        if (busy.Count > 0 && !force) return Results.Json(new { error = "busy", sessions = busy }, statusCode: 409);
+        error = "busy", sessions = busy,
+        background = background.Select(b => new { session = b.Session, kind = b.Job.Kind, label = b.Job.Label, since = b.Job.Since, stale = b.Job.Stale })
+    };
+
+    /// <summary>POST /api/restart. busy: çalışan panel oturumlarının adları; background: arka plan işleri; force yalnız bilgisayardan (çağıran karar verir).</summary>
+    public static async Task<IResult> Begin(IReadOnlyList<string> busy, IReadOnlyList<BgJobOf> background, bool force)
+    {
+        if ((busy.Count > 0 || background.Count > 0) && !force) return Results.Json(BusyBody(busy, background), statusCode: 409);
         if (Interlocked.Exchange(ref _running, 1) == 1) return Results.Json(new { error = "restarting" }, statusCode: 409);
         LastError = null;
         var exe = CanonicalExe();
@@ -98,6 +105,55 @@ static class Restart
         if (child.HasExited) return Fail(ErrorOf(child.ExitCode), $"yeni süreç hemen kapandı (çıkış {child.ExitCode}); eski panel açık kalıyor.");
         _ = Watch(child);
         return Results.Json(new { ok = true, pid = child.Id });
+    }
+
+    // ---- "İşler bitince yeniden başlat" ----
+
+    static readonly object WaitLock = new();
+    static System.Threading.Timer? _waitTimer;
+    static volatile bool _waiting;
+    static int _waitChecking;
+    const int WaitPollMs = 3000;
+
+    /// <summary>Kullanıcı "işler bitince yeniden başlat" dedi: oturum çalışmıyor ve arka plan işi kalmayınca panel kendisi yeniden başlar.</summary>
+    public static bool Waiting => _waiting;
+
+    public static void WaitUntilIdle(HostedSessions hosted)
+    {
+        lock (WaitLock)
+        {
+            if (_waiting) return;
+            _waiting = true;
+            LastError = null;
+            _waitTimer = new System.Threading.Timer(_ => _ = CheckWait(hosted), null, WaitPollMs, WaitPollMs);
+        }
+        Log("INFO", "Yeniden başlatma, çalışan oturumlar ve arka plan işleri bitince yapılmak üzere bekletiliyor.");
+    }
+
+    public static bool CancelWait(bool quiet = false)
+    {
+        lock (WaitLock)
+        {
+            if (!_waiting) return false;
+            _waiting = false;
+            _waitTimer?.Dispose();
+            _waitTimer = null;
+        }
+        if (!quiet) Log("INFO", "Bekleyen yeniden başlatma iptal edildi.");
+        return true;
+    }
+
+    static async Task CheckWait(HostedSessions hosted)
+    {
+        if (!_waiting || hosted.AnyBusy || hosted.BackgroundJobs().Count > 0) return;
+        if (Interlocked.Exchange(ref _waitChecking, 1) == 1) return;
+        try
+        {
+            if (!CancelWait(quiet: true)) return; // bu arada iptal edildi
+            Log("INFO", "İşler bitti; bekleyen yeniden başlatma yapılıyor.");
+            await Begin([], [], force: false); // başarısızlık LastError'a yazılır (arayüz /api/version'dan okur)
+        }
+        finally { Volatile.Write(ref _waitChecking, 0); }
     }
 
     /// <summary>Yeni süreç devralmadan kapanırsa (anahtar yok, çalışan oturum çıktı, kapatma reddedildi) nedeni sakla.</summary>

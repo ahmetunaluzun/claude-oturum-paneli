@@ -46,6 +46,7 @@ builder.Logging.AddDebug();
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<Transcripts>();
 builder.Services.AddSingleton<ContextWindows>();
+builder.Services.AddSingleton<BackgroundWork>();
 builder.Services.AddSingleton<HostedSessions>();
 builder.Services.AddSingleton<Skills>();
 builder.Services.AddSingleton<ProjectCost>();
@@ -223,6 +224,8 @@ app.MapGet("/api/state", async (SessionStore store, HostedSessions hosted, Tray 
     night = night.Brief(),
     now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
     boot,
+    restartWaiting = Restart.Waiting,
+    restartError = Restart.LastError,
     trayNotify = tray.Notifies,
     sessions,
     hosted = hostedList,
@@ -381,10 +384,15 @@ app.MapPost("/api/attach", async (HttpContext ctx) =>
 });
 
 // Çalışan panel oturumu varsa kapatma reddedilir (force=1 ile zorlanır); açık oturumlar sonraki açılışta geri gelir.
+// Arka plan işi (alt ajan, arka plan komutu) olan "boşta" oturum da çalışıyor sayılır (yanıtta ayrı "background" listesi).
 app.MapPost("/api/quit", (HttpContext ctx, IHostApplicationLifetime life, HostedSessions hosted) =>
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
-    if (hosted.AnyBusy && ctx.Request.Query["force"] != "1") return Results.Json(new { error = "busy" }, statusCode: 409);
+    if (ctx.Request.Query["force"] != "1")
+    {
+        var bg = hosted.BackgroundJobs();
+        if (hosted.AnyBusy || bg.Count > 0) return Results.Json(Restart.BusyBody(hosted.BusyNames, bg), statusCode: 409);
+    }
     Restart.MarkHandingOver(); // yeniden başlatma sürüyorsa bu istek yeni süreçten: uygulama penceresi açık kalır
     _ = Task.Delay(300).ContinueWith(_ => life.StopApplication());
     return Results.Ok();
@@ -393,7 +401,19 @@ app.MapPost("/api/quit", (HttpContext ctx, IHostApplicationLifetime life, Hosted
 app.MapPost("/api/restart", async (HttpContext ctx, HostedSessions hosted) =>
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
-    return await Restart.Begin(hosted.BusyNames, force: IsLocal(ctx) && ctx.Request.Query["force"] == "1");
+    // when=idle: çalışan oturum ve arka plan işi bitince kendisi yeniden başlar (telefondan da).
+    if (ctx.Request.Query["when"] == "idle")
+    {
+        if (!hosted.AnyBusy && hosted.BackgroundJobs().Count == 0) return await Restart.Begin([], [], force: false);
+        Restart.WaitUntilIdle(hosted);
+        return Results.Json(new { ok = true, waiting = true });
+    }
+    return await Restart.Begin(hosted.BusyNames, hosted.BackgroundJobs(), force: IsLocal(ctx) && ctx.Request.Query["force"] == "1");
+});
+app.MapPost("/api/restart/cancel", (HttpContext ctx) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    return Results.Json(new { ok = true, cancelled = Restart.CancelWait() });
 });
 
 // Klasör seçme penceresi (işletim sisteminin kendi penceresi).
