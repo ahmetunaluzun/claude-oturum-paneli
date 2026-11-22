@@ -69,7 +69,7 @@ public sealed class Skills(ILogger<Skills> log)
     }
 
     /// <summary>Yalnız kurulu eklenti sürümleri (önbellekteki eski sürüm klasörleri sayılmaz).</summary>
-    IEnumerable<(string Name, string Path)> InstalledPlugins()
+    internal IEnumerable<(string Name, string Path)> InstalledPlugins()
     {
         var file = System.IO.Path.Combine(ClaudeDir, "plugins", "installed_plugins.json");
         if (!File.Exists(file)) yield break;
