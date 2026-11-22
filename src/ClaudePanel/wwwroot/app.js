@@ -200,12 +200,15 @@
   // Kart ve konuşma ekranı eylemleri, toplu seçim (actions.js)
   const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
+  // Paneli yeniden başlat (restart.js): Ayarlar düğmesi + Takip'teki "Yeni sürüm hazır" satırı
+  const R = window.PanelRestart({ t, api, getJson, confirmBox, ask, REMOTE });
   // Takip sekmesi (followup.js)
-  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask, REMOTE, openMenu: A.openMenu,
+  const F = window.PanelFollowUp({ t, api, getJson, toast, esc, dur, openDrawer, setView, startHosted, confirmBox, ask, REMOTE, openMenu: A.openMenu, restart: R,
     lang: () => settings.lang, items: () => items,
     now: () => Date.now() + serverOffset, isOpen: () => view === "follow" });
   // Ayarlar → Mail ve takvim (settings-mail.js)
   window.PanelSettingsMail({ t, api, getJson, toast, ask, confirmBox, esc, REMOTE, reload: () => F.load(false) });
+  R.subscribe(() => F.render());
 
   function render() {
     const q = $("search").value.trim();
@@ -1829,7 +1832,7 @@
   $("sSound").addEventListener("change", (e) => { settings.sound = e.target.checked; save(); if (settings.sound) chime(); });
   $("sLight").addEventListener("change", (e) => { settings.light = e.target.checked; save(); applyTheme(); });
   $("sLang").addEventListener("change", async (e) => {
-    settings.lang = e.target.value; save(); applyI18n(); render(); F.render();
+    settings.lang = e.target.value; save(); applyI18n(); render(); F.render(); R.paintSettings();
     if ($("tqEnabled").checked) { const r = await api("/api/terminal-quota", { enabled: true, lang: settings.lang }); if (r.ok) fillTermQuota(r.data); }
   });
   $("btnBulk").addEventListener("click", (e) => { e.stopPropagation(); A.laneMenu(e.currentTarget); });

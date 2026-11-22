@@ -8,7 +8,7 @@
 // Projesinde açık oturum olan depo ve planlar gizlenir (oturum zaten o işi yapıyor); karar bekleyenler her zaman görünür.
 window.PanelFollowUp = function (d) {
   "use strict";
-  const { t, api, getJson, toast, esc, dur, openDrawer, items, setView, now, isOpen, startHosted, confirmBox, ask, lang, openMenu, REMOTE } = d;
+  const { t, api, getJson, toast, esc, dur, openDrawer, items, setView, now, isOpen, startHosted, confirmBox, ask, lang, openMenu, REMOTE, restart } = d;
   const $ = (id) => document.getElementById(id);
   const SCAN_POLL_MS = 1500, OPEN_POLL_MS = 60_000, BACKGROUND_POLL_MS = 300_000, REOPEN_FRESH_MS = 30_000, JOB_POLL_MS = 1200, LONG_PRESS_MS = 500;
   const STALE_PLAN_MS = 3 * 86_400_000, ACTIVE = ["queued", "committing", "checking", "pushing", "closing"];
@@ -148,12 +148,22 @@ window.PanelFollowUp = function (d) {
 
   function updateItems() {
     const { panel, claude } = snap.updates, out = [];
-    if (panel.newer) out.push({ id: "upd:panel", type: "update", rank: 4, title: t("fuPanelNew", panel.latest), what: t("fuInstalled", panel.current), link: panel.url, sig: panel.latest });
+    // Diskte daha yeni exe var (yerel yayın): "Yeniden başlat" öne çıkar; GitHub'daki aynı ya da eski sürüm satırı gösterilmez.
+    const dv = restart?.disk();
+    if (dv) out.push({ id: "upd:disk", type: "update", rank: 3.5, title: t("rsReadyTitle", dv), what: t("rsReadyWhat", restart.current() || panel.current), restartPanel: true, sig: dv });
+    if (panel.newer && !(dv && !newerThan(panel.latest, dv))) out.push({ id: "upd:panel", type: "update", rank: 4, title: t("fuPanelNew", panel.latest), what: t("fuInstalled", panel.current), link: panel.url, sig: panel.latest });
     const cu = snap.claudeUpdate || { state: "idle" };
     if (claude.newer || cu.state === "running")
       out.push({ id: "upd:claude", type: "update", rank: 4, title: t("fuClaudeNew", claude.latest), what: `${t("fuInstalled", claude.current)} · ${claudeUpdateText(cu)}`,
         claudeUpdate: cu, sig: claude.latest });
     return out;
+  }
+
+  /** a > b (üç parçalı sürüm metni). */
+  function newerThan(a, b) {
+    const pa = String(a || "").split(".").map(Number), pb = String(b || "").split(".").map(Number);
+    for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    return false;
   }
 
   /** Claude Code güncellemesinin satırdaki durumu: panel kendisi günceller (`claude update`). */
@@ -185,6 +195,7 @@ window.PanelFollowUp = function (d) {
     }
     const updNotes = [];
     for (const [u, name] of [[panel, t("fuPanelName")], [claude, "Claude Code"]]) {
+      if (u === panel && restart?.disk()) continue; // diskte yeni sürüm var: "Yeni sürüm hazır" satırı var, "güncel" notu çelişir
       if (u.state !== "ok") updNotes.push([t("fuUnknown", name), true]);
       else if (!u.newer) updNotes.push([t("fuUpToDate", name, u.current), false]);
     }
@@ -261,6 +272,7 @@ window.PanelFollowUp = function (d) {
     if (it.type === "decision") side.appendChild(button(t("fuOpenChat"), () => openDrawer(it.session), true));
     if (it.type === "conflict") side.appendChild(button(t("fuShowSessions"), () => setView("sessions")));
     if (it.claudeUpdate && it.claudeUpdate.state !== "running") side.appendChild(button(t("fuClaudeUpdateNow"), claudeUpdateNow, true));
+    if (it.restartPanel) side.appendChild(button(t("rsGoNew"), () => restart.run(), true));
     D.side(it, side, snap);
     Z.side(it, side);
     P.side(it, side);

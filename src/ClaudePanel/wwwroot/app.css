@@ -922,3 +922,20 @@ dialog label.mail-field { display: grid; gap: 4px; font-size: 12px; }
   .mail-acct-src .btn, fieldset.mail-set > .btn, .mail-client .btn, .mail-wait .btn { min-height: 44px; }
   .mail-acct-src label.check { min-height: 44px; }
 }
+
+/* Paneli yeniden başlat (restart.js): Ayarlar'daki düğme çifti, "Yeni sürüm hazır" notu, tam ekran bekleme/hata katmanı */
+.rs-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.rs-ready { margin: 0 0 10px; color: var(--accent); }
+.rs-layer { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(6px); }
+.rs-box { max-width: 440px; width: 100%; padding: 26px 24px 22px; text-align: center; background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.rs-box h2 { margin: 6px 0 8px; font-size: 18px; }
+.rs-box p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.rs-box.error h2 { color: var(--danger); }
+.rs-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+.rs-spin { display: inline-block; width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--line);
+  border-top-color: var(--accent); animation: rs-spin 0.9s linear infinite; }
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rs-spin { animation: none; border-color: var(--accent); } }
+@media (max-width: 640px) { .rs-actions .btn { flex: 1; min-height: 44px; } }

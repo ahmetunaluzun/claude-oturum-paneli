@@ -303,8 +303,12 @@
         <button type="button" class="btn small danger" id="btnForget" data-i18n="rForget"></button>
       </fieldset>
       <button type="button" class="btn small local-only" id="btnResetTabs" data-i18n="resetTabs"></button>
+      <p class="hint wide rs-ready" id="rsReady" hidden></p>
       <div class="row between">
-        <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
+        <div class="rs-settings-actions">
+          <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
+          <button type="button" class="btn" id="btnRestart" data-i18n="rsGo"></button>
+        </div>
         <button class="btn primary" data-i18n="ok"></button>
       </div>
     </form>
@@ -417,6 +421,7 @@
   <script src="/assets/followup-mail.js"></script>
   <script src="/assets/followup-pushguard.js"></script>
   <script src="/assets/settings-mail.js"></script>
+  <script src="/assets/restart.js"></script>
   <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>
