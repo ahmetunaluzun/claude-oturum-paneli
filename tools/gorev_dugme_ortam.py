@@ -21,7 +21,7 @@ def yaz(yol, metin=""):
 
 def gorev(ad, komut, arg, **k):
     g = dict(id="\\Deneme\\" + ad, name=ad, folder="\\Deneme", enabled=True, nextRun=now + 2 * H, lastRun=now - 5 * H, lastResult=0,
-             command=komut, args=arg, workDir="", schedule=None, canDisable=True, unreadable=False)
+             command=komut, args=arg, workDir="", schedule=None, canDisable=True, unreadable=False, running=False)
     g.update(k)
     return g
 
@@ -51,6 +51,9 @@ gorevler = [
     gorev("Haftalık Kontrol", "kontrol.bat", "", workDir=haftalik),
     gorev("Yardım Sitesi", PY, f'-3.13 "{site}\\izle.py"', lastResult=1),
     gorev("Edge İzleyici", PWSH, f'-NoProfile -File "{edge}\\izle.ps1" > "{edge}\\cikti.log"', lastResult=0x80070420),
+    # 0x800710E0: tek kopya kuralında saatlik tetikleme reddedildi; kopya çalışıyorsa bilgi, çalışmıyorsa arıza
+    gorev("Bekçi", PWSH, f'-NoProfile -File "{edge}\izle.ps1"', lastResult=0x800710E0, running=True),
+    gorev("Reddedilen", PWSH, f'-NoProfile -File "{edge}\izle.ps1"', lastResult=0x800710E0),
     gorev("Kaynak Öncelik", PWSH, f'-NoProfile -File "{kaynak}\\oncelik.ps1"', lastResult=0xC000013A),
     gorev("Günlük Rapor", PY, f'"{rapor}\\rapor.py"', lastResult=2),
     gorev("Kapalı İş", PY, f'"{rapor}\\rapor.py"', enabled=False, nextRun=None, lastResult=0x41303),

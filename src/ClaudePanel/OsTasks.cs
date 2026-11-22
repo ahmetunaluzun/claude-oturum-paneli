@@ -10,8 +10,10 @@ namespace ClaudePanel;
 /// <param name="LastResult">Son çalışmanın sonuç kodu (Windows: HRESULT / çıkış kodu; macOS: launchctl'in son çıkış durumu); bilinmiyorsa null.</param>
 /// <param name="Schedule">macOS: plist'teki zamanlama anahtarı (ör. "StartInterval=3600"); Windows'ta null (sonraki çalışma gösterilir).</param>
 /// <param name="Unreadable">Kaynak okunamadı (ör. ikili plist): satır "okunamadı" diye gösterilir, sessiz atlanmaz.</param>
+/// <param name="Running">Görevin bir kopyası şu an çalışıyor (Windows: TASK_STATE_RUNNING). Tek kopya kuralında saatlik tetikleme
+/// 0x800710E0 ile reddedilir; çalışan kopya varken bu kod arıza değildir.</param>
 public sealed record OsTask(string Id, string Name, string Folder, bool Enabled, long? NextRun, long? LastRun, long? LastResult,
-    string Command, string Args, string WorkDir, string? Schedule, bool CanDisable, bool Unreadable = false);
+    string Command, string Args, string WorkDir, string? Schedule, bool CanDisable, bool Unreadable = false, bool Running = false);
 
 /// <summary>
 /// Görev kaynağı seçimi. Testte ve ekran görüntüsünde gerçek zamanlayıcıya dokunulmaz:

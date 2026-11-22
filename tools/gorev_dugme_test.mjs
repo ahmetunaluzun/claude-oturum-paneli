@@ -48,7 +48,7 @@ async function open(width, lang = "tr") {
   await sleep(300);
   await ev(`(() => { const s = [...document.querySelectorAll(".fu-sec")].find(s => s.querySelector(".fu-name").textContent === ${JSON.stringify(lang === "en" ? "Scheduled work" : "Zamanlanmış işler")});
     const f = s?.querySelector(".fu-fold"); if (f && f.getAttribute("aria-expanded") === "false") f.click(); })()`);
-  if (!(await until(`document.querySelectorAll('.fu-row[data-type="task"]').length === 6`))) check("görev satırları göründü", await ev(`document.querySelectorAll('.fu-row[data-type="task"]').length`), 6);
+  if (!(await until(`document.querySelectorAll('.fu-row[data-type="task"]').length === 8`))) check("görev satırları göründü", await ev(`document.querySelectorAll('.fu-row[data-type="task"]').length`), 8);
   await sleep(500);
 }
 const shot = async (name) => { await sleep(400); const s = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }); writeFileSync(`${out}_${name}.png`, Buffer.from(s.result.data, "base64")); };
@@ -80,6 +80,10 @@ await sleep(400);
 // ---- sonuç kodları: bilgi / hata ----
 let r = await row("Edge İzleyici");
 check("0x80070420: gri bilgi, 'zaten çalışıyordu'", [r.etiket, r.ne.endsWith("— zaten çalışıyordu, yenisi başlamadı")], [["Görev Zamanlayıcı"], true]);
+r = await row("Bekçi");
+check("0x800710E0 + görev çalışıyor: gri bilgi, 'zaten çalışıyordu'", [r.etiket, r.ne.endsWith("— zaten çalışıyordu, yenisi başlamadı")], [["Görev Zamanlayıcı"], true]);
+r = await row("Reddedilen");
+check("0x800710E0 + çalışan kopya yok: hata", [r.etiket, r.ne.endsWith("— zamanlayıcı başlatmayı reddetti (tek kopya kuralı ya da koşul)")], [["Görev Zamanlayıcı", "son çalışma hatalı"], true]);
 r = await row("Kaynak Öncelik");
 check("0xC000013A: gri bilgi, 'kapanışta durduruldu'", [r.etiket, r.ne.endsWith("— kapanışta durduruldu (Ctrl+C, pencere ya da oturum kapandı)")], [["Görev Zamanlayıcı"], true]);
 r = await row("Günlük Rapor");

@@ -10,7 +10,7 @@ namespace ClaudePanel;
 static class NativeTasks
 {
     public const string Kind = "windows";
-    const int ActionExec = 0, IncludeHidden = 1;
+    const int ActionExec = 0, IncludeHidden = 1, TaskStateRunning = 4; // TASK_STATE_RUNNING (taskschd.h)
 
     public static List<OsTask>? List()
     {
@@ -56,7 +56,7 @@ static class NativeTasks
                 if (command.Length == 0) continue;
                 bool enabled = task.Enabled;
                 list.Add(new OsTask((string)task.Path, (string)task.Name, folderPath, enabled, enabled ? Ms((DateTime)task.NextRunTime) : null,
-                    Ms((DateTime)task.LastRunTime), unchecked((uint)(int)task.LastTaskResult), command, args, workDir, null, true));
+                    Ms((DateTime)task.LastRunTime), unchecked((uint)(int)task.LastTaskResult), command, args, workDir, null, true, Running: (int)task.State == TaskStateRunning));
             }
             catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidCastException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException) { }
         }

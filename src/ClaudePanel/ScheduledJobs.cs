@@ -9,7 +9,7 @@ namespace ClaudePanel;
 /// <param name="Log">Görevin logu (var olan dosya ya da klasör, TaskLogs.cs); bulunamadıysa null.</param>
 /// <param name="Cwd">"Claude'a incelet" oturumunun klasörü: proje kökü, yoksa çalışma klasörü, yoksa betiğin klasörü; yoksa null.</param>
 public sealed record SchedTask(string Id, string Name, string Folder, bool Enabled, long? NextRun, long? LastRun, long? LastResult,
-    string Command, string? Schedule, string? Root, string? Project, string? Reveal, bool CanDisable, bool Unreadable, string? Log = null, string? Cwd = null);
+    string Command, string? Schedule, string? Root, string? Project, string? Reveal, bool CanDisable, bool Unreadable, string? Log = null, string? Cwd = null, bool Running = false);
 
 /// <param name="State">"ok" | "failed" (zamanlayıcı okunamadı).</param>
 /// <param name="Kind">"windows" | "mac" | "test".</param>
@@ -88,7 +88,7 @@ public sealed partial class ScheduledJobs(SessionStore store, HostedSessions hos
             var cwd = m.Root ?? (Directory.Exists(t.WorkDir) ? t.WorkDir : script is not null ? Path.GetDirectoryName(script) : null);
             list.Add(new SchedTask(t.Id, t.Name, t.Folder, t.Enabled, t.NextRun, t.LastRun, t.LastResult, Shorten(command), t.Schedule,
                 m.Root, m.Root is null ? null : Path.GetFileName(m.Root), m.Reveal, t.CanDisable, false, TaskLogs.Find(t, script),
-                cwd is not null && Directory.Exists(cwd) ? cwd : null));
+                cwd is not null && Directory.Exists(cwd) ? cwd : null, t.Running));
         }
         return new SchedOs("ok", OsTasks.Kind, list.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
     }

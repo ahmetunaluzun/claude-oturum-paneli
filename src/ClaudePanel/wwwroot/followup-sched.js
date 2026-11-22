@@ -24,10 +24,13 @@ window.PanelFollowSched = function (c) {
   const when = (ms) => (ms > now() ? t("fuIn", dur(ms - now())) : t("since", dur(now() - ms)));
 
   /** Sonuç kodu → { text, failed, odd }. Kod bilinmiyorsa (null) metin "bilinmiyor". odd: arıza sayılan kod (kullanıcı
-   *  "bu görev için normal" diyebilir; o zaman failed=false, metne "bu görev için normal" eklenir). */
-  function result(code, mac, id) {
+   *  "bu görev için normal" diyebilir; o zaman failed=false, metne "bu görev için normal" eklenir).
+   *  running: görevin bir kopyası şu an çalışıyor. Tek kopya kuralında (IgnoreNew) yeni tetikleme 0x800710E0 ile reddedilir;
+   *  o zaman kod "zaten çalışıyordu" demektir, arıza değildir. */
+  function result(code, mac, id, running) {
     if (code === null || code === undefined) return { text: t("fuRes_unknown"), failed: false, odd: false };
-    const key = mac ? (code === 0 ? "ok" : null) : RESULT[code];
+    let key = mac ? (code === 0 ? "ok" : null) : RESULT[code];
+    if (key === "refused" && running) key = "already";
     const r = key ? { text: t("fuRes_" + key), failed: !NOT_FAILED.has(key) }
       : { text: code >= 0 && code <= 0xFFFF ? t("fuRes_exit", code) : t("fuRes_code", "0x" + code.toString(16).toUpperCase()), failed: true };
     if (r.failed && isNormal(id, code)) return { text: `${r.text} · ${t("fuResNormal")}`, failed: false, odd: true };
@@ -51,7 +54,7 @@ window.PanelFollowSched = function (c) {
       const base = { type: "task", root: k.root ? low(k.root) : NOPROJ, rootPath: k.root || t("fuSchedNoProject"), task: k };
       if (k.unreadable)
         return { ...base, id: "task:" + low(k.id), title: k.name, tags: tag(t("fuUnreadableTag"), "warn"), what: t("fuTaskUnreadable"), sub: k.id, rank: 2, sig: "unreadable" };
-      const res = result(k.lastResult, mac, k.id), failed = k.enabled && res.failed;
+      const res = result(k.lastResult, mac, k.id, k.running), failed = k.enabled && res.failed;
       const tags = tag(t("fuTask_" + os.kind)) + (k.enabled ? "" : tag(t("fuTaskOff"))) + (failed ? tag(t("fuTaskFailed"), "warn") : "");
       const parts = [];
       if (k.schedule) parts.push(k.schedule);
