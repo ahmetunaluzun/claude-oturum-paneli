@@ -11,6 +11,7 @@
   <title>Claude Oturum Paneli</title>
   <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/cost.css">
 </head>
 <body>
   <div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -60,6 +61,8 @@
         <p class="hint" data-i18n="codexLaneHint"></p>
         <div class="cards" id="cardsCodex"></div>
       </section>
+      <!-- Proje maliyeti: açık oturumların projeleri (cost.js) -->
+      <section class="cost-box" id="costSessions" hidden></section>
       <div class="empty" id="empty" hidden>
         <div class="pulse-ring"><img src="/assets/logo.svg" alt=""></div>
         <h3 data-i18n="emptyTitle"></h3>
@@ -74,6 +77,8 @@
         <button type="button" class="btn small primary" id="btnRecentOpen" data-i18n="recentOpen" data-i18n-title="recentOpenHint"></button>
         <button type="button" class="btn small" id="btnRecentClear" data-i18n="recentClear"></button>
       </div>
+      <!-- Proje maliyeti: dönemdeki tüm projeler (cost.js) -->
+      <section class="cost-box" id="costRecent"></section>
       <div class="list" id="recentList"></div>
     </div>
 
@@ -103,6 +108,8 @@
             </div>
           </div>
           <p class="hint wide" id="skillCount"></p>
+          <!-- Açılış yükü (load.js) -->
+          <section class="load-box" id="loadBox"></section>
           <section class="guide" id="skillGuide"></section>
           <div class="skill-grid" id="skillGrid"></div>
         </div>
@@ -419,6 +426,7 @@
   <script src="/assets/i18n-plan.js"></script>
   <script src="/assets/i18n-mail.js"></script>
   <script src="/assets/i18n-codex.js"></script>
+  <script src="/assets/i18n-cost.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
   <script src="/assets/followup-state.js"></script>
@@ -431,6 +439,8 @@
   <script src="/assets/settings-mail.js"></script>
   <script src="/assets/restart.js"></script>
   <script src="/assets/codex.js"></script>
+  <script src="/assets/cost.js"></script>
+  <script src="/assets/load.js"></script>
   <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>

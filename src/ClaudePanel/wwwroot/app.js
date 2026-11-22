@@ -213,6 +213,11 @@
   const C = window.PanelCodex({ t, api, getJson, toast, ask, esc, dur, REMOTE, openDrawer, matches, modelChip: A.modelChip,
     now: () => Date.now() + serverOffset, query: () => $("search").value.trim(), lang: () => settings.lang,
     onRecentChange: () => { if (view === "recent") renderRecent(); } });
+  // Proje maliyeti (cost.js): Oturumlar'da açık oturumların projeleri, Son oturumlar'da tüm projeler
+  const K = window.PanelCost({ t, getJson, esc, lang: () => settings.lang,
+    liveCwds: () => items.filter(s => s.status !== "ended").map(s => s.cwd) });
+  // Açılış yükü (load.js): Skill kütüphanesinde
+  const L = window.PanelLoad({ t, getJson, esc, lang: () => settings.lang });
 
   function render() {
     const q = $("search").value.trim();
@@ -235,6 +240,7 @@
     const allIdle = items.filter(s => s.lane === "idle").length;
     $("summary").textContent = t("summary", items.length, allIdle, items.length - allIdle);
     C.render();
+    K.render();
     $("empty").hidden = items.length > 0 || C.liveCount() > 0;
     document.querySelectorAll("#viewSessions .lane:not(.codex-lane)").forEach(l => l.hidden = items.length === 0);
     tick();
@@ -981,6 +987,7 @@
       try { lib = await getJson("/api/skills"); } catch { lib = { skills: [], guide: [], categories: [] }; }
     }
     renderSkills();
+    L.load();
     setTimeout(() => $("skillSearch").focus(), 50);
   }
 
@@ -1014,6 +1021,7 @@
     // Rehber: arama ve kategori yokken "hangi iş → hangi skill" kartları
     const guide = $("skillGuide");
     guide.hidden = !!q || skillCat !== "all" || !lib.guide.length;
+    $("loadBox").hidden = !!q || skillCat !== "all";
     if (!guide.hidden) {
       guide.innerHTML = `<h3>${t("guideTitle")}</h3><div class="guide-grid"></div>`;
       const gg = guide.querySelector(".guide-grid");
@@ -1840,7 +1848,7 @@
   $("sSound").addEventListener("change", (e) => { settings.sound = e.target.checked; save(); if (settings.sound) chime(); });
   $("sLight").addEventListener("change", (e) => { settings.light = e.target.checked; save(); applyTheme(); });
   $("sLang").addEventListener("change", async (e) => {
-    settings.lang = e.target.value; save(); applyI18n(); render(); F.render(); R.paintSettings();
+    settings.lang = e.target.value; save(); applyI18n(); render(); F.render(); R.paintSettings(); L.render();
     if ($("tqEnabled").checked) { const r = await api("/api/terminal-quota", { enabled: true, lang: settings.lang }); if (r.ok) fillTermQuota(r.data); }
   });
   $("btnBulk").addEventListener("click", (e) => { e.stopPropagation(); A.laneMenu(e.currentTarget); });
@@ -1876,6 +1884,7 @@
   applyI18n();
   if (settings.notify && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
   poll();
+  K.load();
   F.load(false); // sekme rozeti için
 
   // Adresten açılış: ?view=recent|skills|follow, ?open=<oturum kimliği>
