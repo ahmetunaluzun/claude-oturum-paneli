@@ -26,7 +26,7 @@ py -3.13 "$SG" --senaryo ilk "$TW\\google.json"
 GP=$(freeport); G="http://127.0.0.1:$GP"
 py -3.13 "$SG" --sunucu "$GP" "$TW\\google.json" "$TW\\google.log" &
 GPID=$!
-mkdir -p "$T/chrome" _onizleme; rm -f _onizleme/mail_*.png
+mkdir -p "$T/chrome" _onizleme; for f in _onizleme/mail_*.png; do case "$f" in *mail_imap_*) ;; *) rm -f "$f";; esac; done
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CLAUDE_EXE="$TW\\sahte-claude.cmd" \

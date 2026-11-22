@@ -38,15 +38,18 @@ window.PanelFollowMail = function (c) {
     });
   }
 
-  /** Hesap durumları: istemci yok, yeniden giriş, güncellenemedi, denetleniyor. */
+  /** Hesap durumları: istemci yok (yalnız Google girişi), yeniden giriş / şifre, IMAP kapalı, takvim adresi, güncellenemedi, denetleniyor. */
   function accountNotes(m) {
     const notes = [];
-    if (m.state === "noclient") return [[t("fuMailNoClient"), true]];
     for (const a of m.accounts) {
-      if (a.state === "reauth") notes.push([t("fuMailReauth", a.email), true]);
+      const imap = a.provider === "imap";
+      if (a.state === "noclient") notes.push([t("fuMailNoClient"), true]);
+      else if (a.state === "reauth") notes.push([t(imap ? "fuMailI_reauth" : "fuMailReauth", a.email), true]);
+      else if (imap && (a.state === "disabled" || a.state === "domain" || a.state === "icaldenied")) notes.push([t("fuMailI_" + a.state, a.email), true]);
       else if (a.state === "net" && a.okAt) notes.push([t("fuMailStale", a.email, dur(now() - a.okAt)), true]);
       else if (a.state === "net") notes.push([t("fuMailNet", a.email), true]);
       else if (a.state === "pending") notes.push([t("fuMailPending"), true]);
+      if (m.filterAwaiting && a.mail && !a.awaitingOk && a.state === "ok") notes.push([t("fuMailNoAwaiting", a.email), false]);
     }
     return notes;
   }

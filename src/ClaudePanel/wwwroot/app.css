@@ -968,3 +968,35 @@ html.selecting .codex-card { opacity: .5; }
   .codex-ring svg { width: 26px; height: 26px; }
   .codex-ring .codex-q-reset, .codex-ring .codex-q-sec { display: none; }
 }
+
+/* Mail ve takvim → adım adım hesap ekleme sihirbazı (settings-mail.js); sınıflar .mw- önekli */
+.mw { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mw-step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
+.mw-step[data-state="locked"] { opacity: .5; }
+.mw-step[data-state="done"] { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.mw-mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  border: 1.5px solid var(--line); color: var(--muted); }
+.mw-step[data-state="active"] .mw-mark { border-color: var(--accent); color: var(--accent); }
+.mw-step[data-state="done"] .mw-mark { background: var(--ok); border-color: var(--ok); color: #fff; }
+.mw-body { display: grid; gap: 6px; min-width: 0; justify-items: start; }
+.mw-body > input, .mw-body > .btn { max-width: 100%; }
+.mw-body > input { width: 100%; box-sizing: border-box; }
+.mw-title { font-size: 13px; color: var(--text); }
+.mw-hint, .mw-msg { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.mw-msg:empty { display: none; }
+.mw-msg[data-kind="ok"] { color: var(--ok); }
+.mw-msg[data-kind="warn"] { color: var(--idle); }
+[data-theme="light"] .mw-msg[data-kind="warn"] { color: #9A6400; }
+[data-theme="light"] .mw-msg[data-kind="ok"] { color: #1F7A52; }
+.mw-secret { -webkit-text-security: disc; font-family: ui-monospace, Consolas, monospace; letter-spacing: .08em; }
+.mw-more, .mw-adv { font-size: 12px; color: var(--muted); }
+.mw-more summary, .mw-adv summary { cursor: pointer; padding: 4px 0; }
+.mw-more > *:not(summary), .mw-adv > *:not(summary) { margin-top: 6px; }
+.mw-adv[open] { display: grid; gap: 8px; }
+.mail-acct-head small.mail-ok { color: var(--ok); }
+[data-theme="light"] .mail-acct-head small.mail-ok { color: #1F7A52; }
+@media (max-width: 640px) {
+  .mw-step { padding: 8px; gap: 8px; grid-template-columns: 24px minmax(0, 1fr); }
+  .mw-body .btn, .mw-more summary, .mw-adv summary, .mw-adv .btn { min-height: 44px; }
+  .mw-body .btn { width: 100%; }
+}

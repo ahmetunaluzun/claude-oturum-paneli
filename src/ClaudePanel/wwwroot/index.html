@@ -256,20 +256,70 @@
       <fieldset class="mail-set" id="mailBox">
         <legend data-i18n="smTitle"></legend>
         <p class="mail-note" data-i18n="smIntro"></p>
-        <div class="mail-client local-only" id="smClient">
-          <ol class="mail-steps" id="smSteps">
-            <li data-i18n="smStep1"></li><li data-i18n="smStep2"></li><li data-i18n="smStep3"></li><li data-i18n="smStep4"></li>
-          </ol>
-          <p class="mail-note" id="smClientOk" data-i18n="smClientOk" hidden></p>
-          <button type="button" class="btn small" id="btnSmClient"></button>
-          <input type="file" id="smClientFile" accept=".json,application/json" hidden>
-        </div>
+        <ol class="mw local-only" id="mwWizard">
+          <li class="mw-step" id="mwS1">
+            <span class="mw-mark" id="mwM1" aria-hidden="true"></span>
+            <div class="mw-body">
+              <b class="mw-title" data-i18n="mwS1Title"></b>
+              <input type="text" id="mwEmail" inputmode="email" autocomplete="off" spellcheck="false" data-i18n-ph="mwEmailPh">
+              <p class="mw-msg" id="mwMsg1" role="status"></p>
+            </div>
+          </li>
+          <li class="mw-step" id="mwS2">
+            <span class="mw-mark" id="mwM2" aria-hidden="true"></span>
+            <div class="mw-body">
+              <b class="mw-title" data-i18n="mwS2Title"></b>
+              <p class="mw-hint" data-i18n="mwS2Text"></p>
+              <button type="button" class="btn small" id="btnMwApp" data-i18n="mwS2Btn"></button>
+              <p class="mw-msg" id="mwMsg2" role="status"></p>
+              <details class="mw-more">
+                <summary data-i18n="mwNoPageTitle"></summary>
+                <p class="mw-hint" data-i18n="mwNoPage1"></p>
+                <button type="button" class="btn small" id="btnMwTwosv" data-i18n="mwTwosvBtn"></button>
+                <p class="mw-hint" data-i18n="mwNoPage2"></p>
+              </details>
+            </div>
+          </li>
+          <li class="mw-step" id="mwS3">
+            <span class="mw-mark" id="mwM3" aria-hidden="true"></span>
+            <div class="mw-body">
+              <b class="mw-title" data-i18n="mwS3Title"></b>
+              <input type="text" id="mwPass" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwPassPh">
+              <p class="mw-msg" id="mwMsg3a" role="status"></p>
+              <button type="button" class="btn small primary" id="btnMwConnect" data-i18n="mwConnect"></button>
+              <p class="mw-msg" id="mwMsg3" role="status"></p>
+            </div>
+          </li>
+          <li class="mw-step" id="mwS4">
+            <span class="mw-mark" id="mwM4" aria-hidden="true"></span>
+            <div class="mw-body">
+              <b class="mw-title" data-i18n="mwS4Title"></b>
+              <p class="mw-hint" data-i18n="mwS4Text"></p>
+              <button type="button" class="btn small" id="btnMwCal" data-i18n="mwS4Btn"></button>
+              <input type="text" id="mwIcal" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwIcalPh">
+              <p class="mw-msg" id="mwMsg4a" role="status"></p>
+              <button type="button" class="btn small" id="btnMwIcal" data-i18n="mwIcalTry"></button>
+              <p class="mw-msg" id="mwMsg4" role="status"></p>
+            </div>
+          </li>
+        </ol>
         <ul class="mail-accounts" id="smAccounts"></ul>
-        <div class="mail-wait" id="smLogin" hidden>
-          <p class="mail-note" data-i18n="smWaiting"></p>
-          <button type="button" class="btn small" id="btnSmCancel" data-i18n="smCancel"></button>
-        </div>
-        <button type="button" class="btn small primary local-only" id="btnSmAdd" data-i18n="smAdd"></button>
+        <details class="mw-adv local-only" id="mwAdv">
+          <summary data-i18n="mwAdvTitle"></summary>
+          <div class="mail-client" id="smClient">
+            <ol class="mail-steps" id="smSteps">
+              <li data-i18n="smStep1"></li><li data-i18n="smStep2"></li><li data-i18n="smStep3"></li><li data-i18n="smStep4"></li>
+            </ol>
+            <p class="mail-note" id="smClientOk" data-i18n="smClientOk" hidden></p>
+            <button type="button" class="btn small" id="btnSmClient"></button>
+            <input type="file" id="smClientFile" accept=".json,application/json" hidden>
+          </div>
+          <div class="mail-wait" id="smLogin" hidden>
+            <p class="mail-note" data-i18n="smWaiting"></p>
+            <button type="button" class="btn small" id="btnSmCancel" data-i18n="smCancel"></button>
+          </div>
+          <button type="button" class="btn small local-only" id="btnSmAdd" data-i18n="smAdd"></button>
+        </details>
         <p class="mail-note remote-only" data-i18n="smRemoteNote"></p>
         <div class="mail-filter" id="smFilter">
           <p class="mail-sub" data-i18n="smFilterTitle"></p>
