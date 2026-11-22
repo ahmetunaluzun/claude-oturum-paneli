@@ -63,8 +63,10 @@ def yaz(home, ad, satirlar, yas_sn=0, gun="2026/11/22"):
     return f
 
 
-def tara(home):
-    env = dict(os.environ, CLAUDE_PANEL_CODEX_HOME=str(home))
+def tara(home, **ek):
+    env = dict(os.environ, CLAUDE_PANEL_CODEX_HOME=str(home), **ek)
+    if home is None:
+        env.pop("CLAUDE_PANEL_CODEX_HOME")
     r = subprocess.run([str(EXE), "--codex-scan"], env=env, capture_output=True, timeout=60)
     return json.loads(r.stdout.decode("utf-8"))
 
@@ -120,6 +122,11 @@ with tempfile.TemporaryDirectory() as t:
     kontrol("kilit + yeni + tur bitti → açık", s.get("eeee", {}).get("state"), "open")
     kontrol("kilit var ama dosya eski → bitti", s.get("ffff", {}).get("state"), "ended")
     kontrol("en yeni önce", list(s)[0] in ("dddd", "eeee"), True)
+    # Uydurma ortam (CLAUDE_PANEL_CLAUDE_DIR): gerçek ~/.codex ve CODEX_HOME okunmaz
+    yalitim = tara(None, CLAUDE_PANEL_CLAUDE_DIR=str(Path(t) / "claude"), CODEX_HOME=str(home))
+    kontrol("uydurma ortamda gerçek Codex okunmaz", (yalitim["home"], yalitim["sessions"]), (None, []))
+    kontrol("uydurma ortamda CLAUDE_PANEL_CODEX_HOME sayılır",
+            len(tara(home, CLAUDE_PANEL_CLAUDE_DIR=str(Path(t) / "claude"))["sessions"]), 5)
 
 print(f"Codex tarama: {gecti} geçti, {kaldi} kaldı")
 sys.exit(1 if kaldi else 0)

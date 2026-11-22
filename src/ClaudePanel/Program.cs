@@ -565,6 +565,7 @@ app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowE
 app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (ScheduleEndpoints.cs)
 app.MapPlans(Authorized); // Planlı işler: /api/plans* (PlanEndpoints.cs)
 app.MapMail(Authorized, IsLocal); // Mail ve takvim: /api/mail* (Mail/MailEndpoints.cs)
+app.MapCodex(Authorized); // Codex oturumları, salt okuma: /api/codex* (CodexEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>
 {
@@ -633,7 +634,8 @@ static class Remote
     [
         "/api/focus/", "/api/open-folder", "/api/adopt/", "/api/attach", "/api/quit", "/api/pick-folder",
         "/api/clipboard-paths", "/api/reveal", "/api/path-links", "/api/terminal-quota", "/api/schedule/disable", "/api/schedule/run", "/api/schedule/log",
-        "/api/mail/client", "/api/mail/accounts" // mail hesabı ekleme/kaldırma, istemci dosyası: yalnız bilgisayardan
+        "/api/mail/client", "/api/mail/accounts", // mail hesabı ekleme/kaldırma, istemci dosyası: yalnız bilgisayardan
+        "/api/codex/open-folder" // Codex oturumunun klasörünü bilgisayarda açar
     ];
 
     public static bool IsPublic(string path) => Public.Contains(path);

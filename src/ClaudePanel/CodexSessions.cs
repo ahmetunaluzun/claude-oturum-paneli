@@ -16,10 +16,18 @@ public static class CodexSessions
     const int MaxFiles = 200;
     static readonly TimeSpan LiveWindow = TimeSpan.FromMinutes(10);
 
-    public static string Home =>
+    /// <summary>
+    /// Codex kökü. Uydurma ortamda (CLAUDE_PANEL_CLAUDE_DIR verilmiş: test, ekran görüntüsü) gerçek ~/.codex OKUNMAZ
+    /// (OsTasks deseni); orada yalnız CLAUDE_PANEL_CODEX_HOME sayılır, verilmemişse null (Codex yok).
+    /// </summary>
+    public static string? Home =>
         Environment.GetEnvironmentVariable("CLAUDE_PANEL_CODEX_HOME") is { Length: > 0 } p ? p
+        : Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_DIR") is { Length: > 0 } ? null
         : Environment.GetEnvironmentVariable("CODEX_HOME") is { Length: > 0 } c ? c
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
+
+    /// <summary>Codex kurulu mu (kök klasör var mı). Panel bu klasöre hiçbir şey yazmaz.</summary>
+    public static bool Installed => Home is { } h && Directory.Exists(h);
 
     public sealed record RateWindow(double UsedPercent, int WindowMinutes, long? ResetsAt);
 
@@ -31,8 +39,9 @@ public static class CodexSessions
     /// <summary>Son <paramref name="days"/> günün oturumları, en yeni önce. Codex kurulu değilse boş liste.</summary>
     public static List<CodexSession> Scan(int days = 14)
     {
-        var root = Path.Combine(Home, "sessions");
         var list = new List<CodexSession>();
+        if (Home is not { } home) return list;
+        var root = Path.Combine(home, "sessions");
         if (!Directory.Exists(root)) return list;
         var since = DateTime.Now.AddDays(-days);
         IEnumerable<FileInfo> files;
@@ -43,22 +52,38 @@ public static class CodexSessions
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return list; }
         foreach (var f in files)
-            if (Read(f) is { } s) list.Add(s);
+            if (Cached(f) is { } c) list.Add(c.S with { State = StateOf(home, c.S, c.LastTurn) });
+        // Listeden düşen dosyaların önbelleği atılır (bellek dosya sayısıyla sınırlı kalır).
+        var seen = files.Select(f => f.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var k in Cache.Keys) if (!seen.Contains(k)) Cache.TryRemove(k, out _);
         return list;
     }
 
-    static CodexSession? Read(FileInfo f)
+    // Ayrıştırılmış dosya: boyut + son yazma zamanı değişmedikçe yeniden okunmaz (panel birkaç saniyede bir tarar).
+    // Geçersiz dosya da (P null) saklanır; dosya değişince yeniden denenir.
+    sealed record Parsed(CodexSession S, string? LastTurn);
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Len, DateTime Mtime, Parsed? P)> Cache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    static Parsed? Cached(FileInfo f)
     {
-        List<string> lines;
-        try
-        {
-            using var fs = new FileStream(f.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var sr = new StreamReader(fs);
-            lines = [];
-            while (sr.ReadLine() is { } l) if (l.Length > 0) lines.Add(l);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
-        if (lines.Count == 0) return null;
+        if (Cache.TryGetValue(f.FullName, out var c) && c.Len == f.Length && c.Mtime == f.LastWriteTimeUtc) return c.P;
+        var p = Read(f);
+        Cache[f.FullName] = (f.Length, f.LastWriteTimeUtc, p);
+        return p;
+    }
+
+    // Kilit dosyası canlı yazar olmadan da kalabilir; tek başına yetmez, son yazma zamanıyla birlikte bakılır.
+    static string StateOf(string home, CodexSession s, string? lastTurn)
+    {
+        var locked = File.Exists(Path.Combine(home, "thread-writer-locks", s.Id + ".lock"));
+        var recent = DateTimeOffset.Now - s.Updated < LiveWindow;
+        return locked && recent ? (lastTurn == "started" ? "working" : "open") : "ended";
+    }
+
+    static Parsed? Read(FileInfo f)
+    {
+        if (Lines(f.FullName) is not { Count: > 0 } lines) return null;
         var first = Parse(lines[0]);
         if (first?["type"]?.GetValue<string>() != "session_meta" || first["payload"] is not JsonObject meta) return null;
 
@@ -95,12 +120,62 @@ public static class CodexSessions
         var started = DateTimeOffset.TryParse(Str(meta, "timestamp"), CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeUniversal, out var t) ? t : new DateTimeOffset(f.CreationTime);
         var updated = new DateTimeOffset(f.LastWriteTime);
-        var locked = File.Exists(Path.Combine(Home, "thread-writer-locks", id + ".lock"));
-        var recent = DateTimeOffset.Now - updated < LiveWindow;
-        // Kilit dosyası canlı yazar olmadan da kalabilir; tek başına yetmez, son yazma zamanıyla birlikte bakılır.
-        var state = locked && recent ? (lastTurn == "started" ? "working" : "open") : "ended";
-        return new CodexSession(id, Str(meta, "cwd") ?? "", Str(meta, "source") ?? "unknown", model, Str(meta, "cli_version"),
-            Short(title, 120), Short(lastAsst, 300), started, updated, state, f.FullName, plan, prim, sec);
+        var s = new CodexSession(id, Str(meta, "cwd") ?? "", Str(meta, "source") ?? "unknown", model, Str(meta, "cli_version"),
+            Short(title, 120), Short(lastAsst, 300), started, updated, "ended", f.FullName, plan, prim, sec);
+        return new Parsed(s, lastTurn);
+    }
+
+    public sealed record CodexItem(string Id, string Kind, string Text, long? Ts);
+    sealed record TranscriptCache(string File, long Len, DateTime Mtime, List<CodexItem> Items);
+    static volatile TranscriptCache? transcript; // okuma görünümü 1,5 sn'de bir sorar; dosya değişmedikçe yeniden ayrıştırılmaz
+
+    /// <summary>
+    /// Okuma görünümü: kullanıcı ve asistan mesajları (developer mesajı ve "&lt;" ile başlayan enjekte ortam metni hariç).
+    /// Dosya yolu istemciden ALINMAZ: kimlik taramadaki oturuma eşlenir; bulunamazsa null.
+    /// </summary>
+    public static List<CodexItem>? ReadTranscript(string id, int limit = 250)
+    {
+        if (Scan().FirstOrDefault(s => s.Id == id) is not { } s) return null;
+        var fi = new FileInfo(s.File);
+        if (transcript is { } c && c.File == fi.FullName && c.Len == fi.Length && c.Mtime == fi.LastWriteTimeUtc)
+            return c.Items.TakeLast(limit).ToList();
+        if (Lines(s.File) is not { } lines) return null;
+        List<CodexItem> items = [], events = [];
+        for (var i = 1; i < lines.Count; i++)
+        {
+            if (Parse(lines[i]) is not { } o || o["payload"] is not JsonObject p) continue;
+            long? ts = DateTimeOffset.TryParse(Str(o, "timestamp"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal,
+                out var t) ? t.ToUnixTimeMilliseconds() : null;
+            var type = Str(o, "type");
+            if (type == "response_item" && Str(p, "type") == "message" && Str(p, "role") is "user" or "assistant")
+            {
+                var text = Text(p["content"]);
+                var kind = Str(p, "role")!;
+                if (string.IsNullOrWhiteSpace(text) || (kind == "user" && text.TrimStart().StartsWith('<'))) continue;
+                items.Add(new CodexItem("c" + i, kind, text.Trim(), ts));
+            }
+            // Eski kalıcılık modu: mesajlar yalnız olay olarak (docs/codex-yerel-bicim.md); response_item yoksa bunlar kullanılır.
+            else if (type == "event_msg" && Str(p, "type") is "user_message" or "agent_message"
+                     && Str(p, "message") is { Length: > 0 } m && !(Str(p, "type") == "user_message" && m.TrimStart().StartsWith('<')))
+                events.Add(new CodexItem("e" + i, Str(p, "type") == "user_message" ? "user" : "assistant", m.Trim(), ts));
+        }
+        var list = items.Count > 0 ? items : events;
+        transcript = new TranscriptCache(fi.FullName, fi.Length, fi.LastWriteTimeUtc, list);
+        return list.TakeLast(limit).ToList();
+    }
+
+    // Codex yazarken de okunabilsin: paylaşımlı açılır, kilit alınmaz. Boş satırlar atlanır.
+    static List<string>? Lines(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var sr = new StreamReader(fs);
+            var lines = new List<string>();
+            while (sr.ReadLine() is { } l) if (l.Length > 0) lines.Add(l);
+            return lines;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
     }
 
     static JsonNode? Parse(string line)
