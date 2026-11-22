@@ -31,6 +31,7 @@
       <button data-view="follow"><span data-i18n="navFollow"></span><span class="pill" id="navFollow" hidden>0</span></button>
     </nav>
     <div class="usage" id="usage" hidden></div>
+    <div class="codex-quota" id="codexQuota" hidden></div>
     <div class="actions">
       <input type="search" id="search" data-i18n-ph="search" autocomplete="off">
       <button class="btn primary" id="btnNew"><span class="plus">+</span> <span data-i18n="newSession"></span></button>
@@ -52,6 +53,12 @@
         <h2><span class="dot busy"></span><span data-i18n="laneBusy"></span><span class="count" id="countBusy">0</span></h2>
         <p class="hint" data-i18n="laneBusyHint"></p>
         <div class="cards" id="cardsBusy"></div>
+      </section>
+      <!-- Codex oturumları, salt okuma (codex.js); Codex kurulu değilse ya da açık oturum yoksa gizli -->
+      <section class="lane codex-lane" id="codexLane" hidden>
+        <h2><span class="dot codex-dot"></span><span data-i18n="codexLane"></span><span class="count" id="countCodex">0</span></h2>
+        <p class="hint" data-i18n="codexLaneHint"></p>
+        <div class="cards" id="cardsCodex"></div>
       </section>
       <div class="empty" id="empty" hidden>
         <div class="pulse-ring"><img src="/assets/logo.svg" alt=""></div>
@@ -411,6 +418,7 @@
   <script src="/assets/i18n-follow.js"></script>
   <script src="/assets/i18n-plan.js"></script>
   <script src="/assets/i18n-mail.js"></script>
+  <script src="/assets/i18n-codex.js"></script>
   <script src="/assets/md.js"></script>
   <script src="/assets/actions.js"></script>
   <script src="/assets/followup-state.js"></script>
@@ -422,6 +430,7 @@
   <script src="/assets/followup-pushguard.js"></script>
   <script src="/assets/settings-mail.js"></script>
   <script src="/assets/restart.js"></script>
+  <script src="/assets/codex.js"></script>
   <script src="/assets/followup-view.js"></script>
   <script src="/assets/followup.js"></script>
   <script src="/assets/app.js"></script>

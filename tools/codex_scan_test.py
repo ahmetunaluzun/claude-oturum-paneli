@@ -8,11 +8,12 @@ import os
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 KOK = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(KOK / "tools"))  # -I betik klasörünü yola koymaz; ortak satır üreticileri codex_ortam.py'de
+from codex_ortam import kota, meta, mesaj, olay, satir, yaz  # noqa: E402
 EXE = Path(sys.argv[1]) if len(sys.argv) > 1 else KOK / "src/ClaudePanel/bin/Release/net10.0-windows/win-x64/ClaudePanel.exe"
 gecti = kaldi = 0
 
@@ -25,42 +26,6 @@ def kontrol(ad, gercek, beklenen):
     else:
         kaldi += 1
         print("KALDI ", ad, "→", repr(gercek), "beklenen", repr(beklenen))
-
-
-def satir(tur, payload, ts="2026-11-21T23:23:32.769Z"):
-    return json.dumps({"timestamp": ts, "type": tur, "payload": payload}, ensure_ascii=False)
-
-
-def meta(sid, cwd, eski=False):
-    p = {"id": sid, "timestamp": "2026-11-21T23:23:32.769Z", "cwd": cwd, "source": "cli", "cli_version": "0.171.0"}
-    if not eski:
-        p["session_id"] = sid
-    return satir("session_meta", p)
-
-
-def mesaj(rol, metin):
-    tip = "output_text" if rol == "assistant" else "input_text"
-    return satir("response_item", {"type": "message", "role": rol, "content": [{"type": tip, "text": metin}]})
-
-
-def olay(tip, **ek):
-    return satir("event_msg", {"type": tip, **ek})
-
-
-def kota(yuzde, pencere, limit_id="codex"):
-    return olay("token_count", info=None, rate_limits={"limit_id": limit_id, "plan_type": "go",
-                "primary": {"used_percent": yuzde, "window_minutes": pencere, "resets_at": 1797600001}, "secondary": None})
-
-
-def yaz(home, ad, satirlar, yas_sn=0, gun="2026/11/22"):
-    d = home / "sessions" / gun
-    d.mkdir(parents=True, exist_ok=True)
-    f = d / ad
-    f.write_text("\n".join(satirlar) + "\n", encoding="utf-8")
-    if yas_sn:
-        t = time.time() - yas_sn
-        os.utime(f, (t, t))
-    return f
 
 
 def tara(home, **ek):

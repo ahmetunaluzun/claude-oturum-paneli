@@ -209,6 +209,10 @@
   // Ayarlar → Mail ve takvim (settings-mail.js)
   window.PanelSettingsMail({ t, api, getJson, toast, ask, confirmBox, esc, REMOTE, reload: () => F.load(false) });
   R.subscribe(() => F.render());
+  // Codex oturumları, salt okuma (codex.js): Codex şeridi, Son oturumlar satırları, okuma görünümü, üst çubukta kota
+  const C = window.PanelCodex({ t, api, getJson, toast, ask, esc, dur, REMOTE, openDrawer, matches, modelChip: A.modelChip,
+    now: () => Date.now() + serverOffset, query: () => $("search").value.trim(), lang: () => settings.lang,
+    onRecentChange: () => { if (view === "recent") renderRecent(); } });
 
   function render() {
     const q = $("search").value.trim();
@@ -230,8 +234,9 @@
     F.onItems();
     const allIdle = items.filter(s => s.lane === "idle").length;
     $("summary").textContent = t("summary", items.length, allIdle, items.length - allIdle);
-    $("empty").hidden = items.length > 0;
-    document.querySelectorAll("#viewSessions .lane").forEach(l => l.hidden = items.length === 0);
+    C.render();
+    $("empty").hidden = items.length > 0 || C.liveCount() > 0;
+    document.querySelectorAll("#viewSessions .lane:not(.codex-lane)").forEach(l => l.hidden = items.length === 0);
     tick();
   }
 
@@ -424,7 +429,7 @@
   function tick() {
     const now = Date.now() + serverOffset;
     document.querySelectorAll(".reset-in").forEach(el => { el.textContent = resetIn(Number(el.dataset.at)); });
-    document.querySelectorAll(".card").forEach(card => {
+    document.querySelectorAll(".card:not(.codex-card)").forEach(card => {
       const since = Number(card.dataset.since), started = Number(card.dataset.started), lane = card.dataset.lane;
       card.querySelector(".state-time").textContent = t(lane === "busy" ? "workingFor" : "waitingFor", dur(now - since));
       card.querySelector(".age").textContent = `${t("started")}: ${t("since", dur(now - started))}`;
@@ -581,6 +586,7 @@
   function refreshDrawerHeader() {
     const tg = drawer.target;
     if (!tg) return;
+    if (tg.kind === "codex") { C.drawerHeader(tg); return; }
     const live = liveOf(tg);
     const prevSid = tg.sessionId;
     if (live) Object.assign(tg, live);
@@ -637,9 +643,10 @@
   async function loadTranscript(first) {
     const tg = drawer.target;
     if (!tg) return;
-    if (!tg.sessionId) { if (first) $("dMessages").innerHTML = `<p class="muted center">${t("noteStarting")}</p>`; return; }
+    if (!tg.sessionId && tg.kind !== "codex") { if (first) $("dMessages").innerHTML = `<p class="muted center">${t("noteStarting")}</p>`; return; }
     let data;
-    try { data = await getJson(`/api/transcript/${encodeURIComponent(tg.sessionId)}?limit=250`); } catch { return; }
+    const url = tg.kind === "codex" ? C.transcriptUrl(tg) : `/api/transcript/${encodeURIComponent(tg.sessionId)}?limit=250`;
+    try { data = await getJson(url); } catch { return; }
     if (drawer.target !== tg) return;
     if (data.title) { tg.title = data.title; $("dTitle").textContent = data.title; }
     const box = $("dMessages");
@@ -822,7 +829,7 @@
   async function sendFromDrawer() {
     const tg = drawer.target;
     const text = $("dInput").value.trim();
-    if (!tg || !text || drawer.sending) return;
+    if (!tg || !text || drawer.sending || tg.kind === "codex") return; // Codex: yalnız okuma
     drawer.sending = true;
     try {
       const live = liveOf(tg);
@@ -895,12 +902,13 @@
     const q = $("search").value.trim();
     const liveIds = new Set(items.map(s => s.sessionId));
     for (const id of [...picked]) if (liveIds.has(id)) picked.delete(id);
-    const list = recent.filter(r => matches(q, r.title, r.cwd));
+    const list = [...recent, ...C.recent()].filter(r => matches(q, r.title, r.cwd)).sort((a, b) => b.updatedAt - a.updatedAt);
     const box = $("recentList");
     box.innerHTML = list.length ? "" : `<p class="muted">${t("emptyRecent")}</p>`;
     const now = Date.now() + serverOffset;
     updateRecentBar();
     list.forEach((r, i) => {
+      if (r.codex) { box.appendChild(C.recentRow(r, i)); return; }
       const item = document.createElement("div");
       item.className = "recent-item";
       item.style.setProperty("--i", Math.min(i, 20));

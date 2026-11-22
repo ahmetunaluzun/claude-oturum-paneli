@@ -939,3 +939,32 @@ dialog label.mail-field { display: grid; gap: 4px; font-size: 12px; }
 @keyframes rs-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rs-spin { animation: none; border-color: var(--accent); } }
 @media (max-width: 640px) { .rs-actions .btn { flex: 1; min-height: 44px; } }
+
+/* ---- Codex oturumları, salt okuma (codex.js) ---- */
+:root { --codex: #2BB39A; }
+[data-theme="light"] { --codex: #0E7F6C; }
+.codex-dot { background: var(--codex); }
+.badge.codex-badge { color: var(--codex); border-color: color-mix(in srgb, var(--codex) 45%, var(--line)); font-weight: 600; flex: none; }
+.codex-card .meta { margin-top: 2px; }
+.codex-state { font-weight: 600; }
+.codex-card[data-lane="busy"] .codex-state { color: var(--busy); }
+.codex-card[data-lane="idle"] .codex-state { color: var(--idle); }
+.codex-age { color: var(--muted); opacity: .75; }
+.codex-ask { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-note { font-size: 12px; color: var(--muted); }
+html.selecting .codex-card { opacity: .5; }
+.r-pick.codex-nopick { visibility: hidden; cursor: default; }
+.r-side .codex-badge { margin-bottom: 2px; }
+.codex-quota { display: flex; }
+.codex-ring small { display: block; font-size: 11px; }
+.codex-ring.codex-reset .fg { stroke: var(--muted); }
+.codex-ring b { color: var(--text); }
+.codex-ring .codex-q-name { color: var(--codex); font-weight: 600; }
+@media (max-width: 1040px) { .codex-quota { order: 3; } }
+@media (max-width: 640px) {
+  /* Telefonda yalnız yüzde + ad: yenilenme ve ikinci pencere ayrıntısı title'da */
+  .codex-quota { order: 5; }
+  .codex-ring { gap: 6px; font-size: 11px; }
+  .codex-ring svg { width: 26px; height: 26px; }
+  .codex-ring .codex-q-reset, .codex-ring .codex-q-sec { display: none; }
+}
