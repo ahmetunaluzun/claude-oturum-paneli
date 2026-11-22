@@ -77,7 +77,11 @@ await offline(false);
 await sleep(300);
 await tapSend();
 check("ağ gelince gönderildi: kutu boşaldı", await until(`document.getElementById("dInput").value === ""`, 5000), true);
-check("gönderilen mesaj konuşmada", await until(`[...document.querySelectorAll("#dMessages *")].some(e => e.children.length === 0 && e.textContent.includes(${JSON.stringify(TEXT)}))`, 8000), true);
+// Bu ortamda sahte claude döküm yazmaz (döküm boş). Gönderilen mesajın yankı balonu (.pending) döküm boşken yapılan
+// yenilemelerde (1,5 sn'de bir) silinmemeli: eskiden loadTranscript kutuyu sıfırlıyor, mesaj "—" ile kayboluyordu.
+check("gönderilen mesaj konuşmada", await until(`[...document.querySelectorAll("#dMessages .msg.user")].some(e => e.textContent.includes(${JSON.stringify(TEXT)}))`, 8000), true);
+await sleep(4000);
+check("döküm boşken birkaç yenilemeden sonra da mesaj duruyor", await ev(`[...document.querySelectorAll("#dMessages .msg.user.pending")].some(e => e.textContent.includes(${JSON.stringify(TEXT)}))`), true);
 check("gönderdikten sonra da kutu odakta", await ev(`document.activeElement?.id`), "dInput");
 await sleep(800);
 await shot("390_gonderildi");

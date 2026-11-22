@@ -656,7 +656,8 @@
     if (drawer.target !== tg) return;
     if (data.title) { tg.title = data.title; $("dTitle").textContent = data.title; }
     const box = $("dMessages");
-    if (drawer.rendered.size === 0) box.innerHTML = "";
+    // Döküm henüz boşken kutu sıfırlanır ama gönderilen mesajın yankı balonu (.pending) korunur; döküm gelince o siler.
+    if (drawer.rendered.size === 0) box.querySelectorAll(":scope > :not(.pending)").forEach(e => e.remove());
     const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
     let added = 0;
     const fresh = [];
@@ -669,7 +670,7 @@
       added++;
     }
     linkPaths(fresh);
-    if (!data.items.length && drawer.rendered.size === 0) box.innerHTML = `<p class="muted center">—</p>`;
+    if (!data.items.length && drawer.rendered.size === 0 && !box.querySelector(".pending")) box.innerHTML = `<p class="muted center">—</p>`;
     if (added && (first || nearBottom)) box.scrollTo({ top: box.scrollHeight, behavior: first ? "auto" : "smooth" });
     const live = liveOf(tg);
     box.classList.toggle("typing", !!live && live.lane === "busy");
