@@ -152,7 +152,8 @@
   <footer class="bottom">
     <span id="conn" class="conn ok"></span>
     <span data-i18n="footer" id="footText"></span>
-    <span class="abj-foot" id="abjFoot" data-has="0"></span>
+    <button type="button" class="abj-foot" id="abjFoot" data-has="0" aria-expanded="false" aria-controls="abjPop"></button>
+    <div class="abj-pop" id="abjPop" role="dialog" aria-labelledby="abjPopTitle" hidden></div>
     <span class="abj-wait" id="abjWait" hidden><span id="abjWaitText"></span> · <button type="button" class="link" id="abjCancel"></button></span>
     <span class="ver" id="ver"></span>
   </footer>

@@ -202,7 +202,7 @@
   const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
   // Arka plan işi görünürlüğü (bgjobs.js): kart rozeti, alt bilgi, yeniden başlat/kapat uyarı listesi
-  const B = window.PanelBgJobs({ t, api, toast, restartError: (code) => R.errText(code) });
+  const B = window.PanelBgJobs({ t, api, toast, dur, openDrawer, restartError: (code) => R.errText(code) });
   // Paneli yeniden başlat (restart.js): Ayarlar düğmesi + Takip'teki "Yeni sürüm hazır" satırı
   const R = window.PanelRestart({ t, api, getJson, confirmBox, ask, REMOTE, bg: B, toast });
   // Takip sekmesi (followup.js)

@@ -95,7 +95,7 @@ check("alt bilgi: 'arka plan işi yok'", (await foot()).metin + "|" + (await foo
 kayit(file, "agent", "aUI000001", "Uzun araştırma");
 check("alt ajan başlayınca boşta (bekleyen) kartta rozet çıkar", await until(`(() => { const c = ${cardOf}; return c && !c.querySelector(".abj-chip").hidden; })()`, 15000), true);
 let c1 = await chip();
-check("rozet: 'arka planda: 1 alt ajan', ipucunda etiket, kart hâlâ boşta", [c1.gorunur, c1.metin, c1.ipucu, c1.serit, c1.bayat], [true, "arka planda: 1 alt ajan", "alt ajan: Uzun araştırma", "idle", "0"]);
+check("rozet: 'arka planda: 1 alt ajan', ipucunda etiket, kart hâlâ boşta", [c1.gorunur, c1.metin, c1.ipucu, c1.serit, c1.bayat], [true, "arka planda: 1 alt ajan — Uzun araştırma", "alt ajan: Uzun araştırma", "idle", "0"]);
 check("alt bilgi: 'arka planda 1 iş'", (await foot()).metin, "arka planda 1 iş");
 await click(cardOf, 700);
 check("çekmece başlığında aynı bilgi", await ev(`document.getElementById("dMeta").textContent.includes("arka planda: 1 alt ajan")`), true);
@@ -109,6 +109,28 @@ await shot("1280_kart");
 kayit(file, "agent", "aUI000003", "Takılmış ajan", "7");
 check("bayat iş: rozette 'takılmış olabilir' + uyarı rengi", await until(`(() => { const c = ${cardOf}; const e = c && c.querySelector(".abj-chip"); return e && e.dataset.stale === "1" && e.textContent.includes("takılmış olabilir"); })()`, 15000), true);
 check("alt bilgi: sayı + takılmış olabilir", (await foot()).metin, "arka planda 3 iş · 1 tanesi takılmış olabilir");
+
+// ================= 3b. Alt bilgiye basınca iş listesi: oturum, iş, tür, süre =================
+const popInfo = () => ev(`(() => { const p = document.getElementById("abjPop"), b = document.getElementById("abjFoot"); if (p.hidden) return { acik: false, aria: b.getAttribute("aria-expanded") };
+  const r = p.getBoundingClientRect();
+  return { acik: true, aria: b.getAttribute("aria-expanded"), baslik: p.querySelector("h3").textContent, oturum: [...p.querySelectorAll(".abj-sname")].map(x => x.textContent),
+    isler: [...p.querySelectorAll("li")].map(li => ({ ne: li.querySelector(".abj-what").textContent, meta: li.querySelector(".abj-meta").textContent, bayat: li.dataset.stale })),
+    ekranda: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, ustunde: r.bottom <= b.getBoundingClientRect().top }; })()`);
+await click(`document.getElementById("abjFoot")`, 500);
+const pl = await popInfo();
+check("liste açıldı, başlık ve oturum adı", [pl.acik, pl.aria, pl.baslik, pl.oturum], [true, "true", "Arka planda süren işler", ["Deneme oturumu"]]);
+check("listede üç iş ve açıklamaları", pl.isler?.map(i => i.ne).sort(), ["Derleme izleyici", "Takılmış ajan", "Uzun araştırma"]);
+const isOf = (ne) => pl.isler?.find(i => i.ne === ne);
+check("tür ve süre yazıyor; takılmış olan işaretli", [isOf("Uzun araştırma")?.meta.startsWith("Alt ajan") && isOf("Uzun araştırma").meta.includes("önce başladı"),
+  isOf("Derleme izleyici")?.meta.startsWith("Arka plan komutu"), isOf("Uzun araştırma")?.bayat, isOf("Takılmış ajan")?.bayat, isOf("Takılmış ajan")?.meta.includes("takılmış olabilir")], [true, true, "0", "1", true]);
+check("liste ekranda ve göstergenin üstünde", [pl.ekranda, pl.ustunde], [true, true]);
+await shot("1280_liste");
+await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`); await sleep(200);
+check("Esc ile kapanır", (await popInfo()).acik, false);
+await click(`document.getElementById("abjFoot")`, 400);
+await click(`document.querySelector("#abjPop .abj-sname")`, 800);
+check("oturum adına basınca liste kapanır, oturum açılır", [(await popInfo()).acik, await ev(`document.body.classList.contains("drawer-open")`)], [false, true]);
+await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`); await sleep(400);
 
 // ================= 4. Yeniden başlat: uyarı penceresi =================
 await click(`document.getElementById("btnSettings")`, 800);
@@ -157,6 +179,12 @@ check("390 px: rozet ve alt bilgi taşmıyor", await ev(`(() => { const f = docu
   return [f.scrollWidth <= f.clientWidth + 1, e.getBoundingClientRect().right <= c.getBoundingClientRect().right + 1, document.documentElement.scrollWidth <= innerWidth]; })()`), [true, true, true]);
 await ev(`document.querySelector("footer.bottom").scrollIntoView()`);
 await shot("390_kart");
+await click(`document.getElementById("abjFoot")`, 500);
+const pt = await popInfo();
+check("telefon: liste açılır, ekrana sığar, yatay taşma yok", [pt.acik, pt.ekranda, pt.isler?.length, await ev(`(() => { const p = document.getElementById("abjPop"); return p.scrollWidth <= p.clientWidth + 1; })()`)], [true, true, 3, true]);
+await shot("390_liste");
+await click(`document.querySelector("main") || document.body`, 300);
+check("telefon: dışarı basınca kapanır", (await popInfo()).acik, false);
 
 // ================= 7. İngilizce =================
 await open(1280, { lang: "en", light: true });

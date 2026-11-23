@@ -42,8 +42,13 @@ static class Native
         return true;
     });
 
+    /// <summary>
+    /// Klasörü Gezgin'de açar. Sondaki "\" atılır: ArgumentList onu tırnaktan önce "\\" yapar, Gezgin komut satırını argv kuralıyla
+    /// ayrıştırmadığı için "…\klasör\\" yolunu tanımaz ve Belgeler'i açar (konuşmadaki "C:\…\klasör\" bağlantısı, 23.11.2026).
+    /// Kök ("C:\") kısalmaz; tırnak elle yazılır.
+    /// </summary>
     public static void RevealFolder(string path) =>
-        Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { path }, UseShellExecute = false });
+        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{Path.TrimEndingDirectorySeparator(path)}\"", UseShellExecute = false });
 
     /// <summary>Metin dosyasını Not Defteri'nde açar (dosya türü ilişkilendirmesi kullanılmaz: hiçbir şey çalıştırılmaz).</summary>
     public static void OpenText(string path) =>
