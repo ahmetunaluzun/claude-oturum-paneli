@@ -520,6 +520,13 @@
       }
       return;
     }
+    if (r.data?.error === "not-front") {
+      // Pencere bulundu ama Windows öne getirmedi (başka pencerede yazılıyor ya da pencere başka masaüstünde).
+      const d = r.data;
+      if (d.tab && d.tabId) { settings.tabMap[s.sessionId] = d.tab; settings.tabIds[s.sessionId] = d.tabId; save(); }
+      toast(s.desk ? t("notFrontDesk", s.desk.name || t("deskN", s.desk.number)) : t("notFront"), "warn");
+      return;
+    }
     if (r.data?.error === "pick-tab") {
       if (settings.tabMap[s.sessionId] || settings.tabIds[s.sessionId]) { delete settings.tabMap[s.sessionId]; delete settings.tabIds[s.sessionId]; save(); }
       pickTab(s, r.data.tabs || []);

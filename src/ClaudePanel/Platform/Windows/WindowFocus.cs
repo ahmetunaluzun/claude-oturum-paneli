@@ -18,6 +18,11 @@ public static class WindowFocus
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int max);
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
 
     public static FocusResult Focus(int pid, string folder, string? preferredTab, string? preferredTabId = null)
     {
@@ -30,12 +35,12 @@ public static class WindowFocus
             // VS Code gibi uygulamalar tüm pencerelerini tek süreçte tutar; MainWindowHandle o an hangisiyse odur.
             // Birden çok pencere varsa başlığı klasör adıyla eşleşen pencere seçilir.
             var all = VirtualDesktops.TopWindows().GetValueOrDefault(ownerPid) ?? [];
-            BringToFront(all.Count > 1 && ByTitle(all, folder) is { } w ? w : mainWindow);
-            return new(true);
+            // Windows öne getirmeyi reddedebilir (kullanıcı başka pencerede çalışıyor, pencere başka masaüstünde): sessizce "oldu" denmez.
+            return BringToFront(all.Count > 1 && ByTitle(all, folder) is { } w ? w : mainWindow) ? new(true) : new(false, "not-front");
         }
 
         var tabs = TerminalTabs(ownerPid);
-        if (tabs.Count == 0) { BringToFront(mainWindow); return new(true); }
+        if (tabs.Count == 0) return BringToFront(mainWindow) ? new(true) : new(false, "not-front");
 
         // Önce sekme kimliği (claude sekme başlığını değiştirse de aynı kalır), sonra hatırlanan ad, sonra klasör adı.
         var target = (preferredTabId is not null ? tabs.FirstOrDefault(t => t.Id == preferredTabId) : null)
@@ -50,24 +55,44 @@ public static class WindowFocus
                 ((SelectionItemPattern)p).Select();
         }
         catch (ElementNotAvailableException) { return new(false, "pick-tab", tabs.Select(t => t.Name).ToList()); }
-        BringToFront(target.Window);
-        return new(true, Tab: target.Name, TabId: target.Id);
+        // Sekme seçildi; pencere öne gelmese de sekme bilgisi hatırlansın diye döner.
+        return BringToFront(target.Window) ? new(true, Tab: target.Name, TabId: target.Id)
+            : new(false, "not-front", Tab: target.Name, TabId: target.Id);
     }
 
     sealed record Tab(string Name, string Id, AutomationElement Element, IntPtr Window);
 
-    /// <summary>Başlığı klasör adıyla en iyi eşleşen pencere; tek ve açık eşleşme yoksa null.</summary>
+    /// <summary>Başlığı klasör adıyla en iyi eşleşen pencere; tek ve açık eşleşme yoksa null.
+    /// Klasör eşleşmezse üst klasörleri dener (oturum açık klasörün alt klasöründe olabilir: "proje\alt").</summary>
     internal static IntPtr? ByTitle(List<IntPtr> windows, string folder)
     {
-        var f = Norm(Path.GetFileName(folder.TrimEnd('\\', '/')));
+        var dir = folder.TrimEnd('\\', '/');
+        for (var depth = 0; depth < 4 && dir.Length > 0; depth++)
+        {
+            if (ByName(windows, Norm(Path.GetFileName(dir))) is { } w) return w;
+            var up = Path.GetDirectoryName(dir);
+            if (string.IsNullOrEmpty(up) || up == dir || Path.GetPathRoot(up) == up) break;
+            dir = up;
+        }
+        return null;
+    }
+
+    static IntPtr? ByName(List<IntPtr> windows, string f)
+    {
         if (f.Length == 0) return null;
         // VS Code başlığı: "dosya - klasör - Visual Studio Code" (ayraç ayara göre " - " ya da " — "); parçalar ayrı puanlanır.
+        // Son parça uygulama adıdır ("Visual Studio Code"): klasör adı "Code" içeriyorsa her pencere eşleşmesin diye atlanır.
         var scored = windows
-            .Select(h => (h, score: Title(h).Split([" — ", " - ", " | "], StringSplitOptions.RemoveEmptyEntries)
-                .Select(part => Score(Norm(part), f)).DefaultIfEmpty(0).Max()))
+            .Select(h => (h, score: TitleParts(Title(h)).Select(part => Score(Norm(part), f)).DefaultIfEmpty(0).Max()))
             .Where(x => x.score > 0).OrderByDescending(x => x.score).ToList();
         if (scored.Count == 0 || (scored.Count > 1 && scored[0].score == scored[1].score)) return null;
         return scored[0].h;
+    }
+
+    internal static string[] TitleParts(string title)
+    {
+        var parts = title.Split([" — ", " - ", " | "], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? parts[..^1] : parts;
     }
 
     static string Title(IntPtr h)
@@ -149,14 +174,34 @@ public static class WindowFocus
         return null;
     }
 
-    internal static void BringToFront(IntPtr h)
+    /// <summary>Pencereyi öne getirir; gerçekten öne geldiyse true. Windows arka plandaki sürecin öne getirmesini kısıtlar
+    /// (kullanıcı o an başka pencerede yazıyorsa ya da pencere başka sanal masaüstündeyse reddedebilir); sonuç ölçülür.</summary>
+    internal static bool BringToFront(IntPtr h)
     {
-        if (h == IntPtr.Zero) return;
+        if (h == IntPtr.Zero) return false;
         if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
-        // Windows, arka plandaki süreçten öne getirmeyi engeller; ALT tuşu bu kilidi açar.
-        keybd_event(0x12, 0, 0, UIntPtr.Zero);
-        keybd_event(0x12, 0, 2, UIntPtr.Zero);
-        SetForegroundWindow(h);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            if (GetForegroundWindow() == h) return true;
+            // Öndeki pencerenin giriş kuyruğuna bağlanmak öne getirme kilidini açar; ALT tuşu da ayrıca kilidi açar.
+            var fgThread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+            var me = GetCurrentThreadId();
+            var attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+            try
+            {
+                keybd_event(0x12, 0, 0, UIntPtr.Zero);
+                keybd_event(0x12, 0, 2, UIntPtr.Zero);
+                BringWindowToTop(h);
+                SetForegroundWindow(h);
+            }
+            finally { if (attached) AttachThreadInput(me, fgThread, false); }
+            for (var i = 0; i < 10; i++)
+            {
+                if (GetForegroundWindow() == h) return true;
+                Thread.Sleep(30);
+            }
+        }
+        return GetForegroundWindow() == h;
     }
 
     internal static int ParentOf(int pid)

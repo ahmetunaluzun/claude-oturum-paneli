@@ -2,6 +2,9 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## Yayınlanmamış
+- **Düzeltme — "VS Code'a git" / "Sekmeye git" artık doğru pencereyi gerçekten öne getiriyor** (issue #1, madde 4, VS Code tarafı). Ölçümle bulunan iki neden: (1) Windows öne getirmeyi reddedince (kullanıcı başka pencerede çalışırken) panel yine "oldu" diyordu; artık öndeki pencerenin giriş kuyruğuna bağlanarak (AttachThreadInput) öne getirir, sonucu ölçer, yine olmazsa "Windows pencereyi öne getirmedi; görev çubuğunda yanıp sönen pencereye tıklayın" (pencere başka masaüstündeyse "Pencere Masaüstü N üzerinde") uyarısı çıkar. Windows Terminal yolu da aynı. (2) Oturum açık klasörün alt klasöründeyse ("proje\alt") pencere başlığında eşleşme bulunamıyor, son kullanılan VS Code penceresi geliyordu; artık üst klasörler de denenir. Başlığın son parçası (uygulama adı "Visual Studio Code") eşleştirmede sayılmaz. Test: `tools/vscode_odak_deneme.ps1` (ayrı VS Code profiliyle iki gerçek pencere, öndeki pencere ölçülür) 11/11; eski `oturum_yuzey_test.sh` geçti.
+
 ## 0.18.0 — 2026-11-23
 - **Düzeltme — Bozuk JSON gövdesi artık 400 döner (500 değil).** Uçlardaki `ReadFromJsonAsync` bozuk gövdede `JsonException` fırlatıyordu; 40 uç için tek ara katman (`Program.cs`) yakalar, `{"error":"badjson"}` döner. Test: `tools/arkaplan_ui_test.sh` "bozuk JSON gövdesi 400".
 - **Düzeltme — Yeniden başlat onayında "Yine de şimdi" 1280 px'te alt satıra düşmüyor.** Üç düğmeli onay penceresi 440 yerine 540 px genişlikte açılır (dar ekranda yine sarar). Test: "1280'de üç düğme tek satırda".
