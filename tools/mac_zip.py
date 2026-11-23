@@ -15,7 +15,12 @@ def ziple(surum: str, rid: str) -> Path:
     kaynak = DIST / rid
     hedef = DIST / f"ClaudePanel-{surum}-{rid}.zip"
     ust = f"ClaudePanel-{rid}"
-    dosyalar = sorted(p for p in kaynak.rglob("*") if p.is_file())
+    # publish klasörüne tüm platformların kitaplıkları ve .pdb de düşer: yalnız bu mimarininkiler (runtimes/macos-<mimari>) girer.
+    mac = "macos-" + rid.removeprefix("osx-")
+    def girsin(p: Path) -> bool:
+        r = p.relative_to(kaynak).parts
+        return p.suffix != ".pdb" and (r[0] != "runtimes" or r[1] == mac)
+    dosyalar = sorted(p for p in kaynak.rglob("*") if p.is_file() and girsin(p))
     dosyalar.append(KOK / "MAC_TEST.md")
     with zipfile.ZipFile(hedef, "w", zipfile.ZIP_DEFLATED) as z:
         for p in dosyalar:
