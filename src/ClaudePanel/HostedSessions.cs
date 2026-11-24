@@ -7,7 +7,7 @@ namespace ClaudePanel;
 
 public sealed record HostedInfo(string Key, string? SessionId, string Cwd, string? Name, string Status,
     long StartedAt, long StatusSince, string? Model, string? LastError, double CostUsd, string? Task, string? Night,
-    IReadOnlyList<BgJob>? Background = null);
+    IReadOnlyList<BgJob>? Background = null, string? Account = null);
 
 /// <summary>
 /// Panelin kendi içinde çalıştırdığı oturumlar: claude -p --input-format stream-json ile açık kalan süreç.
@@ -43,6 +43,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         public bool Hidden;
         /// <summary>Son yanıt hata ile bitti.</summary>
         public bool LastFailed;
+        /// <summary>Ek Claude hesabında çalışıyorsa hesabın kimliği (Accounts.cs); varsayılan hesapta null.</summary>
+        public string? Account;
     }
 
     /// <summary>Panel ya da Windows yeniden başlarken çalışmakta olan oturuma, geri bağlanınca gönderilir.</summary>
@@ -66,11 +68,17 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     public IReadOnlyList<HostedInfo> List() => ListAll(includeHidden: false, withBackground: true);
 
     /// <summary>Arka plan işleri dahil: aynı projede çalışan oturum denetimi için (ProjectGuard).</summary>
-    public IReadOnlyList<HostedInfo> ListAll(bool includeHidden = true, bool withBackground = false) => _sessions.Values
-        .Where(h => includeHidden || !h.Hidden)
-        .Select(h => new HostedInfo(h.Key, h.SessionId, h.Cwd, h.Name, h.Status, h.StartedAt, h.StatusSince,
-            h.Model, h.LastError, h.Cost, h.Task, h.Night, withBackground ? background.Of(h.SessionId) : null))
-        .OrderBy(h => h.StartedAt).ToList();
+    public IReadOnlyList<HostedInfo> ListAll(bool includeHidden = true, bool withBackground = false)
+    {
+        // Birden çok hesap varsa varsayılan hesaptaki oturum da hesabıyla etiketlenir (kart rozeti); tek hesapta null.
+        var accounts = Accounts.List();
+        var def = accounts.Count > 1 ? accounts[0].Id : null;
+        return _sessions.Values
+            .Where(h => includeHidden || !h.Hidden)
+            .Select(h => new HostedInfo(h.Key, h.SessionId, h.Cwd, h.Name, h.Status, h.StartedAt, h.StatusSince,
+                h.Model, h.LastError, h.Cost, h.Task, h.Night, withBackground ? background.Of(h.SessionId) : null, h.Account ?? def))
+            .OrderBy(h => h.StartedAt).ToList();
+    }
 
     public static string? Validate(string? cwd, string? prompt, string? model)
     {
@@ -82,7 +90,9 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
 
     /// <summary>Yeni oturum açar; resumeId verilirse o oturumu kaldığı yerden sürdürür.</summary>
     /// <param name="hidden">Arka plan işi: oturum listesinde görünmez, diske yazılmaz.</param>
-    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false)
+    /// <param name="account">Claude hesabı (Accounts.cs kimliği). Ek hesapta claude o hesabın klasörüyle
+    /// (CLAUDE_CONFIG_DIR) başlar; null ya da varsayılan hesapta değişken kaldırılır (panel başka hesaptan miras almış olsa da).</param>
+    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false, string? account = null)
     {
         if (string.IsNullOrWhiteSpace(prompt)) prompt = null;
         var psi = new ProcessStartInfo(Launcher.ClaudeExe())
@@ -104,6 +114,10 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         if (resumeId is not null && Guid.TryParse(resumeId, out _)) { psi.ArgumentList.Add("--resume"); psi.ArgumentList.Add(resumeId); }
         // Gece koruması panelle birlikte gelir; ~/.claude/hooks altında betik olmayan bilgisayarda (Mac) da çalışır.
         if (NightGuard.SettingsArg() is { } guard) { psi.ArgumentList.Add("--settings"); psi.ArgumentList.Add(guard); }
+        var acct = Accounts.Find(account);
+        // Ortam bloğuna yalnız gerektiğinde dokunulur (dokununca .NET bloğu kendisi kurar).
+        if (acct is { IsDefault: false }) psi.Environment["CLAUDE_CONFIG_DIR"] = acct.Dir;
+        else if (Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is not null) psi.Environment.Remove("CLAUDE_CONFIG_DIR");
 
         var sw = Stopwatch.StartNew();
         var proc = Process.Start(psi) ?? throw new InvalidOperationException("claude başlatılamadı");
@@ -114,13 +128,14 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         var h = new Hosted
         {
             Key = Guid.NewGuid().ToString("N")[..12], Proc = proc, Cwd = cwd, Name = name, Model = model,
-            SessionId = resumeId, StartedAt = now, StatusSince = now, Status = "idle", Hidden = hidden
+            SessionId = resumeId, StartedAt = now, StatusSince = now, Status = "idle", Hidden = hidden,
+            Account = acct is { IsDefault: false } ? acct.Id : null
         };
         _sessions[h.Key] = h;
         Persist();
         _ = Task.Run(() => PumpStdout(h));
         _ = Task.Run(() => PumpStderr(h));
-        log.LogInformation("Panel oturumu başladı {Key} klasör={Cwd} model={Model} resume={Resume}", h.Key, cwd, model, resumeId);
+        log.LogInformation("Panel oturumu başladı {Key} klasör={Cwd} model={Model} resume={Resume} hesap={Account}", h.Key, cwd, model, resumeId, h.Account ?? "varsayılan");
         if (!string.IsNullOrWhiteSpace(prompt)) Send(h.Key, prompt);
         // Başlatma süresi dosya loguna: yanıtın geciktiği durumda nedeni (süreç açılışı mı) ölçülebilsin.
         RemoteLog.Info($"Panel oturumu başlatıldı {h.Key}: süreç açılışı {startMs} ms, toplam {sw.ElapsedMilliseconds} ms, klasör {cwd}");
@@ -234,6 +249,26 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
 
     /// <summary>Oturumu kapatır (konuşma kaydı diskte kalır, sonra sürdürülebilir).</summary>
     public bool Stop(string key) => Stop(key, forget: true);
+
+    /// <summary>
+    /// Boştaki panel oturumunu kapatıp aynı konuşmayı öteki hesapla açar (konuşma kayıtları iki hesapta ortak olmalı:
+    /// ek hesabın projects klasörü varsayılanınkine bağlı). Hata kodu ya da null; yeni anahtar <paramref name="newKey"/>.
+    /// </summary>
+    public string? SwitchAccount(string key, string account, out string? newKey)
+    {
+        newKey = null;
+        if (!_sessions.TryGetValue(key, out var h) || h.Hidden) return "missing";
+        if (h.Status != "idle" || h.Task is not null) return "busy";
+        if (h.SessionId is null) return "generic";
+        var target = Accounts.Find(account);
+        if (target is null) return "account";
+        if ((target.IsDefault ? null : target.Id) == h.Account) return "same";
+        var (cwd, model, name, sid) = (h.Cwd, h.Model, h.Name, h.SessionId);
+        Stop(key, forget: true);
+        newKey = Start(cwd, null, model, name, sid, account: target.Id);
+        log.LogInformation("Panel oturumu hesap değiştirdi: oturum {Sid} → {Account}", sid, target.Id);
+        return null;
+    }
 
     /// <param name="forget">true: kullanıcı kapattı, açılışta geri getirilmez. false: panel kapanıyor, listede kalır.</param>
     bool Stop(string key, bool forget)
@@ -371,7 +406,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     readonly object _persistLock = new();
 
     /// <param name="Busy">Kayıt anında çalışıyordu (eski dosyalarda yok → false).</param>
-    sealed record Saved(string SessionId, string Cwd, string? Name, string? Model, bool Busy = false);
+    sealed record Saved(string SessionId, string Cwd, string? Name, string? Model, bool Busy = false, string? Account = null);
     volatile bool _closing; // panel kapanıyor: listeyi artık yeniden yazma (oturumlar tek tek düşerken liste boşalmasın)
 
     /// <summary>Açık panel oturumlarının listesini diske yazar (oturum kimliği belli olanlar).</summary>
@@ -379,7 +414,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     {
         if (_closing) return;
         var list = _sessions.Values.Where(h => h.SessionId is not null && !h.Hidden)
-            .Select(h => new Saved(h.SessionId!, h.Cwd, h.Name, h.Model, h.Status == "busy"))
+            .Select(h => new Saved(h.SessionId!, h.Cwd, h.Name, h.Model, h.Status == "busy", h.Account))
             .Concat(_pending) // henüz bağlanamamış olanlar da listede kalır
             .GroupBy(s => s.SessionId).Select(g => g.First()).ToList();
         lock (_persistLock)
@@ -441,7 +476,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
                 if (other.Any(r => !r.IsOrphanPanelProcess)) continue;
                 _pending.Remove(s);
                 var model = s.Model is { } m && (Models.Contains(m) || System.Text.RegularExpressions.Regex.IsMatch(m, "^claude-[a-z0-9.-]+$")) ? m : null;
-                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId);
+                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId, account: s.Account);
                 if (s.Busy) log.LogInformation("Yarıda kalan iş sürdürülüyor: oturum {Sid} klasör={Cwd}", s.SessionId, s.Cwd);
                 n++;
             }

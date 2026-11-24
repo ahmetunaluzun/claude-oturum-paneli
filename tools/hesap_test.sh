@@ -97,6 +97,43 @@ PID=$!
 for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$PORT/api/state" && break; sleep 0.2; done
 case "$(curl -s "http://127.0.0.1:$PORT/api/state")" in *'"accounts":null'*) check "tek hesapta accounts null" 1 1;; *) check "tek hesapta accounts null" 0 1;; esac
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
+
+# ---- öteki hesapta devam: panel oturumu kapanır, aynı konuşma hedef hesabın klasörüyle (CLAUDE_CONFIG_DIR) açılır ----
+echo '{"claudeAiOauth":{"accessToken":"sahte","subscriptionType":"team"}}' > "$I/.credentials.json"
+mkdir -p "$T/proje"
+printf '{"_test":"gece-modu-koruma quota-guard project-guard"}' > "$P/settings.json" # satır içi --settings JSON .cmd ile geçmez
+printf '@echo off\r\npy -3.13 "%s"\r\n' "$(cygpath -w "$PWD/tools/sahte_claude.py")" > "$T/sahte-claude.cmd"
+LOGF="$T/claude.log"; B="http://127.0.0.1:$PORT"
+CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_CLAUDE_EXE="$(cygpath -w "$T/sahte-claude.cmd")" SAHTE_CLAUDE_LOG="$(cygpath -w "$LOGF")" \
+  "$EXE" --no-window >/dev/null 2>&1 &
+PID=$!
+for _ in $(seq 1 50); do [ -f "$T/data/panel-$PORT.token" ] && curl -s -o /dev/null "$B/api/state" && break; sleep 0.2; done
+TOK=$(cat "$T/data/panel-$PORT.token")
+post() { curl -s -o "$T/resp" -w '%{http_code}' -X POST "$B$1" -H "X-Panel-Token: $TOK" -H "Origin: $B" -H "Content-Type: application/json" -d "$2"; }
+hosted() { # $1 anahtar → "durum hesap"
+  curl -s "$B/api/state" | PYTHONUTF8=1 py -3.13 -c "import json,sys;h=[x for x in json.load(sys.stdin)['hosted'] if x['key']==sys.argv[1]];print((h[0]['status']+' '+str(h[0].get('account'))) if h else 'yok')" "$1"
+}
+bekle_bos() { for _ in $(seq 1 60); do case "$(hosted "$1")" in idle*) return;; esac; sleep 0.25; done; }
+son_hesap() { grep '^HESAP' "$LOGF" | tail -1 | cut -f3 | tr -d '\r'; }
+PROJ=$(cygpath -w "$T/proje" | sed 's/\\/\\\\/g')
+check "panel oturumu açıldı" "$(post /api/hosted "{\"cwd\":\"$PROJ\",\"prompt\":\"merhaba\"}")" 200
+K=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K"
+check "ilk açılış varsayılan hesapta" "$(son_hesap)" "-"
+check "varsayılan hesaptaki panel oturumu etiketli" "$(hosted "$K")" "idle .claude"
+check "aynı hesaba geçiş reddedilir" "$(post /api/switch-account "{\"key\":\"$K\",\"account\":\".claude\"}")" 409
+check "bilinmeyen hesap 400" "$(post /api/switch-account "{\"key\":\"$K\",\"account\":\"..\\\\\\\\x\"}")" 400
+check "anahtarsız istek 403" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$B/api/switch-account" -H 'Content-Type: application/json' -d "{\"key\":\"$K\",\"account\":\".claude-is\"}")" 403
+check "şirket hesabına geç (200)" "$(post /api/switch-account "{\"key\":\"$K\",\"account\":\".claude-is\"}")" 200
+K2=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K2"
+check "yeni süreç şirket klasörüyle açıldı" "$(son_hesap)" "$(cygpath -w "$I")"
+check "eski oturum listeden çıktı, yenisi şirket hesabında" "$(hosted "$K") / $(hosted "$K2")" "yok / idle .claude-is"
+check "hesap diske yazıldı (panel yeniden açılınca aynı hesap)" "$(grep -c '"Account":".claude-is"' "$T/data/hosted.json")" 1
+check "geri al: varsayılan hesaba (200)" "$(post /api/switch-account "{\"key\":\"$K2\",\"account\":\".claude\"}")" 200
+K3=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K3"
+check "geri alınca değişken kaldırıldı" "$(son_hesap)" "-"
+check "çalışan oturum taşınmaz (busy)" "$(post /api/hosted/$K3/send '{"text":"BEKLE"}' >/dev/null; sleep 0.5; post /api/switch-account "{\"key\":\"$K3\",\"account\":\".claude-is\"}")" 409
+curl -s -o /dev/null -X POST "$B/api/quit?force=1" -H "X-Panel-Token: $TOK" -H "Origin: $B"
+kill $PID 2>/dev/null; wait $PID 2>/dev/null
 taskkill //F //PID "$W1" //PID "$W2" >/dev/null 2>&1
 sleep 0.5
 rm -rf "$T"

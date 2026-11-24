@@ -127,7 +127,7 @@
       id: "h:" + h.key, kind: "panel", key: h.key, sessionId: h.sessionId, name: h.name || folderName(h.cwd),
       cwd: h.cwd, status: h.status, lane: h.status === "busy" || h.status === "starting" ? "busy" : "idle",
       since: h.statusSince, started: h.startedAt, cost: h.costUsd, error: h.lastError, model: h.model,
-      task: h.task, night: h.night, stats: st.stats?.[h.sessionId], bgjobs: h.background || []
+      task: h.task, night: h.night, stats: st.stats?.[h.sessionId], bgjobs: h.background || [], account: h.account || null
     }));
     const hostedIds = new Set(hosted.map(h => h.sessionId).filter(Boolean));
     // surface: oturum nerede açık (Claude Code'un entrypoint alanı): masaüstü uygulaması, VS Code ya da terminal.
@@ -201,7 +201,7 @@
   const matches = (q, ...vals) => !q || vals.some(v => norm(v).includes(norm(q)));
 
   // Kart ve konuşma ekranı eylemleri, toplu seçim (actions.js)
-  const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE,
+  const A = window.PanelActions({ t, api, toast, ask, confirmBox, adopt, goTo, openFolder, openDrawer, REMOTE, otherAccounts, switchAccount,
     items: () => items, render: () => render(), wrapAllIdle: () => wrapAllIdle(), closeAll: () => closeAll(), resumeAllIdle: () => resumeAllIdle() });
   // Arka plan işi görünürlüğü (bgjobs.js): kart rozeti, alt bilgi, yeniden başlat/kapat uyarı listesi
   const B = window.PanelBgJobs({ t, api, toast, dur, openDrawer, restartError: (code) => R.errText(code) });
@@ -356,12 +356,11 @@
 
   // Kart rozeti: nerede açık (+ birden çok sanal masaüstü varsa hangisi). Panel oturumunda rozet yok.
   function kindLabel(s) {
-    if (s.kind === "panel") return "";
+    if (s.kind === "panel") return acctLabel(s);
     if (s.kind === "bg") return t("bg");
     const where = s.surface === "desktop" ? t("desktopApp") : s.surface === "vscode" ? "VS Code"
       : settings.tabMap[s.sessionId] ? t("tabLabel", settings.tabMap[s.sessionId]) : t("terminal");
-    const acct = s.account && accountList.length > 1 ? accountList.find(a => a.id === s.account) : null;
-    return [where, s.desk ? s.desk.name || t("deskN", s.desk.number) : "", acct ? accountName(acct) : ""].filter(Boolean).join(" · ");
+    return [where, s.desk ? s.desk.name || t("deskN", s.desk.number) : "", acctLabel(s)].filter(Boolean).join(" · ");
   }
 
   // "Bu projede N oturum açık" rozeti: aynı projedeki oturumlardan birini kaydedip kapatma / panele alma kısayolu.
@@ -588,6 +587,33 @@
     if (!r.ok) { toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
     toast(t("adopted", s.name));
     if (drawer.target) { drawer.target.id = "h:" + r.data.key; drawer.target.kind = "panel"; drawer.target.key = r.data.key; }
+  }
+
+  // ---- Birden çok Claude hesabı (Accounts.cs) ----
+  // Kart rozetinde oturumun hesabı (yalnız birden çok hesap varsa).
+  function acctLabel(s) {
+    const a = s?.account && accountList.length > 1 ? accountList.find(x => x.id === s.account) : null;
+    return a ? accountName(a) : "";
+  }
+  // Oturumun taşınabileceği öteki hesaplar; hesabı bilinmeyen oturum (ör. bağlantılı sessions klasörü) için boş.
+  function otherAccounts(s) {
+    if (accountList.length < 2 || !s?.account) return [];
+    return accountList.filter(a => a.id !== s.account).map(a => ({ id: a.id, name: accountName(a) }));
+  }
+  // Öteki hesapta devam: boştaki oturum kapanır, aynı konuşma o hesapla panelde açılır (konuşma kayıtları ortak).
+  const switching = new Set();
+  async function switchAccount(s, acc) {
+    const id = s.kind === "panel" ? s.key : s.pid;
+    if (!s || !acc || switching.has(id)) return;
+    switching.add(id);
+    if (!await confirmBox({ title: t("switchTitle", acc.name), text: t("switchConfirm", s.name, acc.name), okText: t("switchOk") })) { switching.delete(id); return; }
+    let r;
+    try { r = await api("/api/switch-account", s.kind === "panel" ? { key: s.key, account: acc.id } : { pid: s.pid, account: acc.id }); }
+    catch { r = { ok: false, data: null }; }
+    finally { switching.delete(id); }
+    if (!r.ok) { toast(t(`err_${r.data?.error || "generic"}`), "warn"); return; }
+    toast(t("switched", s.name, acc.name));
+    if (drawer.target && r.data?.key) { drawer.target.id = "h:" + r.data.key; drawer.target.kind = "panel"; drawer.target.key = r.data.key; }
   }
 
   async function openFolder(s) { if (s) await api("/api/open-folder", { path: s.cwd }); }

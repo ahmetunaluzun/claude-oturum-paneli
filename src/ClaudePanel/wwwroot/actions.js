@@ -109,6 +109,9 @@ window.PanelActions = function (d) {
       add(t(goLabel(s)), () => goTo(s));
       if (canAdopt(s)) add(t("adopt"), () => adopt(s));
     }
+    // Öteki Claude hesabında devam (yalnız boştaki oturum; birden çok hesap varsa)
+    if ((isPanel(s) && s.lane === "idle" && !s.task) || canAdopt(s))
+      for (const a of d.otherAccounts?.(s) || []) add(t("switchAcct", a.name), () => d.switchAccount(s, a));
     if (s?.kind === "bg" && !REMOTE) add(t("openAgents"), () => goTo(s));
     if (!inDrawer) add(t("openConv"), () => openDrawer(s));
     if (L.length) L.push(null);

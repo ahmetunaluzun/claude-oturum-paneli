@@ -57,5 +57,17 @@ for (const light of [false, true]) {
     }
   }
 }
+// Kart: rozet hesap adını taşır, ⋯ menüsünde öteki hesaba geçiş
+await send("Emulation.setDeviceMetricsOverride", { width: 1500, height: 900, deviceScaleFactor: 1, mobile: false });
+await ev(`localStorage.setItem("panel.settings", JSON.stringify(Object.assign(JSON.parse(localStorage.getItem("panel.settings")||"{}"), {light:false}))); location.reload()`);
+await sleep(3500);
+check("kart rozeti: Terminal · şirket", await ev(`document.querySelector('.card .kind-badge')?.textContent`), "Terminal · Örnek Şirket A.Ş.");
+await ev(`document.querySelector('.card .more').click()`);
+await sleep(500);
+const items = await ev(`[...document.querySelectorAll('.pop-menu [role=menuitem]')].map(b => b.textContent)`);
+check("⋯ menüsünde kişisel hesaba geçiş", items?.includes("Kişisel hesabında devam et"), true);
+check("kendi hesabına geçiş yok", items?.some(x => x.includes("Örnek Şirket A.Ş. hesabında")), false);
+const s2 = await send("Page.captureScreenshot", { format: "png" });
+writeFileSync(`${out}_menu.png`, Buffer.from(s2.result.data, "base64"));
 ws.close();
 process.exit(fail);

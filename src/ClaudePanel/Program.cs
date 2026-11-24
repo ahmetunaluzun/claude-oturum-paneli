@@ -375,24 +375,32 @@ app.MapPost("/api/adopt/{pid:int}", async (int pid, HttpContext ctx, SessionStor
     if (!Authorized(ctx)) return Results.StatusCode(403);
     var s = store.List().FirstOrDefault(x => x.Pid == pid);
     if (s is null) return Results.NotFound();
-    if (s.Status != "idle") return Results.Json(new { error = "busy" }, statusCode: 409);
-    if (!Guid.TryParse(s.SessionId, out _)) return Results.Json(new { error = "generic" }, statusCode: 409);
-    try
-    {
-        using var p = Process.GetProcessById(pid);
-        // Mac'te npm ile kurulan claude "node" adıyla görünür; pid zaten claude'un kendi oturum dosyasından geliyor.
-        if (!p.ProcessName.Equals("claude", StringComparison.OrdinalIgnoreCase)
-            && !(!OperatingSystem.IsWindows() && p.ProcessName == "node"))
-            return Results.Json(new { error = "generic" }, statusCode: 409);
-        int shell = TerminalTab.FindOwnedShell(pid); // claude kapanmadan önce: sonra ebeveyni okunamaz
-        p.Kill();
-        await p.WaitForExitAsync(new CancellationTokenSource(5000).Token);
-        TerminalTab.CloseIfIdle(shell); // boş kalan terminal sekmesi de kapansın
-    }
-    catch (ArgumentException) { /* zaten kapanmış */ }
-    catch (OperationCanceledException) { return Results.Json(new { error = "generic" }, statusCode: 409); }
+    if (await TerminalSessions.Close(s) is { } err) return Results.Json(new { error = err }, statusCode: 409);
+    // Ek hesapta çalışan terminal oturumu panele kendi hesabıyla alınır.
     var (key, _) = StartOnce.Run("hosted", s.Cwd, null, s.SessionId,
-        () => hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId), k => k is not null && hosted.Has(k));
+        () => hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId, account: s.Account), k => k is not null && hosted.Has(k));
+    return Results.Json(new { key, sessionId = s.SessionId });
+});
+// Öteki Claude hesabında devam et (Accounts.cs): boştaki oturum kapanır, aynı konuşma hedef hesapla panel oturumu olarak açılır.
+// Terminal oturumu (pid) panele alınarak, panel oturumu (key) yeniden başlatılarak taşınır.
+app.MapPost("/api/switch-account", async (HttpContext ctx, SessionStore store, HostedSessions hosted) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    var req = await ctx.Request.ReadFromJsonAsync<SwitchAccountRequest>();
+    if (Accounts.Find(req?.Account) is not { } target) return Results.Json(new { error = "account" }, statusCode: 400);
+    if (req!.Key is { Length: > 0 } hk)
+    {
+        var e = hosted.SwitchAccount(hk, target.Id, out var nk);
+        return e is null ? Results.Json(new { key = nk }) : Results.Json(new { error = e }, statusCode: e == "missing" ? 404 : 409);
+    }
+    var s = req.Pid is { } pid ? store.List().FirstOrDefault(x => x.Pid == pid) : null;
+    if (s is null) return Results.NotFound();
+    if (string.Equals(s.Account ?? Accounts.List()[0].Id, target.Id, StringComparison.OrdinalIgnoreCase))
+        return Results.Json(new { error = "same" }, statusCode: 409);
+    if (await TerminalSessions.Close(s) is { } err) return Results.Json(new { error = err }, statusCode: 409);
+    var (key, _) = StartOnce.Run("hosted", s.Cwd, null, s.SessionId,
+        () => hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId, account: target.Id), k => k is not null && hosted.Has(k));
+    RemoteLog.Info($"Terminal oturumu öteki hesaba geçti: {s.SessionId} → {target.Id}");
     return Results.Json(new { key, sessionId = s.SessionId });
 });
 app.MapPost("/api/attach", async (HttpContext ctx) =>
@@ -654,6 +662,7 @@ static async Task<bool> PanelAlreadyRunning(string url)
 record PathRequest(string? Path);
 record FocusRequest(string? Tab, string? TabId);
 record SendRequest(string? Text);
+public record SwitchAccountRequest(int? Pid, string? Key, string? Account);
 public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null);
 public record DirsRequest(string? Path, string? Q = null);
 public record DirEntry(string Name, string Path, bool Known);

@@ -27,6 +27,14 @@ echo '{"claudeAiOauth":{"accessToken":"sahte"}}' > "$T/claude/.credentials.json"
 echo '{"claudeAiOauth":{"accessToken":"sahte"}}' > "$T/claude-is/.credentials.json"
 echo '{"oauthAccount":{"organizationName":"kisi@ornek.com'"'"'s Organization"}}' > "$T/.claude.json"
 echo '{"oauthAccount":{"organizationName":"Örnek Şirket A.Ş."}}' > "$T/claude-is/.claude.json"
+# Şirket hesabında boştaki bir terminal oturumu (kart rozeti + ⋯ menüsünde "Kişisel hesabında devam et")
+mkdir -p "$T/claude-is/sessions" "$T/p/Muhasebe Projesi"
+py -3.13 -c "import time; time.sleep(900)  # $TW" >/dev/null 2>&1 & YP=$!
+sleep 0.3; WPID=$(cat /proc/$YP/winpid)
+FT=$(pwsh -NoProfile -c "(Get-Process -Id $WPID).StartTime.ToFileTimeUtc()" | tr -d '\r')
+CWD=$(cygpath -w "$T/p/Muhasebe Projesi" | sed 's/\\/\\\\/g')
+printf '{"pid":%s,"sessionId":"6f0c2a10-0000-4000-8000-00000000a001","cwd":"%s","startedAt":%s000,"procStart":"%s","version":"2.1.331","kind":"interactive","entrypoint":"cli","status":"idle","statusUpdatedAt":%s000}' \
+  "$WPID" "$CWD" "$((now-600))" "$FT" "$((now-120))" > "$T/claude-is/sessions/$WPID.json"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CODEX_HOME="$TW\\codex" \

@@ -12,7 +12,8 @@
 #   planlı iş istemi ise   → (istem "[Planlı iş"/"[Planned task" ile başlıyorsa) PLAN-KARAR / PLAN-DOSYA / PLAN-CAKIS: bkz. plan()
 #   durdurma istemi ise     → (istemde CronDelete geçiyorsa) kayda CronDelete + ScheduleWakeup stop yazar
 #   diğer                   → kısa yanıt
-# Her açılış ve her mesaj SAHTE_CLAUDE_LOG dosyasına yazılır: "ACILIS\t<sid>\t<cwd>" / "MESAJ\t<sid>\t<cwd>\t<metin>".
+# Her açılış ve her mesaj SAHTE_CLAUDE_LOG dosyasına yazılır: "ACILIS\t<sid>\t<cwd>" / "HESAP\t<sid>\t<CLAUDE_CONFIG_DIR|->" /
+# "MESAJ\t<sid>\t<cwd>\t<metin>".
 # Çağıran .cmd argümanları iletmez (satır içi JSON'u cmd ayrıştıramıyor); bu betik argüman kullanmaz.
 import json
 import os
@@ -98,6 +99,8 @@ def plan(text):
 
 
 log("ACILIS", SID, CWD)
+# Hangi Claude hesabıyla açıldı (hesap_test.sh: öteki hesapta devam)
+log("HESAP", SID, os.environ.get("CLAUDE_CONFIG_DIR") or "-")
 first = True
 for line in sys.stdin:
     try:
