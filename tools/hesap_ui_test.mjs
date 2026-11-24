@@ -69,5 +69,18 @@ check("⋯ menüsünde kişisel hesaba geçiş", items?.includes("Kişisel hesab
 check("kendi hesabına geçiş yok", items?.some(x => x.includes("Örnek Şirket A.Ş. hesabında")), false);
 const s2 = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(`${out}_menu.png`, Buffer.from(s2.result.data, "base64"));
+// Yeni oturum penceresi: hesap seçimi görünür; kayıtlı projede şirket hesabı, başka klasörde varsayılan hesap seçili
+await ev(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}))`);
+await sleep(300);
+await ev(`document.getElementById("btnNew").click()`);
+await sleep(1200);
+const pickAcct = (p) => ev(`(() => { const c = document.getElementById("fCwd"); c.value = ${JSON.stringify(p)};
+  c.dispatchEvent(new Event("input")); const s = document.getElementById("fAccount"), r = document.getElementById("fAccountRow");
+  return { shown: !r.hidden && r.getBoundingClientRect().height > 0, picked: s.selectedOptions[0]?.textContent, n: s.options.length }; })()`);
+check("yeni oturum: kayıtlı proje şirket hesabında", await pickAcct(process.env.HESAP_PROJ), { shown: true, picked: "Örnek Şirket A.Ş.", n: 2 });
+check("yeni oturum: alt klasör de projenin hesabında", (await pickAcct(process.env.HESAP_PROJ + "\\alt")).picked, "Örnek Şirket A.Ş.");
+check("yeni oturum: başka klasör kişisel hesapta", (await pickAcct(process.env.HESAP_BASKA)).picked, "Kişisel");
+const s3 = await send("Page.captureScreenshot", { format: "png" });
+writeFileSync(`${out}_yeni_oturum.png`, Buffer.from(s3.result.data, "base64"));
 ws.close();
 process.exit(fail);

@@ -91,7 +91,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     /// <summary>Yeni oturum açar; resumeId verilirse o oturumu kaldığı yerden sürdürür.</summary>
     /// <param name="hidden">Arka plan işi: oturum listesinde görünmez, diske yazılmaz.</param>
     /// <param name="account">Claude hesabı (Accounts.cs kimliği). Ek hesapta claude o hesabın klasörüyle
-    /// (CLAUDE_CONFIG_DIR) başlar; null ya da varsayılan hesapta değişken kaldırılır (panel başka hesaptan miras almış olsa da).</param>
+    /// (CLAUDE_CONFIG_DIR) başlar. null: projenin kayıtlı hesabı (ProjectAccounts), o da yoksa varsayılan hesap.</param>
     public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false, string? account = null)
     {
         if (string.IsNullOrWhiteSpace(prompt)) prompt = null;
@@ -114,10 +114,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         if (resumeId is not null && Guid.TryParse(resumeId, out _)) { psi.ArgumentList.Add("--resume"); psi.ArgumentList.Add(resumeId); }
         // Gece koruması panelle birlikte gelir; ~/.claude/hooks altında betik olmayan bilgisayarda (Mac) da çalışır.
         if (NightGuard.SettingsArg() is { } guard) { psi.ArgumentList.Add("--settings"); psi.ArgumentList.Add(guard); }
-        var acct = Accounts.Find(account);
-        // Ortam bloğuna yalnız gerektiğinde dokunulur (dokununca .NET bloğu kendisi kurar).
-        if (acct is { IsDefault: false }) psi.Environment["CLAUDE_CONFIG_DIR"] = acct.Dir;
-        else if (Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is not null) psi.Environment.Remove("CLAUDE_CONFIG_DIR");
+        var acct = Accounts.Find(account ?? ProjectAccounts.Of(cwd));
+        ProjectAccounts.ApplyEnv(psi, acct);
 
         var sw = Stopwatch.StartNew();
         var proc = Process.Start(psi) ?? throw new InvalidOperationException("claude başlatılamadı");
@@ -266,6 +264,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         var (cwd, model, name, sid) = (h.Cwd, h.Model, h.Name, h.SessionId);
         Stop(key, forget: true);
         newKey = Start(cwd, null, model, name, sid, account: target.Id);
+        ProjectAccounts.Set(cwd, target.Id); // proje bundan sonra bu hesapla açılır
         log.LogInformation("Panel oturumu hesap değiştirdi: oturum {Sid} → {Account}", sid, target.Id);
         return null;
     }
@@ -476,7 +475,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
                 if (other.Any(r => !r.IsOrphanPanelProcess)) continue;
                 _pending.Remove(s);
                 var model = s.Model is { } m && (Models.Contains(m) || System.Text.RegularExpressions.Regex.IsMatch(m, "^claude-[a-z0-9.-]+$")) ? m : null;
-                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId, account: s.Account);
+                // Kayıtta hesap yoksa varsayılan hesapta açılmıştı: projenin hesabına kaymasın.
+                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId, account: s.Account ?? Accounts.List()[0].Id);
                 if (s.Busy) log.LogInformation("Yarıda kalan iş sürdürülüyor: oturum {Sid} klasör={Cwd}", s.SessionId, s.Cwd);
                 n++;
             }

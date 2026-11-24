@@ -35,6 +35,9 @@ FT=$(pwsh -NoProfile -c "(Get-Process -Id $WPID).StartTime.ToFileTimeUtc()" | tr
 CWD=$(cygpath -w "$T/p/Muhasebe Projesi" | sed 's/\\/\\\\/g')
 printf '{"pid":%s,"sessionId":"6f0c2a10-0000-4000-8000-00000000a001","cwd":"%s","startedAt":%s000,"procStart":"%s","version":"2.1.331","kind":"interactive","entrypoint":"cli","status":"idle","statusUpdatedAt":%s000}' \
   "$WPID" "$CWD" "$((now-600))" "$FT" "$((now-120))" > "$T/claude-is/sessions/$WPID.json"
+# Muhasebe Projesi şirket hesabına kayıtlı (ProjectAccounts.cs): yeni oturum penceresinde şirket hesabı seçili gelmeli
+printf '{"%s":"claude-is"}' "${CWD,,}" > "$T/data/project-accounts.json"
+export HESAP_PROJ="$(cygpath -w "$T/p/Muhasebe Projesi")" HESAP_BASKA="$(cygpath -w "$T/p")"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CODEX_HOME="$TW\\codex" \

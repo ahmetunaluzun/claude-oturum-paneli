@@ -1,7 +1,8 @@
 namespace ClaudePanel;
 
 /// <param name="Mode">Projede zaten oturum varken ne yapılacağı: null (sor: 409) | "send" | "later" | "worktree" | "force".</param>
-public sealed record HostedRequest(string? Cwd, string? Prompt, string? Model, string? Name, string? ResumeId, string? Mode = null);
+public sealed record HostedRequest(string? Cwd, string? Prompt, string? Model, string? Name, string? ResumeId, string? Mode = null,
+    string? Account = null);
 public sealed record FollowRepoRequest(string? Path, bool? Push, string? Lang);
 public sealed record FollowAllRequest(string[]? Paths, string? Lang);
 public sealed record FollowAllowRequest(string? Path, string[]? Fps, string? Lang);
@@ -47,7 +48,7 @@ public static class FollowEndpoints
         var (key, repeated) = StartOnce.Run("hosted:" + mode, cwd, req.Prompt, req.ResumeId, () =>
         {
             var others = guard.SessionsIn(ProjectRoots.Of(cwd), req.ResumeId);
-            if (others.Count == 0 || mode == "force") return hosted.Start(cwd, req.Prompt, model, req.Name, req.ResumeId);
+            if (others.Count == 0 || mode == "force") return hosted.Start(cwd, req.Prompt, model, req.Name, req.ResumeId, account: req.Account);
             var panels = others.Where(s => s.Kind == "panel" && s.Key is not null).ToList();
             if (mode == "send" && hasPrompt && panels.FirstOrDefault(s => s.Status == "idle") is { } idle && hosted.Send(idle.Key!, req.Prompt!))
             {
@@ -68,7 +69,7 @@ public static class FollowEndpoints
                 var rel = Path.GetRelativePath(gitRoot, ProjectRoots.Normalize(cwd));
                 var dir = rel == "." ? path : Path.Combine(path, rel);
                 if (!Directory.Exists(dir)) dir = path;
-                var started = hosted.Start(dir, req.Prompt, model, req.Name, null);
+                var started = hosted.Start(dir, req.Prompt, model, req.Name, null, account: req.Account ?? ProjectAccounts.Of(cwd));
                 RemoteLog.Info($"Ayrı çalışma kopyası açıldı: {path}");
                 body = new { key = started, worktree = path };
                 return started;

@@ -119,6 +119,7 @@
   let trayNotify = false;
   let view = "sessions";
   let accountList = []; // /api/state accounts (birden çok Claude hesabı varsa): kart rozeti ve kota halkaları
+  let projectAccounts = {}; // proje kökü (küçük harf) → kayıtlı hesap (ProjectAccounts.cs)
 
   function normalize(st) {
     // Proje kökü (git kökü; yoksa klasör) sunucudan gelir: aynı projedeki oturumları eşlemek için. root küçük harf anahtardır.
@@ -164,6 +165,7 @@
       rememberFolders(items.map(s => s.cwd));
       render();
       accountList = st.accounts || [];
+      projectAccounts = st.projectAccounts || {};
       renderUsage(st.usage, st.accounts);
       renderNightPill(st.night);
       B.paintFoot(items, st);
@@ -600,6 +602,24 @@
     if (accountList.length < 2 || !s?.account) return [];
     return accountList.filter(a => a.id !== s.account).map(a => ({ id: a.id, name: accountName(a) }));
   }
+  // Yeni oturum penceresi: birden çok hesap varsa hesap seçimi; seçili klasörün projesine kayıtlı hesap gelir
+  // (kayıt anahtarı proje kökü: klasör o kökün altındaysa en uzun eşleşen kök).
+  function syncAccount() {
+    const row = $("fAccountRow"), sel = $("fAccount");
+    row.hidden = accountList.length < 2;
+    if (row.hidden) return;
+    const ids = accountList.map(a => a.id).join("|");
+    if (sel.dataset.ids !== ids) {
+      sel.dataset.ids = ids;
+      sel.innerHTML = accountList.map(a => `<option value="${esc(a.id)}">${esc(accountName(a))}</option>`).join("");
+    }
+    const cwd = $("fCwd").value.trim().toLowerCase().replace(/[\\/]+$/, "");
+    let best = "";
+    for (const k of Object.keys(projectAccounts))
+      if ((cwd === k || cwd.startsWith(k + "\\") || cwd.startsWith(k + "/")) && k.length > best.length) best = k;
+    sel.value = best ? projectAccounts[best] : accountList.find(a => a.isDefault)?.id || accountList[0].id;
+  }
+
   // Öteki hesapta devam: boştaki oturum kapanır, aynı konuşma o hesapla panelde açılır (konuşma kayıtları ortak).
   const switching = new Set();
   async function switchAccount(s, acc) {
@@ -1332,6 +1352,7 @@
   document.querySelectorAll("#projTabs button").forEach(b => b.addEventListener("click", () => setProjTab(b.dataset.tab)));
   $("dirUp").addEventListener("click", () => openDir(dirView.data?.parent || ""));
   function renderProjects() {
+    syncAccount();
     if (dirView.tab === "browse") { renderDirs(); return; }
     const q = norm($("projSearch").value.trim());
     const sel = $("fCwd").value.trim().toLowerCase();
@@ -1380,6 +1401,7 @@
     if (startingNew) return;
     if (searchPending) { $("newErr").textContent = t("err_pickFolder", $("fCwd").value.trim()); $("projSearch").focus(); return; }
     const body = { cwd: $("fCwd").value.trim(), name: $("fName").value.trim() || null, prompt: $("fPrompt").value.trim(), model: $("fModel").value || null };
+    if (accountList.length > 1 && $("fAccount").value) body.account = $("fAccount").value; // seçilen hesap projenin hesabı olur
     if (REMOTE) where = "panel"; // telefondan terminal penceresi açılamaz
     startingNew = true;
     $("btnStart").disabled = true;

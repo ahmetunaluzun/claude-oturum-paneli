@@ -132,6 +132,21 @@ check "geri al: varsayılan hesaba (200)" "$(post /api/switch-account "{\"key\":
 K3=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K3"
 check "geri alınca değişken kaldırıldı" "$(son_hesap)" "-"
 check "çalışan oturum taşınmaz (busy)" "$(post /api/hosted/$K3/send '{"text":"BEKLE"}' >/dev/null; sleep 0.5; post /api/switch-account "{\"key\":\"$K3\",\"account\":\".claude-is\"}")" 409
+# ---- proje hesabı: yeni oturumda seçilen hesap projeye kaydedilir, hesapsız açılan oturum onu kullanır ----
+check "geri alınca proje kaydı silindi" "$(cat "$T/data/project-accounts.json" 2>/dev/null | grep -c 'proje')" 0
+check "bilinmeyen hesapla yeni oturum 400" "$(post /api/hosted "{\"cwd\":\"$PROJ\",\"prompt\":\"a\",\"account\":\"yok\",\"mode\":\"force\"}")" 400
+check "şirket hesabı seçilerek açıldı" "$(post /api/hosted "{\"cwd\":\"$PROJ\",\"prompt\":\"a\",\"account\":\".claude-is\",\"mode\":\"force\"}")" 200
+K4=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K4"
+check "seçilen hesapla açıldı" "$(son_hesap)" "$(cygpath -w "$I")"
+check "proje şirket hesabına kaydedildi" "$(grep -c '.claude-is' "$T/data/project-accounts.json")" 1
+case "$(curl -s "$B/api/state")" in *'"projectAccounts":{"'*'proje":".claude-is"}'*) check "durumda proje hesabı" 1 1;; *) check "durumda proje hesabı" 0 1;; esac
+check "hesapsız açılan oturum (aynı proje) 200" "$(post /api/hosted "{\"cwd\":\"$PROJ\",\"prompt\":\"b\",\"mode\":\"force\"}")" 200
+K5=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K5"
+check "hesapsız oturum projenin hesabıyla açıldı" "$(son_hesap)" "$(cygpath -w "$I")"
+mkdir -p "$T/baska"; BASKA=$(cygpath -w "$T/baska" | sed 's/\\/\\\\/g')
+check "başka projede hesapsız oturum 200" "$(post /api/hosted "{\"cwd\":\"$BASKA\",\"prompt\":\"c\"}")" 200
+K6=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K6"
+check "başka proje varsayılan hesapta" "$(son_hesap)" "-"
 curl -s -o /dev/null -X POST "$B/api/quit?force=1" -H "X-Panel-Token: $TOK" -H "Origin: $B"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 taskkill //F //PID "$W1" //PID "$W2" >/dev/null 2>&1

@@ -252,6 +252,8 @@ app.MapGet("/api/state", async (SessionStore store, HostedSessions hosted, Tray 
             usage = a.IsDefault ? store.Usage(night.RefreshUsageSoon) : store.Usage(a.Dir, () => night.RefreshUsageSoon(a.Dir))
         }).ToList()
         : null,
+    // Proje başına kayıtlı hesap (yeni oturum penceresinde seçili gelir); tek hesapta null.
+    projectAccounts = Accounts.List().Count > 1 ? ProjectAccounts.All() : null,
     // Oturum klasörü → proje kökü (git kökü; yoksa klasör): "bu projede N oturum açık" ve Takip'te oturumdaki projeler.
     roots = sessions.Select(s => s.Cwd).Concat(hostedList.Select(h => h.Cwd)).Where(c => !string.IsNullOrEmpty(c))
         .Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(c => c, ProjectRoots.Of),
@@ -303,7 +305,9 @@ app.MapPost("/api/sessions", async (HttpContext ctx, ProjectGuard guard) =>
     if (!Authorized(ctx)) return Results.StatusCode(403);
     var req = await ctx.Request.ReadFromJsonAsync<NewSessionRequest>();
     var error = Launcher.Validate(req);
+    if (error is null && req!.Account is { } acc && Accounts.Find(acc) is null) error = "account";
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
+    if (req!.Account is { } chosen) ProjectAccounts.Set(req.Cwd!, chosen);
     // Yinelenen istek (düğmeye art arda basma) ikinci oturumu açmaz (StartOnce.cs).
     // Aynı projede oturum varsa açılmaz (409 + seçenekler); kullanıcı "yine de aç" derse mode=force ile gelir.
     object? conflict = null;
@@ -332,7 +336,10 @@ app.MapPost("/api/hosted", async (HttpContext ctx, HostedSessions hosted, Projec
     var model = string.IsNullOrWhiteSpace(req?.Model) ? null : req.Model;
     var error = HostedSessions.Validate(req?.Cwd, req?.Prompt, model);
     if (error is null && string.IsNullOrWhiteSpace(req!.Prompt) && req.ResumeId is null) error = "prompt";
+    if (error is null && req!.Account is { } acc && Accounts.Find(acc) is null) error = "account";
     if (error is not null) return Results.Json(new { error }, statusCode: 400);
+    // Yeni oturumda seçilen hesap projenin hesabı olur (Accounts.cs, ProjectAccounts.cs).
+    if (req!.Account is { } chosen) ProjectAccounts.Set(req.Cwd!, chosen);
     // Yinelenen istek ilk oturumun anahtarını alır; o oturum kapatıldıysa yeniden başlatılır.
     // Aynı projede başka oturum varsa 409 + seçenekler (FollowEndpoints.StartHosted).
     return FollowEndpoints.StartHosted(req!, model, hosted, guard);
@@ -400,6 +407,7 @@ app.MapPost("/api/switch-account", async (HttpContext ctx, SessionStore store, H
     if (await TerminalSessions.Close(s) is { } err) return Results.Json(new { error = err }, statusCode: 409);
     var (key, _) = StartOnce.Run("hosted", s.Cwd, null, s.SessionId,
         () => hosted.Start(s.Cwd, null, null, s.CustomName, s.SessionId, account: target.Id), k => k is not null && hosted.Has(k));
+    ProjectAccounts.Set(s.Cwd, target.Id); // proje bundan sonra bu hesapla açılır
     RemoteLog.Info($"Terminal oturumu öteki hesaba geçti: {s.SessionId} → {target.Id}");
     return Results.Json(new { key, sessionId = s.SessionId });
 });
@@ -663,7 +671,7 @@ record PathRequest(string? Path);
 record FocusRequest(string? Tab, string? TabId);
 record SendRequest(string? Text);
 public record SwitchAccountRequest(int? Pid, string? Key, string? Account);
-public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null);
+public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null, string? Account = null);
 public record DirsRequest(string? Path, string? Q = null);
 public record DirEntry(string Name, string Path, bool Known);
 public record WrapRequest(bool Close);
