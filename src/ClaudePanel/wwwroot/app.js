@@ -118,6 +118,7 @@
   let firstLoad = true;
   let trayNotify = false;
   let view = "sessions";
+  let accountList = []; // /api/state accounts (birden çok Claude hesabı varsa): kart rozeti ve kota halkaları
 
   function normalize(st) {
     // Proje kökü (git kökü; yoksa klasör) sunucudan gelir: aynı projedeki oturumları eşlemek için. root küçük harf anahtardır.
@@ -134,7 +135,7 @@
     const term = (st.sessions || []).filter(s => !hostedIds.has(s.sessionId)).map(s => ({
       id: s.sessionId, kind: s.kind === "interactive" ? "terminal" : "bg", sessionId: s.sessionId, pid: s.pid,
       name: s.customName || folderName(s.cwd) || s.name, cwd: s.cwd, status: s.status,
-      surface: surfaceOf(s.entrypoint), waiting: s.status === "waiting" ? (s.waitingFor || "") : null,
+      surface: surfaceOf(s.entrypoint), waiting: s.status === "waiting" ? (s.waitingFor || "") : null, account: s.account || null,
       desk: st.desktops?.[s.pid] || null,
       lane: s.status === "idle" || s.status === "waiting" ? "idle" : "busy", since: s.statusSince, started: s.startedAt,
       stats: st.stats?.[s.sessionId]
@@ -162,6 +163,7 @@
       items = next;
       rememberFolders(items.map(s => s.cwd));
       render();
+      accountList = st.accounts || [];
       renderUsage(st.usage, st.accounts);
       renderNightPill(st.night);
       B.paintFoot(items, st);
@@ -358,7 +360,8 @@
     if (s.kind === "bg") return t("bg");
     const where = s.surface === "desktop" ? t("desktopApp") : s.surface === "vscode" ? "VS Code"
       : settings.tabMap[s.sessionId] ? t("tabLabel", settings.tabMap[s.sessionId]) : t("terminal");
-    return s.desk ? `${where} · ${s.desk.name || t("deskN", s.desk.number)}` : where;
+    const acct = s.account && accountList.length > 1 ? accountList.find(a => a.id === s.account) : null;
+    return [where, s.desk ? s.desk.name || t("deskN", s.desk.number) : "", acct ? accountName(acct) : ""].filter(Boolean).join(" · ");
   }
 
   // "Bu projede N oturum açık" rozeti: aynı projedeki oturumlardan birini kaydedip kapatma / panele alma kısayolu.

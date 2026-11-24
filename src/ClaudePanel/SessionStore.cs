@@ -3,7 +3,11 @@ using System.Text.Json;
 
 namespace ClaudePanel;
 
-/// <summary>Claude Code'un ~/.claude/sessions/*.json dosyalarından canlı oturumları okur.</summary>
+/// <summary>
+/// Claude Code'un &lt;hesap klasörü&gt;/sessions/*.json dosyalarından canlı oturumları okur. Birden çok hesap varsa
+/// (Accounts.cs) her hesabın sessions klasörü ayrı okunur ve oturum o hesapla etiketlenir. Ek hesabın sessions klasörü
+/// varsayılanınkine bağlantıysa (junction) oturumlar ayırt edilemez: o klasör ikinci kez okunmaz, hesap bilinmez.
+/// </summary>
 public sealed class SessionStore(ILogger<SessionStore> log)
 {
     static readonly string ClaudeDir = Quota.ClaudeDir;
@@ -13,9 +17,27 @@ public sealed class SessionStore(ILogger<SessionStore> log)
     public IReadOnlyList<SessionInfo> List()
     {
         var result = new List<SessionInfo>();
-        if (!Directory.Exists(SessionsDir)) return result;
+        var accounts = Accounts.List();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in accounts)
+        {
+            var dir = a.IsDefault ? SessionsDir : Path.Combine(a.Dir, "sessions");
+            if (!Directory.Exists(dir) || !seen.Add(RealPath(dir))) continue;
+            Read(dir, accounts.Count > 1 ? a.Id : null, result);
+        }
+        return result.OrderBy(s => s.StartedAt).ToList();
+    }
 
-        foreach (var file in Directory.EnumerateFiles(SessionsDir, "*.json"))
+    /// <summary>Bağlantı (junction/symlink) ise hedefi; değilse kendisi.</summary>
+    static string RealPath(string dir)
+    {
+        try { return new DirectoryInfo(dir).ResolveLinkTarget(true)?.FullName ?? Path.GetFullPath(dir); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Path.GetFullPath(dir); }
+    }
+
+    void Read(string dir, string? account, List<SessionInfo> result)
+    {
+        foreach (var file in Directory.EnumerateFiles(dir, "*.json"))
         {
             try
             {
@@ -26,7 +48,7 @@ public sealed class SessionStore(ILogger<SessionStore> log)
                     raw.Cwd ?? "", raw.Kind ?? "interactive", raw.Status ?? "unknown",
                     raw.StartedAt, raw.StatusUpdatedAt ?? raw.UpdatedAt ?? raw.StartedAt,
                     raw.Version ?? "", raw.NameSource == "derived" ? null : raw.Name,
-                    raw.Entrypoint, raw.Status == "waiting" ? raw.WaitingFor ?? "" : null));
+                    raw.Entrypoint, raw.Status == "waiting" ? raw.WaitingFor ?? "" : null, account));
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
@@ -34,7 +56,6 @@ public sealed class SessionStore(ILogger<SessionStore> log)
                 log.LogDebug("Oturum dosyası okunamadı {File}: {Msg}", file, ex.Message);
             }
         }
-        return result.OrderBy(s => s.StartedAt).ToList();
     }
 
     /// <summary>PID hâlâ aynı süreç mi (PID yeniden kullanımına karşı başlangıç zamanıyla doğrular).</summary>
@@ -108,4 +129,4 @@ public sealed class SessionStore(ILogger<SessionStore> log)
 public sealed record SessionInfo(
     int Pid, string SessionId, string Name, string Cwd, string Kind, string Status,
     long StartedAt, long StatusSince, string Version, string? CustomName,
-    string? Entrypoint = null, string? WaitingFor = null);
+    string? Entrypoint = null, string? WaitingFor = null, string? Account = null);

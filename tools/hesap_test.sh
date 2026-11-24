@@ -45,8 +45,18 @@ cache "$I" 30 5
 line=$(echo '{}' | CLAUDE_PANEL_CLAUDE_DIR="$P" CLAUDE_CONFIG_DIR="$I" "$EXE" --statusline --lang tr)
 case "$line" in *"5sa: %90 kaldı"*) check "test klasörü CLAUDE_CONFIG_DIR'den önce gelir" 1 1;; *) check "test klasörü önceliği ($line)" 0 1;; esac
 
-# ---- panel: /api/state hesap listesi ----
+# ---- panel: /api/state hesap listesi + oturumun hesabı ----
 export CLAUDE_PANEL_CLAUDE_DIR="$P"
+# Her hesapta bir canlı oturum: yer tutucu süreç + kendi hesabının sessions klasöründe dosya (codex_ui_test.sh deseni)
+oturum() { # $1 sessions klasörü, $2 oturum kimliği → canlı yer tutucu sürecin Windows pid'i
+  py -3.13 -c "import time; time.sleep(300)  # $T" >/dev/null 2>&1 &
+  sleep 0.3; local w; w=$(cat /proc/$!/winpid)
+  local ft; ft=$(pwsh -NoProfile -c "(Get-Process -Id $w).StartTime.ToFileTimeUtc()" | tr -d '\r')
+  printf '{"pid":%s,"sessionId":"%s","cwd":"C:\\\\p","startedAt":%s000,"procStart":"%s","kind":"interactive","status":"idle"}' "$w" "$2" "$now" "$ft" > "$1/$w.json"
+  echo "$w"
+}
+mkdir -p "$I/sessions"
+W1=$(oturum "$P/sessions" kisisel-oturum); W2=$(oturum "$I/sessions" sirket-oturum)
 PORT=$(pwsh -NoProfile -c '$l=[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback,0);$l.Start();$l.LocalEndpoint.Port;$l.Stop()')
 CLAUDE_PANEL_PORT=$PORT "$EXE" --no-window >/dev/null 2>&1 &
 PID=$!
@@ -62,13 +72,24 @@ for x in a:
     u = x.get('usage') or {}
     print(x['id'], x.get('label'), x.get('isDefault'), (u.get('five_hour') or {}).get('used'), (u.get('seven_day') or {}).get('used'))
 print('EPOSTA' if 'kisi@ornek.com' in open(sys.argv[1], encoding='utf-8').read() else 'temiz')
+print(' '.join(sorted(f"{x['sessionId']}={x.get('account')}" for x in s.get('sessions') or [])))
 PY
 cat "$T/acc.txt" | sed 's/^/  /'
 check "iki hesap (giriş yapılmamış klasör sayılmaz)" "$(sed -n 1p "$T/acc.txt")" 2
 check "varsayılan hesap: ad yok (kişisel), kota 10/99" "$(sed -n 2p "$T/acc.txt")" ".claude None True 10 99"
 check "ek hesap: kuruluş adı, kota 30/5" "$(sed -n 3p "$T/acc.txt")" ".claude-is Örnek Şirket A.Ş. False 30 5"
 check "kişisel kuruluş adındaki e-posta arayüze gitmez" "$(sed -n 4p "$T/acc.txt")" "temiz"
+check "oturum kendi hesabıyla etiketli" "$(sed -n 5p "$T/acc.txt")" "kisisel-oturum=.claude sirket-oturum=.claude-is"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
+# ek hesabın sessions klasörü varsayılana bağlantıysa: oturum bir kez listelenir, hesap varsayılan sayılır
+mv "$I/sessions" "$T/eski-sessions"
+cmd //c mklink //J "$(cygpath -w "$I/sessions")" "$(cygpath -w "$P/sessions")" >/dev/null
+CLAUDE_PANEL_PORT=$PORT "$EXE" --no-window >/dev/null 2>&1 &
+PID=$!
+for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$PORT/api/state" && break; sleep 0.2; done
+check "bağlantılı sessions: kişisel oturum bir kez" "$(curl -s "http://127.0.0.1:$PORT/api/state" | grep -o '"sessionId":"kisisel-oturum"' | wc -l)" 1
+kill $PID 2>/dev/null; wait $PID 2>/dev/null
+cmd //c rmdir "$(cygpath -w "$I/sessions")"
 # tek hesapta accounts null kalır
 rm -f "$I/.credentials.json"
 CLAUDE_PANEL_PORT=$PORT "$EXE" --no-window >/dev/null 2>&1 &
@@ -76,6 +97,7 @@ PID=$!
 for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$PORT/api/state" && break; sleep 0.2; done
 case "$(curl -s "http://127.0.0.1:$PORT/api/state")" in *'"accounts":null'*) check "tek hesapta accounts null" 1 1;; *) check "tek hesapta accounts null" 0 1;; esac
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
+taskkill //F //PID "$W1" //PID "$W2" >/dev/null 2>&1
 sleep 0.5
 rm -rf "$T"
 [ $fail = 0 ] && echo "TÜMÜ GEÇTİ" || echo "HATA VAR"
