@@ -167,6 +167,7 @@
       accountList = st.accounts || [];
       projectAccounts = st.projectAccounts || {};
       renderUsage(st.usage, st.accounts);
+      renderQuotaHint();
       renderNightPill(st.night);
       B.paintFoot(items, st);
       refreshDrawerHeader();
@@ -602,6 +603,60 @@
     if (accountList.length < 2 || !s?.account) return [];
     return accountList.filter(a => a.id !== s.account).map(a => ({ id: a.id, name: accountName(a) }));
   }
+  // Kota önerisi: bir hesapta (5 saatlik ya da haftalık) kota QUOTA_LOW altına düşünce ve öteki hesapta en az
+  // QUOTA_ROOM kalmışsa, düşük hesaptaki boştaki oturumları o hesaba geçirmeyi önerir. Kendiliğinden taşımaz;
+  // "Şimdi değil" o hesap çifti için öneriyi kota bir sonraki eşiğe (5 puan) inene kadar susturur.
+  const QUOTA_LOW = 15, QUOTA_ROOM = 30;
+  const quotaMuted = new Map(); // "düşük>hedef" → susturulduğu andaki kalan
+  function acctLeft(a) {
+    const w = [a.usage?.five_hour, a.usage?.seven_day].filter(x => x && x.used != null).map(x => 100 - x.used);
+    return w.length ? Math.max(0, Math.min(...w)) : null;
+  }
+  function quotaSuggestion() {
+    if (accountList.length < 2) return null;
+    const rated = accountList.map(a => ({ a, left: acctLeft(a) })).filter(x => x.left != null);
+    for (const low of rated.filter(x => x.left < QUOTA_LOW).sort((x, y) => x.left - y.left)) {
+      const to = rated.filter(x => x !== low && x.left >= QUOTA_ROOM).sort((x, y) => y.left - x.left)[0];
+      if (!to) continue;
+      const movable = items.filter(s => s.account === low.a.id && s.lane === "idle" && (s.kind === "panel" ? s.key : s.pid));
+      if (!movable.length) continue;
+      const key = low.a.id + ">" + to.a.id, muted = quotaMuted.get(key);
+      if (muted != null && low.left > muted - 5) continue;
+      return { low, to, movable, key };
+    }
+    return null;
+  }
+  let quotaHint = null;
+  function renderQuotaHint() {
+    quotaHint = quotaSuggestion();
+    $("quotaHint").hidden = !quotaHint;
+    if (!quotaHint) return;
+    const { low, to, movable } = quotaHint;
+    $("quotaHintText").textContent = t("quotaHint", accountName(low.a), Math.round(low.left), movable.length, accountName(to.a), Math.round(to.left));
+    $("btnQuotaMove").textContent = t("quotaMove", accountName(to.a));
+  }
+  $("btnQuotaLater").addEventListener("click", () => {
+    if (quotaHint) quotaMuted.set(quotaHint.key, quotaHint.low.left);
+    renderQuotaHint();
+  });
+  $("btnQuotaMove").addEventListener("click", async () => {
+    const h = quotaHint;
+    if (!h) return;
+    $("btnQuotaMove").disabled = true;
+    let moved = 0;
+    try {
+      for (const s of h.movable) {
+        let r;
+        try { r = await api("/api/switch-account", s.kind === "panel" ? { key: s.key, account: h.to.a.id } : { pid: s.pid, account: h.to.a.id }); }
+        catch { r = { ok: false }; }
+        if (r.ok) moved++;
+      }
+    } finally { $("btnQuotaMove").disabled = false; }
+    toast(t("quotaMoved", moved, h.movable.length, accountName(h.to.a)), moved === h.movable.length ? undefined : "warn");
+    quotaMuted.set(h.key, h.low.left);
+    renderQuotaHint();
+  });
+
   // Yeni oturum penceresi: birden çok hesap varsa hesap seçimi; seçili klasörün projesine kayıtlı hesap gelir
   // (kayıt anahtarı proje kökü: klasör o kökün altındaysa en uzun eşleşen kök).
   function syncAccount() {

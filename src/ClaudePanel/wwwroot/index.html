@@ -42,6 +42,12 @@
 
   <main>
     <div class="view" id="viewSessions">
+      <!-- Kota önerisi (birden çok hesap): bir hesapta kota azalınca boştaki oturumları öteki hesaba geçirme -->
+      <div class="recent-bar quota-hint" id="quotaHint" hidden>
+        <b id="quotaHintText"></b>
+        <button type="button" class="btn small primary" id="btnQuotaMove"></button>
+        <button type="button" class="btn small" id="btnQuotaLater" data-i18n="quotaLater"></button>
+      </div>
       <p class="filter-note" id="filterNote" hidden><span id="filterText"></span> <button type="button" class="btn small" id="filterClear" data-i18n="clearSearch"></button></p>
       <section class="lane" data-lane="idle">
         <h2><span class="dot idle"></span><span data-i18n="laneIdle"></span><span class="count" id="countIdle">0</span>

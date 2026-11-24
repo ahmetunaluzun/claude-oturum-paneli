@@ -82,5 +82,31 @@ check("yeni oturum: alt klasör de projenin hesabında", (await pickAcct(process
 check("yeni oturum: başka klasör kişisel hesapta", (await pickAcct(process.env.HESAP_BASKA)).picked, "Kişisel");
 const s3 = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(`${out}_yeni_oturum.png`, Buffer.from(s3.result.data, "base64"));
+// Kota önerisi: kişisel hesapta boşta oturum yokken şerit yok; oturum gelince görünür, "Şimdi değil" susturur
+await ev(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"})); location.reload()`);
+await sleep(3500);
+const hint = () => ev(`(() => { const h = document.getElementById("quotaHint"), b = h.getBoundingClientRect();
+  const btn = document.getElementById("btnQuotaMove"), r = btn.getBoundingClientRect();
+  return { shown: !h.hidden && b.height > 0, text: document.getElementById("quotaHintText").textContent, move: btn.textContent,
+    btnOnTop: !h.hidden && btn.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)),
+    overflow: h.scrollWidth > h.clientWidth + 1 }; })()`);
+check("kota önerisi: kişisel hesapta oturum yokken görünmez", (await hint()).shown, false);
+writeFileSync(process.env.HESAP_KISISEL_PATH, process.env.HESAP_KISISEL_JSON);
+let hs;
+for (let i = 0; i < 20; i++) { await sleep(500); hs = await hint(); if (hs.shown) break; }
+check("kota önerisi: görünür, düğme tıklanabilir, taşmıyor", [hs.shown, hs.btnOnTop, hs.overflow], [true, true, false]);
+check("kota önerisi metni", hs.text, "Kişisel hesabında %1 kota kaldı. Boştaki 1 oturum Örnek Şirket A.Ş. hesabına geçirilebilir (orada %92 var); konuşmalar kaybolmaz.");
+check("kota önerisi düğmesi", hs.move, "Örnek Şirket A.Ş. hesabına geçir");
+for (const [w, h, mob, n] of [[1500, 900, false, "genis"], [390, 844, true, "telefon"]]) {
+  await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: mob });
+  await sleep(700);
+  const m = await hint();
+  check(`kota önerisi ${n}: düğme görünür, taşma yok`, [m.btnOnTop, m.overflow], [true, false]);
+  const s4 = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: w, height: mob ? 500 : 300, scale: 1 } });
+  writeFileSync(`${out}_kota_onerisi_${n}.png`, Buffer.from(s4.result.data, "base64"));
+}
+await ev(`document.getElementById("btnQuotaLater").click()`);
+await sleep(2500);
+check("Şimdi değil: öneri susar (durum yenilense de)", (await hint()).shown, false);
 ws.close();
 process.exit(fail);

@@ -38,6 +38,15 @@ printf '{"pid":%s,"sessionId":"6f0c2a10-0000-4000-8000-00000000a001","cwd":"%s",
 # Muhasebe Projesi şirket hesabına kayıtlı (ProjectAccounts.cs): yeni oturum penceresinde şirket hesabı seçili gelmeli
 printf '{"%s":"claude-is"}' "${CWD,,}" > "$T/data/project-accounts.json"
 export HESAP_PROJ="$(cygpath -w "$T/p/Muhasebe Projesi")" HESAP_BASKA="$(cygpath -w "$T/p")"
+# Kota önerisi: kişisel hesapta (haftalık %1) boştaki bir oturum, testin ortasında mjs yazar (önce öneri görünmemeli)
+mkdir -p "$T/p/Kisisel Proje"
+py -3.13 -c "import time; time.sleep(900)  # $TW kisisel" >/dev/null 2>&1 &
+sleep 0.3; WPID2=$(cat /proc/$!/winpid)
+FT2=$(pwsh -NoProfile -c "(Get-Process -Id $WPID2).StartTime.ToFileTimeUtc()" | tr -d '\r')
+CWD2=$(cygpath -w "$T/p/Kisisel Proje" | sed 's/\\/\\\\/g')
+export HESAP_KISISEL_PATH="$(cygpath -w "$T/claude/sessions/$WPID2.json")"
+export HESAP_KISISEL_JSON="$(printf '{"pid":%s,"sessionId":"6f0c2a10-0000-4000-8000-00000000a002","cwd":"%s","startedAt":%s000,"procStart":"%s","version":"2.1.331","kind":"interactive","entrypoint":"cli","status":"idle","statusUpdatedAt":%s000}' \
+  "$WPID2" "$CWD2" "$((now-900))" "$FT2" "$((now-300))")"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CODEX_HOME="$TW\\codex" \
