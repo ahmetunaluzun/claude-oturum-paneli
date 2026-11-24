@@ -33,7 +33,7 @@ public static class QuotaCli
         try { ev = JsonNode.Parse(Console.In.ReadToEnd()); }
         catch (System.Text.Json.JsonException) { }
         SaveContextWindow(ev);
-        Write(Console.OpenStandardOutput(), StatusLine(Quota.Read(fetch: true), ev, Quota.Plan(), Turkish(args)) + "\n");
+        Write(Console.OpenStandardOutput(), StatusLine(Quota.Read(Quota.CurrentDir, fetch: true), ev, Quota.Plan(Quota.CurrentDir), Turkish(args)) + "\n");
         return 0;
     }
 
@@ -160,7 +160,7 @@ public static class QuotaCli
         JsonNode? ev;
         try { ev = JsonNode.Parse(Console.In.ReadToEnd()); }
         catch (System.Text.Json.JsonException) { return 0; }
-        var q = Quota.Read(fetch: true);
+        var q = Quota.Read(Quota.CurrentDir, fetch: true);
         if (q?.Five.Left is not { } left || left > GuardThreshold) return 0; // okunamıyorsa engelleme
         if (Allowed(Str(ev?["tool_name"]) ?? "", ev?["tool_input"])) return 0;
         var tr = Turkish(args);

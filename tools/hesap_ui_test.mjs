@@ -1,0 +1,61 @@
+// İki hesaplı kota görünümü (Accounts.cs): üst çubukta her hesap adıyla iki halka; geniş, dar ve telefon ekranında
+// görünür mü, taşma var mı, koyu/açık temada. Kullanım: node hesap_ui_test.mjs <debugPort> <url> <çıktı öneki>
+import { writeFileSync } from "node:fs";
+const [port, url, out] = process.argv.slice(2);
+const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+const page = targets.find(t => t.type === "page");
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+let id = 0; const wait = new Map();
+ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && wait.has(d.id)) { wait.get(d.id)(d); wait.delete(d.id); } };
+await new Promise(r => ws.onopen = r);
+const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const ev = async (expr) => (await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value;
+let fail = 0;
+const check = (name, got, want) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  console.log(`${ok ? "GEÇTİ" : "KALDI"}  ${name}${ok ? "" : ` (beklenen ${JSON.stringify(want)}, gelen ${JSON.stringify(got)})`}`);
+  if (!ok) fail = 1;
+};
+// Her halka ekranda ve üstünde başka öğe yok mu (elementFromPoint), üst çubuk yatay taşıyor mu
+const measure = `(() => {
+  const box = document.getElementById("usage");
+  const names = [...box.querySelectorAll(".acct-name")].map(e => e.textContent);
+  const rings = [...box.querySelectorAll(".ring")];
+  const visible = rings.filter(r => { const b = r.getBoundingClientRect(); if (!b.width) return false;
+    const x = b.left + Math.min(14, b.width / 2), y = b.top + b.height / 2;
+    return x >= 0 && x <= innerWidth && r.contains(document.elementFromPoint(x, y)); }).length;
+  const top = document.querySelector(".top");
+  const clipped = [...box.querySelectorAll(".acct-name, .ring b")].filter(e => e.scrollWidth > e.clientWidth + 1).length;
+  return { multi: box.classList.contains("multi"), names, rings: rings.length, visible,
+    overflow: top.scrollWidth > top.clientWidth + 1, clipped, crit: box.querySelectorAll(".ring.crit").length,
+    title: rings[0]?.title || "" };
+})()`;
+async function shot(w, h, mobile, name) {
+  await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile });
+  await sleep(900);
+  const m = await ev(measure);
+  const s = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: w, height: mobile ? 260 : 120, scale: 1 } });
+  writeFileSync(`${out}_${name}.png`, Buffer.from(s.result.data, "base64"));
+  return m;
+}
+await send("Emulation.setDeviceMetricsOverride", { width: 1500, height: 900, deviceScaleFactor: 1, mobile: false });
+await send("Page.navigate", { url });
+await sleep(3500);
+for (const light of [false, true]) {
+  await ev(`localStorage.setItem("panel.settings", JSON.stringify(Object.assign(JSON.parse(localStorage.getItem("panel.settings")||"{}"), {light:${light}, lang:"tr"}))); location.reload()`);
+  await sleep(3500);
+  const theme = light ? "acik" : "koyu";
+  for (const [w, h, mob, n] of [[1500, 900, false, "genis"], [1100, 900, false, "dar"], [390, 844, true, "telefon"]]) {
+    const m = await shot(w, h, mob, `${theme}_${n}`);
+    check(`${theme} ${n}: iki hesap adıyla`, [m.multi, m.names], [true, ["Kişisel", "Örnek Şirket A.Ş."]]);
+    check(`${theme} ${n}: 4 halka, hepsi görünür`, [m.rings, m.visible], [4, 4]);
+    check(`${theme} ${n}: üst çubuk taşmıyor, metin kesilmiyor`, [m.overflow, m.clipped], [false, 0]);
+    if (n === "genis") {
+      check(`${theme}: kişisel haftalık %1 kırmızı`, m.crit, 1);
+      check(`${theme}: halkanın üstünde yenilenme saati`, m.title.includes("Yenilenme:"), true);
+    }
+  }
+}
+ws.close();
+process.exit(fail);

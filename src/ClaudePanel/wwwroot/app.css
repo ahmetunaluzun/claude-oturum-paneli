@@ -70,6 +70,20 @@ h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
 .ring.crit .fg { stroke: var(--danger); }
 .ring b { display: block; font-weight: 600; }
 .ring small { color: var(--muted); }
+/* Birden çok hesap: hesap adı üstte, iki küçük halka altında; gruplar ince çizgiyle ayrılır */
+.usage.multi { gap: 14px; align-items: stretch; }
+.acct { display: flex; flex-direction: column; gap: 3px; }
+.acct + .acct { padding-left: 14px; border-left: 1px solid var(--line); }
+.acct-name { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-rings { display: flex; gap: 12px; }
+.usage.multi .ring svg { width: 28px; height: 28px; }
+.usage.multi .ring { font-size: 11.5px; gap: 6px; }
+@media (max-width: 640px) {
+  .usage.multi { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .usage.multi .acct + .acct { padding-left: 10px; }
+  .usage.multi .acct-rings { gap: 8px; }
+  .usage.multi .ring svg { width: 24px; height: 24px; }
+}
 
 /* Düğmeler */
 .btn {

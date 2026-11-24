@@ -57,9 +57,12 @@ public sealed class SessionStore(ILogger<SessionStore> log)
 
     /// <summary>Statusline'ın yazdığı kota önbelleği (varsa). Yoksa null.</summary>
     /// <param name="refresh">Önbellek 5 dakikadan eskiyse çağrılır (yenileme arka planda yapılır).</param>
-    public JsonElement? Usage(Action? refresh = null)
+    public JsonElement? Usage(Action? refresh = null) => Usage(ClaudeDir, refresh);
+
+    /// <summary>Verilen hesap klasörünün kota önbelleği (Accounts.cs).</summary>
+    public JsonElement? Usage(string dir, Action? refresh)
     {
-        var path = Path.Combine(ClaudeDir, "usage-cache.json");
+        var path = Path.Combine(dir, "usage-cache.json");
         if (!File.Exists(path)) { refresh?.Invoke(); return null; }
         try
         {

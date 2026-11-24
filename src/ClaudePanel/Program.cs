@@ -244,6 +244,14 @@ app.MapGet("/api/state", async (SessionStore store, HostedSessions hosted, Tray 
     desktops = desktops.ToDictionary(d => d.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), d => d.Value),
     stats = SessionStatsOf(sessions, hostedList, transcripts, windows),
     usage = store.Usage(night.RefreshUsageSoon),
+    // Birden çok Claude hesabı varsa (Accounts.cs) her birinin kotası; tek hesapta null (arayüz eski görünümde kalır).
+    accounts = Accounts.List() is { Count: > 1 } accts
+        ? accts.Select(a => new
+        {
+            id = a.Id, label = a.Label, isDefault = a.IsDefault,
+            usage = a.IsDefault ? store.Usage(night.RefreshUsageSoon) : store.Usage(a.Dir, () => night.RefreshUsageSoon(a.Dir))
+        }).ToList()
+        : null,
     // Oturum klasörü → proje kökü (git kökü; yoksa klasör): "bu projede N oturum açık" ve Takip'te oturumdaki projeler.
     roots = sessions.Select(s => s.Cwd).Concat(hostedList.Select(h => h.Cwd)).Where(c => !string.IsNullOrEmpty(c))
         .Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(c => c, ProjectRoots.Of),

@@ -162,7 +162,7 @@
       items = next;
       rememberFolders(items.map(s => s.cwd));
       render();
-      renderUsage(st.usage);
+      renderUsage(st.usage, st.accounts);
       renderNightPill(st.night);
       B.paintFoot(items, st);
       refreshDrawerHeader();
@@ -483,8 +483,22 @@
     const when = d.toLocaleString(settings.lang, sameDay ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
     return `<small class="pace warn" title="${esc(t("paceHint"))}">${esc(t("paceEnds", when))}</small>`;
   }
-  function renderUsage(u) {
+  // Birden çok Claude hesabı (Accounts.cs): her hesap kendi adıyla iki halka. Yer dar olduğu için halka kısa yazılır
+  // (kalan + pencere + yenilenmeye kalan süre); yenilenme saati ve hız tahmini üzerine gelince görünür.
+  function accountName(a) { return a.label || (a.isDefault ? t("acctPersonal") : a.id.replace(/^\.claude-?/, "") || a.id); }
+  function renderUsage(u, accounts) {
     const box = $("usage");
+    if (accounts?.length > 1) {
+      const groups = accounts.filter(a => a.usage && (a.usage.five_hour || a.usage.seven_day));
+      if (!groups.length) { box.hidden = true; return; }
+      box.hidden = false;
+      box.classList.add("multi");
+      box.innerHTML = groups.map(a => `<div class="acct" data-acct="${esc(a.id)}"><span class="acct-name">${esc(accountName(a))}</span>
+        <div class="acct-rings">${miniRing(t("fiveHour"), a.usage.five_hour, WINDOW_MS.five_hour)}${miniRing(t("week"), a.usage.seven_day, WINDOW_MS.seven_day)}</div></div>`).join("");
+      box.querySelectorAll(".ring").forEach(r => r.querySelector(".fg").style.strokeDasharray = `${r.dataset.p} 100`);
+      return;
+    }
+    box.classList.remove("multi");
     if (!u || (!u.five_hour && !u.seven_day)) { box.hidden = true; return; }
     box.hidden = false;
     const ring = (label, w, len) => {
@@ -502,6 +516,19 @@
     };
     box.innerHTML = ring(t("fiveHour"), u.five_hour, WINDOW_MS.five_hour) + ring(t("week"), u.seven_day, WINDOW_MS.seven_day);
     box.querySelectorAll(".ring").forEach(r => r.querySelector(".fg").style.strokeDasharray = `${r.dataset.p} 100`);
+  }
+  function miniRing(label, w, len) {
+    if (!w || w.used == null) return "";
+    const left = Math.max(0, Math.min(100, 100 - w.used));
+    const level = left < 15 ? "crit" : left < 40 ? "warn" : "ok";
+    const at = w.resetsAt ? new Date(w.resetsAt) : null;
+    const valid = at && !isNaN(at), past = valid && at.getTime() <= Date.now();
+    const when = valid ? at.toLocaleString(settings.lang, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    const paceText = valid && !past ? (pace(w, len, at).replace(/<[^>]+>/g, "")) : "";
+    const title = [t("left", Math.round(left)), when ? t(past ? "resetDone" : "resetAt", when) : "",
+      valid && !past ? resetIn(at.getTime()) : "", paceText].filter(Boolean).join(" · ");
+    return `<div class="ring ${level}" data-p="${left}" title="${esc(title)}"><svg viewBox="0 0 36 36"><circle class="bgc" cx="18" cy="18" r="15.9"/><circle class="fg" cx="18" cy="18" r="15.9" pathLength="100"/></svg>
+      <div><b>${t("pct", Math.round(left))}</b><small>${label}</small></div></div>`;
   }
 
   // ---- Eylemler ----

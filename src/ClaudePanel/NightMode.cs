@@ -60,6 +60,17 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
         Task.Run(() => { try { ReadUsage(); } finally { Volatile.Write(ref _usageRefreshing, 0); } });
     }
 
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> _otherUsageChecked = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Ek hesabın (Accounts.cs) kota önbelleği eskiyse arka planda yeniler; hesap başına dakikada en çok bir kez.</summary>
+    public void RefreshUsageSoon(string dir)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (_otherUsageChecked.TryGetValue(dir, out var at) && now - at < TimeSpan.FromMinutes(1)) return;
+        _otherUsageChecked[dir] = now;
+        Task.Run(() => Quota.Read(dir, fetch: true, msg => log.LogDebug("{Msg}", msg)));
+    }
+
     public NightSettings Settings { get { lock (_lock) return _settings; } }
 
     /// <summary>/api/state için hafif özet (her 2,5 sn'de okunur; olay dosyasına dokunmaz).</summary>

@@ -25,7 +25,22 @@ public static class Quota
     public static readonly string ClaudeDir = Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_DIR") is { Length: > 0 } d ? d
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
     public static readonly string CacheFile = Path.Combine(ClaudeDir, "usage-cache.json");
-    static readonly string FailFile = Path.Combine(Handoff.DataDir, "usage-fetch-failed");
+
+    /// <summary>
+    /// Bu sürecin hesabı: claude'un çağırdığı --statusline / --quota-guard, oturumun CLAUDE_CONFIG_DIR'ini miras alır
+    /// (ek hesapta o hesabın kotası gösterilir). Test klasörü verilmişse o kazanır.
+    /// </summary>
+    public static string CurrentDir =>
+        Environment.GetEnvironmentVariable("CLAUDE_PANEL_CLAUDE_DIR") is not { Length: > 0 }
+        && Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is { Length: > 0 } c ? c : ClaudeDir;
+
+    static string Trim(string dir) => Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    static bool IsDefault(string dir) => string.Equals(Trim(dir), Trim(ClaudeDir), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Başarısız yenileme işareti hesap başına (bir hesabın token hatası ötekini 3 dk bekletmesin).</summary>
+    static string FailFileOf(string dir) => Path.Combine(Handoff.DataDir,
+        IsDefault(dir) ? "usage-fetch-failed" : "usage-fetch-failed-" + Path.GetFileName(Trim(dir)));
     const int StaleAfterSec = 300;
     static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(3);
     static readonly object FetchLock = new();
@@ -35,16 +50,22 @@ public static class Quota
         root?["_cached_at"] is JsonValue v && v.TryGetValue<double>(out var at) ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() - at : null;
 
     /// <summary>Kota; okunamıyorsa null. <paramref name="fetch"/> false ise yalnız önbellek okunur.</summary>
-    public static QuotaInfo? Read(bool fetch = true, Action<string>? log = null)
+    public static QuotaInfo? Read(bool fetch = true, Action<string>? log = null) => Read(ClaudeDir, fetch, log);
+
+    /// <summary>Verilen hesap klasörünün kotası (Accounts.cs); okunamıyorsa null.</summary>
+    public static QuotaInfo? Read(string dir, bool fetch = true, Action<string>? log = null)
     {
-        var root = ReadCache();
-        if (fetch && (CacheAge(root) is not { } age || age > StaleAfterSec)) root = Fetch(log) ?? root;
+        var root = ReadCache(dir);
+        if (fetch && (CacheAge(root) is not { } age || age > StaleAfterSec)) root = Fetch(dir, log) ?? root;
         return root is null ? null : Parse(root);
     }
 
-    public static JsonNode? ReadCache()
+    public static JsonNode? ReadCache() => ReadCache(ClaudeDir);
+
+    public static JsonNode? ReadCache(string dir)
     {
-        try { return File.Exists(CacheFile) ? JsonNode.Parse(File.ReadAllText(CacheFile)) : null; }
+        var file = Path.Combine(dir, "usage-cache.json");
+        try { return File.Exists(file) ? JsonNode.Parse(File.ReadAllText(file)) : null; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return null; }
     }
 
@@ -61,17 +82,19 @@ public static class Quota
     }
 
     /// <summary>API'den çeker, önbelleğe yazar. Son başarısız denemeden bu yana 3 dakika geçmediyse denemez.</summary>
-    static JsonNode? Fetch(Action<string>? log)
+    static JsonNode? Fetch(string dir, Action<string>? log)
     {
+        var cacheFile = Path.Combine(dir, "usage-cache.json");
+        var failFile = FailFileOf(dir);
         lock (FetchLock)
         {
             try
             {
-                if (File.Exists(FailFile) && DateTime.UtcNow - File.GetLastWriteTimeUtc(FailFile) < RetryAfter) return null;
+                if (File.Exists(failFile) && DateTime.UtcNow - File.GetLastWriteTimeUtc(failFile) < RetryAfter) return null;
                 // Başka süreç az önce yenilediyse onu kullan
-                if (ReadCache() is { } fresh && CacheAge(fresh) is { } a && a <= StaleAfterSec) return fresh;
-                var token = AccessToken();
-                if (string.IsNullOrEmpty(token)) { MarkFailed(); log?.Invoke("Kota: token bulunamadı"); return null; }
+                if (ReadCache(dir) is { } fresh && CacheAge(fresh) is { } a && a <= StaleAfterSec) return fresh;
+                var token = AccessToken(dir);
+                if (string.IsNullOrEmpty(token)) { MarkFailed(failFile); log?.Invoke("Kota: token bulunamadı"); return null; }
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
                 using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.anthropic.com/api/oauth/usage");
                 req.Headers.Authorization = new("Bearer", token);
@@ -79,53 +102,56 @@ public static class Quota
                 using var resp = http.Send(req);
                 if (!resp.IsSuccessStatusCode)
                 {
-                    MarkFailed();
+                    MarkFailed(failFile);
                     log?.Invoke($"Kota okunamadı: HTTP {(int)resp.StatusCode}");
                     return null;
                 }
-                if (JsonNode.Parse(resp.Content.ReadAsStream()) is not JsonObject obj) { MarkFailed(); return null; }
+                if (JsonNode.Parse(resp.Content.ReadAsStream()) is not JsonObject obj) { MarkFailed(failFile); return null; }
                 obj["_cached_at"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
-                Directory.CreateDirectory(ClaudeDir);
-                var tmp = CacheFile + $".{Environment.ProcessId}.tmp";
+                Directory.CreateDirectory(dir);
+                var tmp = cacheFile + $".{Environment.ProcessId}.tmp";
                 File.WriteAllText(tmp, obj.ToJsonString());
-                File.Move(tmp, CacheFile, overwrite: true);
-                if (File.Exists(FailFile)) File.Delete(FailFile);
+                File.Move(tmp, cacheFile, overwrite: true);
+                if (File.Exists(failFile)) File.Delete(failFile);
                 return obj;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
                                            or HttpRequestException or TaskCanceledException or InvalidOperationException)
             {
-                MarkFailed();
+                MarkFailed(failFile);
                 log?.Invoke($"Kota yenilenemedi: {ex.Message}");
                 return null;
             }
         }
     }
 
-    static void MarkFailed()
+    static void MarkFailed(string failFile)
     {
         try
         {
             Directory.CreateDirectory(Handoff.DataDir);
-            File.WriteAllText(FailFile, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            File.WriteAllText(failFile, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>Claude Code'un OAuth kimliği (claudeAiOauth nesnesi); bulunamazsa null.</summary>
-    public static JsonNode? Credentials()
+    public static JsonNode? Credentials() => Credentials(ClaudeDir);
+
+    /// <summary>Hesap klasörünün kimliği. macOS'ta Anahtar Zinciri yalnız varsayılan hesap için okunur.</summary>
+    public static JsonNode? Credentials(string dir)
     {
         try
         {
-            var file = Path.Combine(ClaudeDir, ".credentials.json");
+            var file = Path.Combine(dir, ".credentials.json");
             if (File.Exists(file)) return JsonNode.Parse(File.ReadAllText(file))?["claudeAiOauth"];
-            if (OperatingSystem.IsMacOS() && Keychain() is { Length: > 0 } json) return JsonNode.Parse(json)?["claudeAiOauth"];
+            if (OperatingSystem.IsMacOS() && IsDefault(dir) && Keychain() is { Length: > 0 } json) return JsonNode.Parse(json)?["claudeAiOauth"];
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
         return null;
     }
 
-    static string? AccessToken() => Credentials()?["accessToken"] is JsonValue v && v.TryGetValue<string>(out var t) ? t : null;
+    static string? AccessToken(string dir) => Credentials(dir)?["accessToken"] is JsonValue v && v.TryGetValue<string>(out var t) ? t : null;
 
     /// <summary>macOS: Claude Code kimliği dosyada değil Anahtar Zinciri'nde.</summary>
     static string? Keychain()
@@ -146,9 +172,11 @@ public static class Quota
     }
 
     /// <summary>Plan adı (Max5x, Max20x, Pro...) ya da null.</summary>
-    public static string? Plan()
+    public static string? Plan() => Plan(ClaudeDir);
+
+    public static string? Plan(string dir)
     {
-        var c = Credentials();
+        var c = Credentials(dir);
         var tier = c?["rateLimitTier"] is JsonValue t && t.TryGetValue<string>(out var ts) ? ts : "";
         if (tier.Contains("20x", StringComparison.Ordinal)) return "Max20x";
         if (tier.Contains("5x", StringComparison.Ordinal)) return "Max5x";
