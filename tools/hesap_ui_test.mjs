@@ -29,7 +29,10 @@ const measure = `(() => {
   const clipped = [...box.querySelectorAll(".acct-name, .ring b")].filter(e => e.scrollWidth > e.clientWidth + 1).length;
   return { multi: box.classList.contains("multi"), names, rings: rings.length, visible,
     overflow: top.scrollWidth > top.clientWidth + 1, clipped, crit: box.querySelectorAll(".ring.crit").length,
-    title: rings[0]?.title || "" };
+    title: rings[0]?.title || "",
+    // Yenilenme süresi ipucuna (title) bırakılmaz: telefonda fare yok, her halkada görünür metin olmalı
+    resetIn: [...box.querySelectorAll(".ring .reset-in")].filter(e => { const r = e.getBoundingClientRect();
+      return r.width > 0 && r.right <= innerWidth + 1 && /\d/.test(e.textContent) && e.contains(document.elementFromPoint(r.left + 2, r.top + r.height / 2)); }).length };
 })()`;
 async function shot(w, h, mobile, name) {
   await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile });
@@ -51,6 +54,7 @@ for (const light of [false, true]) {
     check(`${theme} ${n}: iki hesap adıyla`, [m.multi, m.names], [true, ["Kişisel", "Örnek Şirket A.Ş."]]);
     check(`${theme} ${n}: 4 halka, hepsi görünür`, [m.rings, m.visible], [4, 4]);
     check(`${theme} ${n}: üst çubuk taşmıyor, metin kesilmiyor`, [m.overflow, m.clipped], [false, 0]);
+    check(`${theme} ${n}: 4 halkada yenilenme süresi görünür`, m.resetIn, 4);
     if (n === "genis") {
       check(`${theme}: kişisel haftalık %1 kırmızı`, m.crit, 1);
       check(`${theme}: halkanın üstünde yenilenme saati`, m.title.includes("Yenilenme:"), true);

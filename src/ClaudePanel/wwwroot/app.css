@@ -83,6 +83,9 @@ h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
   .usage.multi .acct + .acct { padding-left: 10px; }
   .usage.multi .acct-rings { gap: 8px; }
   .usage.multi .ring svg { width: 24px; height: 24px; }
+  /* Telefonda yenilenme süresi görünür kalsın (ipucu yok): metin halkanın yanında iki satıra kırılır */
+  .usage.multi .ring { white-space: normal; min-width: 0; }
+  .usage.multi .ring small.reset-in { font-size: 10px; line-height: 1.2; }
 }
 
 /* Düğmeler */

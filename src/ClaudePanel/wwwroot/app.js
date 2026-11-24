@@ -533,7 +533,7 @@
     const title = [t("left", Math.round(left)), when ? t(past ? "resetDone" : "resetAt", when) : "",
       valid && !past ? resetIn(at.getTime()) : "", paceText].filter(Boolean).join(" · ");
     return `<div class="ring ${level}" data-p="${left}" title="${esc(title)}"><svg viewBox="0 0 36 36"><circle class="bgc" cx="18" cy="18" r="15.9"/><circle class="fg" cx="18" cy="18" r="15.9" pathLength="100"/></svg>
-      <div><b>${t("pct", Math.round(left))}</b><small>${label}</small></div></div>`;
+      <div><b>${t("pct", Math.round(left))}</b><small>${label}</small>${valid && !past ? `<small class="reset-in" data-at="${at.getTime()}">${esc(resetIn(at.getTime()))}</small>` : ""}</div></div>`;
   }
 
   // ---- Eylemler ----
