@@ -119,8 +119,59 @@ await ev(`document.getElementById("sGithub").click()`); await sleep(1800);
 check("GitHub takibi kapatılınca kart 'Kapalı' ve Genel'e yönlendirir", await conn("github"), { state: "Kapalı", who: "gh CLI", btns: ["Genel'e git"], msg: "" });
 await ev(`document.getElementById("sGithub").click()`); await sleep(1500);
 for (const need of ["setAccounts"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
+
+// ---- (c) Anahtar bağlama: Bağlan → gizli kutu → Dene ve kaydet (sahte deneme sunucusu) ----
+const key = (id) => ev(`(() => { const c = document.querySelector('#setConns [data-key="${id}"]'); if (!c) return null;
+  const vis = (e) => !!e && !e.closest("[hidden]") && getComputedStyle(e).display !== "none";
+  return { state: c.querySelector(".set-state").textContent, uses: c.querySelector(".set-uses").textContent,
+    btns: [...c.querySelectorAll("button")].filter(vis).map(b => b.textContent), box: vis(c.querySelector(".set-keybox")),
+    msg: c.querySelector(".set-msg").textContent, kind: c.querySelector(".set-msg").dataset.kind || "" }; })()`);
+const keyBtn = (id, label) => ev(`[...document.querySelectorAll('#setConns [data-key="${id}"] button')].find(b => b.textContent === ${JSON.stringify(label)} && b.offsetWidth)?.click()`);
+const keyType = (id, v) => ev(`document.querySelector('#setConns [data-key="${id}"] .set-keyinput').value = ${JSON.stringify(v)}`);
+check("üç anahtar kartı sırayla (Google ve GitHub'dan sonra)", await ev(`[...document.querySelectorAll("#setConns .set-card")].map(c => c.dataset.conn || c.dataset.key)`),
+  ["google", "github", "elevenlabs", "openrouter", "gemini"]);
+check("OpenRouter: bağlı değil, Bağlan düğmesi, gizli kutu kapalı", await key("openrouter"),
+  { state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.", btns: ["Bağlan"], box: false, msg: "", kind: "" });
+check("Chrome profil seçimi: varsayılan + iki uydurma profil", await ev(`[!document.getElementById("setProfileRow").hidden, [...document.querySelectorAll("#setKeyProfile option")].map(o => o.textContent), document.getElementById("setKeyProfile").value]`),
+  [true, ["Varsayılan tarayıcı", "İş (is@ornek.com.tr)", "Kişisel (kisi@ornek.com)"], ""]);
+await ev(`(() => { const s = document.getElementById("setKeyProfile"); s.value = "Profile 1"; s.dispatchEvent(new Event("change")); })()`); await sleep(500);
+check("profil seçimi kalıcı (sunucuda)", await ev(`fetch("/api/hub").then(r => r.json()).then(d => d.chrome.selected)`), "Profile 1");
+await keyBtn("openrouter", "Bağlan"); await sleep(600);
+check("Bağlan: gizli kutu açık, sayfa açıldı notu, kutu parola türünde ve odakta", [await key("openrouter"), await ev(`(() => { const i = document.querySelector('[data-key="openrouter"] .set-keyinput'); return [i.type, document.activeElement === i]; })()`)],
+  [{ state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.", btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true,
+    msg: "Anahtar sayfası tarayıcıda açıldı. Anahtarı oluşturup aşağıya yapıştırın.", kind: "" }, ["password", true]]);
+check("gizli kutu ekranda görünür", await seen('#setConns [data-key="openrouter"] .set-keyinput'), "görünür");
+await keyBtn("openrouter", "Dene ve kaydet"); await sleep(300);
+check("boş kutu: önce yapıştırın", (await key("openrouter")).msg, "Önce anahtarı yapıştırın.");
+await keyType("openrouter", "sahte-kotu-anahtar-9991"); await keyBtn("openrouter", "Dene ve kaydet");
+await until(`document.querySelector('[data-key="openrouter"] .set-msg').dataset.kind === "warn"`);
+check("yanlış anahtar: nedeni yazar, kutu açık kalır", await key("openrouter"), { state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.",
+  btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true, msg: "Anahtar yanlış ya da geçersiz. Kopyalarken eksik kalmış olabilir.", kind: "warn" });
+await keyType("openrouter", "sahte-bos-anahtar-9996"); await keyBtn("openrouter", "Dene ve kaydet");
+await until(`document.querySelector('[data-key="openrouter"] .set-msg').textContent.includes("bakiye")`);
+check("bakiye yok: ayrı neden", (await key("openrouter")).msg, "Anahtar çalışıyor ama bakiye ya da kota kalmamış.");
+await keyType("openrouter", "sahte-iyi-openrouter-0002-ASDF"); await keyBtn("openrouter", "Dene ve kaydet");
+await until(`document.querySelector('[data-key="openrouter"] .set-msg').dataset.kind === "ok"`);
+const orOk = await key("openrouter");
+check("geçerli anahtar: bağlı, kalan limit, son 4, kutu kapandı", [orOk.state, /^Anahtarın sınırından kalan: 7,5 \$ · son 4: …ASDF · denendi /.test(orOk.uses), orOk.btns, orOk.box, orOk.msg],
+  ["Anahtar geçerli", true, ["Anahtarı değiştir", "Yeniden dene", "Kaldır"], false, "✓ Anahtar çalışıyor · şifreli kaydedildi"]);
+check("anahtar sayfada yok (kutu boşaltıldı, DOM'da metin yok)", await ev(`[document.querySelector('[data-key="openrouter"] .set-keyinput').value, document.documentElement.outerHTML.includes("sahte-iyi-openrouter")]`), ["", false]);
+await keyBtn("elevenlabs", "Bağlan"); await sleep(400);
+await keyType("elevenlabs", "sahte-iyi-elevenlabs-0001-QWER");
+await ev(`document.querySelector('[data-key="elevenlabs"] .set-keyinput').dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`);
+await until(`document.querySelector('[data-key="elevenlabs"] .set-msg').dataset.kind === "ok"`);
+check("ElevenLabs Enter ile kaydedildi: paket, kalan karakter, çubuk kullanılanı gösterir", await ev(`(() => { const c = document.querySelector('[data-key="elevenlabs"]');
+  return [c.querySelector(".set-who").textContent, c.querySelector(".set-uses").textContent.split(" · ")[0], Math.round(parseFloat(c.querySelector(".set-meter i").style.width)), c.querySelector(".set-meter").hidden]; })()`),
+  ["Seslendirme (eğitim ve tanıtım videoları) · creator", "Bu ay 186.000 / 300.000 karakter kaldı", 38, false]);
+await keyBtn("openrouter", "Kaldır"); await until(`document.querySelector("#dlgAsk[open]")`);
+check("Kaldır: panelin kendi onay penceresi", await ev(`document.getElementById("askTitle").textContent`), "OpenRouter anahtarı kaldırılsın mı?");
+await ev(`document.querySelector('#askButtons button[value="yes"]').click()`);
+await until(`document.querySelector('[data-key="openrouter"] .set-state').textContent === "Bağlı değil"`);
+check("kaldırıldı: bağlı değil, Bağlan düğmesi geri geldi", [(await key("openrouter")).btns, (await key("openrouter")).msg], [["Bağlan"], "Anahtar kaldırıldı."]);
+check("anahtar akış anlatımı görünür", await seen("#setAccounts .key-flow"), "görünür");
+
 const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
-  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button"];
+  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile"];
 const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
   const out = [...document.querySelectorAll("#setAccounts .set-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
   return { clipped, out }; })()`);
@@ -151,7 +202,8 @@ for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {
     }
     check(`${tn} ${n}: menü satırı bölümünü başlığın altına getirir`, navBad, []);
     if (n === "genis") {
-      await scrollTop(600);
+      // Hesaplar bölümünün sonunu geçecek kadar (bölüm boyu içeriğe göre değişir)
+      await scrollTop(await ev(`Math.round(document.getElementById("setNotify").getBoundingClientRect().top + ${SC}.scrollTop - 200)`));
       await ev(`dispatchEvent(new Event("wheel")); document.body.dispatchEvent(new Event("scroll"))`); await sleep(200);
       check(`${tn} genis: kaydırınca etkin satır değişir`, await ev(`document.querySelector("#setNav button.active")?.dataset.sec !== "${navShown[0]}"`), true);
       check(`${tn} genis: menü solda yapışkan`, await ev(`(() => { const n = document.getElementById("setNav").getBoundingClientRect(), top = document.querySelector("header.top").getBoundingClientRect();

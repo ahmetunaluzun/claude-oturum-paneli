@@ -1,0 +1,48 @@
+using System.Text.Json;
+
+namespace ClaudePanel;
+
+/// <summary>
+/// Ayarlar sekmesinin kalıcı seçimleri: &lt;veri klasörü&gt;/hub.json. Gizli bilgi içermez (anahtarlar TokenStore'da).
+/// </summary>
+public static class HubSettings
+{
+    /// <param name="ChromeProfile">Anahtar sayfalarının açılacağı Chrome profil klasörü; null = kendiliğinden (bkz. HubEndpoints).
+    /// "" = varsayılan tarayıcı.</param>
+    public sealed record Saved(string? ChromeProfile = null);
+
+    static readonly string File_ = Path.Combine(Handoff.DataDir, "hub.json");
+    static readonly object Lock = new();
+
+    public static Saved Get()
+    {
+        lock (Lock) return Load();
+    }
+
+    static Saved Load()
+    {
+        try { return File.Exists(File_) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(File_)) ?? new() : new(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return new(); }
+    }
+
+    /// <summary>Oku-değiştir-yaz tek kilitte: iki ayar değişikliği birbirini ezmesin.</summary>
+    public static Saved Update(Func<Saved, Saved> change)
+    {
+        lock (Lock)
+        {
+            var s = change(Load());
+            try
+            {
+                Directory.CreateDirectory(Handoff.DataDir);
+                var tmp = File_ + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(s));
+                File.Move(tmp, File_, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                RemoteLog.Info($"Ayarlar yazılamadı (hub.json): {ex.Message}");
+            }
+            return s;
+        }
+    }
+}
