@@ -86,6 +86,45 @@ check("ayarlar bölümlerine dağılmış", await ev(`(() => { const sec = (id) 
   return [sec("sLight"), sec("sLang"), sec("sGithub"), sec("tqBox"), sec("sNotify"), sec("sSound"), sec("nEnabled"), sec("mailBox"), sec("remoteBox"), sec("btnResetTabs"), sec("btnRestart"), sec("btnQuit")]; })()`),
   ["setGeneral", "setGeneral", "setGeneral", "setGeneral", "setNotify", "setNotify", "setNight", "setMail", "setPhone", "setAdvanced", "setAdvanced", "setAdvanced"]);
 
+// ---- (b) Hesaplar: Claude hesap kartları ve diğer bağlantılar ----
+await until(`document.querySelectorAll("#setClaude .set-card").length === 2`);
+const cards = await ev(`[...document.querySelectorAll("#setClaude .set-card")].map(c => ({ id: c.dataset.acct, name: c.querySelector(".set-name").textContent, who: c.querySelector(".set-who").textContent,
+  state: c.querySelector(".set-state").textContent, cls: c.querySelector(".set-state").className.replace("set-state ", ""), meter: Math.round(parseFloat(c.querySelector(".set-meter i").style.width)),
+  meta: [...c.querySelectorAll(".set-meta span")].map(s => s.textContent.replace(/: .*$/, "")), five: c.querySelectorAll(".set-meta span")[1].textContent,
+  uses: c.querySelector(".set-uses").textContent, projects: [...c.querySelectorAll(".set-proj li")].map(l => l.textContent.split("\\\\").pop()) }))`);
+check("kişisel hesap kartı: ad, klasör, haftalık %1 kırmızı, çubuk %99, 5 saat, varsayılan", cards[0],
+  { id: "claude", name: "Kişisel", who: "Varsayılan hesap · claude", state: "Haftalık %1 kaldı", cls: "crit", meter: 99, meta: ["Haftalık sıfırlanma", "5 saat"], five: "5 saat: %88 kaldı",
+    uses: "Varsayılan: başka hesaba kayıtlı olmayan tüm projeler", projects: [] });
+check("şirket hesap kartı: ad, haftalık %92 yeşil, çubuk %8, kayıtlı proje (diskteki yazımıyla)", cards[1],
+  { id: "claude-is", name: "Örnek Şirket A.Ş.", who: "claude-is", state: "Haftalık %92 kaldı", cls: "ok", meter: 8, meta: ["Haftalık sıfırlanma", "5 saat"], five: "5 saat: %24 kaldı",
+    uses: "Varsayılan: Muhasebe Projesi", projects: ["Muhasebe Projesi"] });
+check("sıfırlanma tarihi yazıyor", await ev(`/Haftalık sıfırlanma: \\d{2} \\S+ \\d{2}:\\d{2}/.test(document.querySelector("#setClaude .set-meta span").textContent)`), true);
+check("hesap ekle kartı yalnız yönlendirme notu (düğme yok)", await ev(`(() => { const a = document.querySelector("#setClaude .set-add");
+  return [a.querySelector("b").textContent, a.textContent.includes("CLAUDE_CONFIG_DIR"), a.querySelectorAll("button, input").length]; })()`), ["+ Claude hesabı ekle", true, 0]);
+check("menüde Hesaplar noktası (haftalık kotası azalan hesap)", await ev(`[document.getElementById("setDotAccounts").hidden, document.getElementById("setDotAccounts").title]`), [false, "Haftalık kotası azalan hesap: Kişisel"]);
+const conn = (id) => ev(`(() => { const c = document.querySelector('#setConns [data-conn="${id}"]'); if (!c) return null;
+  return { state: c.querySelector(".set-state").textContent, who: c.querySelector(".set-who").textContent, btns: [...c.querySelectorAll("button")].map(b => b.textContent), msg: c.querySelector(".set-msg")?.textContent || "" }; })()`);
+check("Google kartı: bağlı değil, yalnız kişisel, Mail ve takvime götürür", await conn("google"),
+  { state: "Bağlı değil", who: "Yalnız kişisel Google hesabı", btns: ["Mail ve takvime git"], msg: "" });
+check("Higgsfield ve Slack kartı yok", await ev(`/higgsfield|slack/i.test(document.getElementById("setConns").textContent)`), false);
+await until(`fetch("/api/github").then(r => r.json()).then(d => d.state === "ok")`, 9000);
+await ev(`document.getElementById("btnSettings").click()`); await sleep(900);
+check("GitHub kartı: sahte gh hesabıyla bağlı", await conn("github"), { state: "Bağlı", who: "gh CLI · testkul", btns: ["Dene"], msg: "" });
+await ev(`document.querySelector('#setConns [data-act="gh-try"]').click()`);
+await until(`document.querySelector('#setConns [data-conn="github"] .set-msg').textContent.startsWith("✓")`, 8000);
+check("GitHub Dene: sonuç kartta yazar", (await conn("github")).msg, "✓ Bağlantı çalışıyor: testkul");
+await ev(`document.querySelector('#setConns [data-conn="google"] button').click()`); await sleep(200); await settle();
+check("Google kartındaki düğme Mail ve takvim bölümüne götürür", await ev(`document.querySelector("#setNav button.active")?.dataset.sec`), "setMail");
+await ev(`document.getElementById("sGithub").click()`); await sleep(1800);
+check("GitHub takibi kapatılınca kart 'Kapalı' ve Genel'e yönlendirir", await conn("github"), { state: "Kapalı", who: "gh CLI", btns: ["Genel'e git"], msg: "" });
+await ev(`document.getElementById("sGithub").click()`); await sleep(1500);
+for (const need of ["setAccounts"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
+const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
+  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button"];
+const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
+  const out = [...document.querySelectorAll("#setAccounts .set-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
+  return { clipped, out }; })()`);
+
 for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {
   if (light) { await theme(true); await openSettings(); }
   for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"]]) {
@@ -94,6 +133,10 @@ for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {
     const bad = [];
     for (const sel of LEGACY) { const r = await seen(sel); if (r !== "görünür") bad.push(`${sel}: ${r}`); }
     check(`${tn} ${n}: eski ayarların hepsi ekranda görünür (${LEGACY.length})`, bad, []);
+    const hid = [];
+    for (const sel of CARDS) { const r = await seen(sel); if (r !== "görünür") hid.push(`${sel}: ${r}`); }
+    check(`${tn} ${n}: hesap ve bağlantı kartları ekranda görünür`, hid, []);
+    check(`${tn} ${n}: kartlarda kesik metin ve taşan öğe yok`, await cardLayout(), { clipped: [], out: 0 });
     check(`${tn} ${n}: yana taşma yok, sıkışmış onay satırı yok`, await layout(), { pageOverflow: false, wide: [], squeezed: 0 });
     // Bölüm menüsü: her satır kendi bölümünü başlığın hemen altına getirir ve etkin olur
     const navBad = [];

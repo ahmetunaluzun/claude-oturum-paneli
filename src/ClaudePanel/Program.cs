@@ -624,6 +624,7 @@ app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (
 app.MapPlans(Authorized); // Planlı işler: /api/plans* (PlanEndpoints.cs)
 app.MapMail(Authorized, IsLocal); // Mail ve takvim: /api/mail* (Mail/MailEndpoints.cs)
 app.MapCodex(Authorized); // Codex oturumları, salt okuma: /api/codex* (CodexEndpoints.cs)
+app.MapHub(Authorized, IsLocal); // Ayarlar sekmesi → Hesaplar: /api/hub (HubEndpoints.cs)
 app.MapCost(); // Proje maliyeti ve açılış yükü, salt okuma: /api/cost, /api/startup-load (CostEndpoints.cs)
 app.MapGet("/api/terminal-quota", () => Results.Json(QuotaSetup.Status()));
 app.MapPost("/api/terminal-quota", async (HttpContext ctx) =>

@@ -30,9 +30,14 @@ echo '{"oauthAccount":{"organizationName":"kisi@ornek.com'"'"'s Organization"}}'
 echo '{"oauthAccount":{"organizationName":"Örnek Şirket A.Ş."}}' > "$T/claude-is/.claude.json"
 CWD=$(cygpath -w "$T/p/Muhasebe Projesi" | sed 's/\\/\\\\/g')
 printf '{"%s":"claude-is"}' "${CWD,,}" > "$T/data/project-accounts.json"
+# GitHub kartı: gerçek gh çağrılmaz (tools/sahte_gh.py, boş liste)
+SGH="$(cygpath -w "$PWD/tools/sahte_gh.py")"
+printf '@echo off\r\npy -3.13 "%s" %%*\r\n' "$SGH" > "$T/sahte-gh.cmd"
+py -3.13 "$SGH" --senaryo bos "$TW\\gh.json"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CODEX_HOME="$TW\\codex" \
+  CLAUDE_PANEL_GH_EXE="$TW\\sahte-gh.cmd" SAHTE_GH_DOSYA="$TW\\gh.json" SAHTE_GH_LOG="$TW\\gh.log" \
   TMP="$TW\\tmp" TEMP="$TW\\tmp" "$EXE" --no-window >/dev/null 2>&1 &
 PID=$!
 for _ in $(seq 1 50); do [ -f "$T/data/panel-$PORT.token" ] && break; sleep 0.2; done
@@ -46,7 +51,7 @@ check "hata ayıklama portu bizim Chrome'da" "$(pwsh -NoProfile -c "\$p=(Get-Net
 curl -s -o /dev/null -X POST "$B/api/quit?force=1" -H "X-Panel-Token: $TOK" -H "Origin: $B"
 for _ in $(seq 1 40); do curl -s -o /dev/null "$B/api/ping" || break; sleep 0.25; done
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
-pwsh -NoProfile -c "Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and \$_.Name -ne 'bash.exe' -and \$_.CommandLine -like '*$TW*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }"
+pwsh -NoProfile -c "Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and \$_.Name -ne 'bash.exe' -and \$_.CommandLine -like '*$TW*' -or \$_.CommandLine -like '*sahte_gh.py*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }"
 kalan() { pwsh -NoProfile -c "@(Get-CimInstance Win32_Process | Where-Object { \$_.Name -ne 'pwsh.exe' -and \$_.Name -ne 'bash.exe' -and \$_.CommandLine -like '*$TW*' }).Count" | tr -d '\r'; }
 for _ in $(seq 1 10); do [ "$(kalan)" = 0 ] && break; sleep 1; done
 check "test süreci kalmadı" "$(kalan)" 0

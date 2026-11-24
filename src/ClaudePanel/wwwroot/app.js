@@ -1799,7 +1799,7 @@
   // ---- Ayarlar ----
   // Ayarlar ayrı bir sekmedir (0.21.0'dan önce pencereydi); bölüm menüsü settings-hub.js'te.
   let settingsOpening = false;
-  const H = window.PanelSettingsHub({ t });
+  const H = window.PanelSettingsHub({ t, api, getJson, toast, esc, REMOTE, accountName, lang: () => settings.lang });
   $("btnSettings").addEventListener("click", () => {
     $("sNotify").checked = settings.notify; $("sSound").checked = settings.sound;
     $("sLight").checked = settings.light; $("sLang").value = settings.lang;
@@ -1808,6 +1808,7 @@
     settingsOpening = true;
     try { setView("settings"); } finally { settingsOpening = false; }
     H.open(!already);
+    H.load();
   });
 
   // ---- Terminal oturumlarında kota (durum satırı + kota koruması, ~/.claude/settings.json) ----
