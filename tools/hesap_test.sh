@@ -147,6 +147,18 @@ mkdir -p "$T/baska"; BASKA=$(cygpath -w "$T/baska" | sed 's/\\/\\\\/g')
 check "başka projede hesapsız oturum 200" "$(post /api/hosted "{\"cwd\":\"$BASKA\",\"prompt\":\"c\"}")" 200
 K6=$(sed 's/.*"key":"\([^"]*\)".*/\1/' "$T/resp"); bekle_bos "$K6"
 check "başka proje varsayılan hesapta" "$(son_hesap)" "-"
+# ---- gece modu kotayı oturumun hesabından okur: kişisel haftalık %1 → K6 bekler; şirket %70/%95 → K4, K5 devam alır ----
+now=$(date +%s); cache "$P" 10 99; cache "$I" 30 5
+bas=$(date -d "@$((now - 120))" +%H:%M); bit=$(date -d "@$((now + 1800))" +%H:%M)
+check "gece modu açıldı" "$(post /api/night "{\"settings\":{\"enabled\":true,\"start\":\"$bas\",\"end\":\"$bit\",\"maxNudges\":3,\"weeklyFloor\":10,\"fiveHourMax\":95}}")" 200
+echo "  gece modu dürtüsü bekleniyor (90 sn boşta + 60 sn'lik tur, en çok ~4 dk)…"
+for _ in $(seq 1 120); do grep -q "^MESAJ.*Gece modu" "$LOGF" && break; sleep 2; done
+sleep 3
+dur() { grep "^MESAJ" "$LOGF" | grep "Gece modu" | cut -f3 | tr -d '\r' | grep -cF "$1"; }
+check "şirket hesabındaki oturumlar dürtüldü (2)" "$(dur "$(cygpath -w "$T/proje")")" 2
+check "kişisel hesaptaki oturum dürtülmedi (kota)" "$(dur "$(cygpath -w "$T/baska")")" 0
+case "$(curl -s "$B/api/night")" in *'Haftalık kotadan %1 kaldı'*) check "gece olayında kişisel kota nedeni" 1 1;; *) check "gece olayında kişisel kota nedeni" 0 1;; esac
+post /api/night '{"settings":{"enabled":false}}' >/dev/null
 curl -s -o /dev/null -X POST "$B/api/quit?force=1" -H "X-Panel-Token: $TOK" -H "Origin: $B"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 taskkill //F //PID "$W1" //PID "$W2" >/dev/null 2>&1

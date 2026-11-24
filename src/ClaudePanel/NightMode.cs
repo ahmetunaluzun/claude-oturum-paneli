@@ -205,16 +205,22 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
         }
         if (candidates.Count == 0) return;
 
-        var wait = QuotaWait(s);
-        if (wait is not null)
+        // Kota hesap başına (Accounts.cs): kotası biten hesabın oturumları bekler, öteki hesaptakiler devam eder.
+        var multi = Accounts.List().Count > 1;
+        var waits = new List<string>();
+        var ready = new List<HostedInfo>();
+        foreach (var g in candidates.GroupBy(h => h.Account ?? "", StringComparer.OrdinalIgnoreCase))
         {
-            if (_waitReason != wait) Event("quota", null, null, wait);
-            _waitReason = wait;
-            return;
+            var acct = Accounts.Find(g.Key);
+            var wait = QuotaWait(s, acct);
+            if (wait is null) { ready.AddRange(g); continue; }
+            waits.Add(multi && acct is not null ? $"{acct.Label ?? acct.Id}: {wait}" : wait);
         }
-        _waitReason = null;
+        var reason = waits.Count > 0 ? string.Join(" ", waits) : null;
+        if (reason is not null && _waitReason != reason) Event("quota", null, null, reason);
+        _waitReason = reason;
 
-        foreach (var h in candidates)
+        foreach (var h in ready)
         {
             if (!hosted.Send(h.Key, Prompt(s), night: true)) continue;
             _nudges[h.Key] = _nudges.GetValueOrDefault(h.Key) + 1;
@@ -237,9 +243,9 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
         $"Bu oturumda yapılacak iş kalmadıysa yanıtının İLK satırına {DoneMark} yaz.";
 
     /// <summary>Kota uygun değilse bekleme nedeni; uygunsa null. Kota okunamıyorsa devam edilir (claude kendisi sınırda durur).</summary>
-    string? QuotaWait(NightSettings s)
+    string? QuotaWait(NightSettings s, Account? account = null)
     {
-        var u = ReadUsage();
+        var u = ReadUsage(account);
         if (u is null) return null;
         var (five, fiveReset, week, weekReset) = u.Value;
         if (week is { } w && 100 - w < s.WeeklyFloor)
@@ -252,9 +258,12 @@ public sealed class NightMode(HostedSessions hosted, ILogger<NightMode> log) : I
     static string Local(DateTimeOffset? t) => t?.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture) ?? "?";
 
     /// <summary>Kota (Quota.cs): önbellek 5 dakikadan eskiyse API'den yenilenir (gece terminal oturumu yokken statusline çalışmaz).</summary>
-    (double? five, DateTimeOffset? fiveReset, double? week, DateTimeOffset? weekReset)? ReadUsage()
+    /// Ek hesapta (Accounts.cs) o hesabın klasöründen okunur.
+    (double? five, DateTimeOffset? fiveReset, double? week, DateTimeOffset? weekReset)? ReadUsage(Account? account = null)
     {
-        var q = Quota.Read(fetch: true, msg => log.LogDebug("{Msg}", msg));
+        var q = account is { IsDefault: false }
+            ? Quota.Read(account.Dir, fetch: true, msg => log.LogDebug("{Msg}", msg))
+            : Quota.Read(fetch: true, msg => log.LogDebug("{Msg}", msg));
         if (q is null) return null;
         return (q.Five.Used, q.Five.ResetsAt, q.Week.Used, q.Week.ResetsAt);
     }
