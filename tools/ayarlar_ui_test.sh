@@ -40,9 +40,12 @@ printf '{"profile":{"info_cache":{"Default":{"name":"İş","user_name":"is@ornek
 KPORT=$(freeport)
 py -3.13 tools/sahte_anahtar.py "$KPORT" "$TW\\anahtar.log" >/dev/null 2>&1 & # log yolu $TW içinde: temizlikte süreç komut satırından bulunur
 for _ in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$KPORT/x" && break; sleep 0.2; done
+# Yapay zekâ işçileri: sahte Codex ağacı (tools/codex_ortam.py), gerçek gemini yerine sürüm yazan sahte betik
+py -3.13 -I tools/codex_ortam.py "$TW\\codex" kur >/dev/null
+printf '@echo off\r\necho 0.1.7\r\n' > "$T/gemini.cmd"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
-CLAUDE_PANEL_KEYTEST_BASE="http://127.0.0.1:$KPORT" CLAUDE_PANEL_HUB_OPEN_LOG="$TW\\acilan.log" CLAUDE_PANEL_CHROME_STATE="$TW\\chrome-state.json" \
+CLAUDE_PANEL_GEMINI_EXE="$TW\\gemini.cmd" CLAUDE_PANEL_KEYTEST_BASE="http://127.0.0.1:$KPORT" CLAUDE_PANEL_HUB_OPEN_LOG="$TW\\acilan.log" CLAUDE_PANEL_CHROME_STATE="$TW\\chrome-state.json" \
   CLAUDE_PANEL_PORT=$PORT CLAUDE_PANEL_DATA="$TW\\data" CLAUDE_PANEL_CLAUDE_DIR="$TW\\claude" CLAUDE_PANEL_CODEX_HOME="$TW\\codex" \
   CLAUDE_PANEL_GH_EXE="$TW\\sahte-gh.cmd" SAHTE_GH_DOSYA="$TW\\gh.json" SAHTE_GH_LOG="$TW\\gh.log" \
   TMP="$TW\\tmp" TEMP="$TW\\tmp" "$EXE" --no-window >/dev/null 2>&1 &

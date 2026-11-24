@@ -32,6 +32,14 @@ public static partial class CodexEndpoints
         usedPercent = w.UsedPercent, windowMinutes = w.WindowMinutes, resetsAt = w.ResetsAt * 1000 // ms
     };
 
+    /// <summary>Ayarlar → Yapay zekâ işçileri kartı: en yeni oturumdan abonelik planı ve Codex CLI sürümü (yoksa null).</summary>
+    public static (string? Plan, string? Version) Info()
+    {
+        if (!CodexSessions.Installed) return (null, null);
+        var list = Sessions().OrderByDescending(s => s.Updated).ToList();
+        return (list.FirstOrDefault(s => s.PlanType is not null)?.PlanType, list.FirstOrDefault(s => s.CliVersion is not null)?.CliVersion);
+    }
+
     /// <summary>GET /api/codex yanıtı. Kota: kota bilgisi olan en yeni oturumun son token_count'u.</summary>
     public static object Snapshot()
     {

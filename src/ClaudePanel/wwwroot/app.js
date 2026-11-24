@@ -1801,6 +1801,7 @@
   let settingsOpening = false;
   const H = window.PanelSettingsHub({ t, api, getJson, toast, esc, REMOTE, accountName, lang: () => settings.lang });
   const SK = window.PanelSettingsKeys({ t, api, esc, toast, confirmBox, REMOTE, lang: () => settings.lang, hub: H });
+  window.PanelSettingsRouting({ t, api, getJson, esc, toast, hub: H, keys: SK });
   $("btnSettings").addEventListener("click", () => {
     $("sNotify").checked = settings.notify; $("sSound").checked = settings.sound;
     $("sLight").checked = settings.light; $("sLang").value = settings.lang;

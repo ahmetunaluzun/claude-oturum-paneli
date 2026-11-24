@@ -170,10 +170,46 @@ await until(`document.querySelector('[data-key="openrouter"] .set-state').textCo
 check("kaldırıldı: bağlı değil, Bağlan düğmesi geri geldi", [(await key("openrouter")).btns, (await key("openrouter")).msg], [["Bağlan"], "Anahtar kaldırıldı."]);
 check("anahtar akış anlatımı görünür", await seen("#setAccounts .key-flow"), "görünür");
 
+// ---- (d) Yapay zekâ işçileri ve iş yönlendirme ----
+const worker = (id) => ev(`(() => { const c = document.querySelector('#wkCards [data-worker="${id}"]'); if (!c) return null;
+  return { who: c.querySelector(".set-who").textContent, on: c.querySelector(".wk-switch").getAttribute("aria-checked"), role: c.querySelector(".wk-switch").getAttribute("role") }; })()`);
+await until(`document.querySelector('#wkCards [data-worker="gemini"] .set-who')?.textContent.includes("0.1.7")`, 8000);
+check("Codex kartı: plan, CLI sürümü, açık", await worker("codex"), { who: "go · codex CLI 0.171.0", on: "true", role: "switch" });
+check("Gemini kartı: CLI sürümü (sahte betik), kapalı", await worker("gemini"), { who: "gemini CLI 0.1.7", on: "false", role: "switch" });
+const route = (job) => ev(`(() => { const c = document.querySelector('#rtList [data-job="${job}"]'); if (!c) return null;
+  return { now: c.querySelector(".rt-now").textContent, chips: [...c.querySelectorAll(".rt-chip")].map(x => (x.querySelector(".rt-label")?.textContent || x.textContent) + (x.querySelector(".rt-st") ? " [" + x.querySelector(".rt-st").textContent + "]" : "") + (x.classList.contains("use") ? " *" : "")) }; })()`);
+check("iş türleri taslaktaki sırada", await ev(`[...document.querySelectorAll("#rtList .rt-card")].map(c => c.querySelector(".rt-name").textContent)`),
+  ["Görsel üretme", "Video", "Uzun belge, kayıt özeti", "Çeviri, toplu metin işleme", "Kod incelemesi (ikinci göz)"]);
+check("görsel: hepsi kapalı/bağlı değil → Claude'un kendi yolu", await route("image"), { now: "Şu an: Claude'un kendi yolu",
+  chips: ["Gemini (Nano Banana) [kapalı · kişisel]", "OpenRouter [bağlı değil]", "Higgsfield [bağlı değil · kişisel]", "Claude: SVG / HTML çizim *"] });
+check("özet: Codex açık → Şu an Codex", await route("summary"), { now: "Şu an: Codex", chips: ["Gemini CLI [kapalı · kişisel]", "Codex [açık] *", "Claude okur (bağlam ve kota harcar)"] });
+check("inceleme: Codex salt okuma, sıra düğmesi yok (tek araç)", [await route("review"), await ev(`!!document.querySelector('#rtList [data-job="review"] [data-rt-edit]')`)],
+  [{ now: "Şu an: Codex", chips: ["Codex [açık · salt okuma] *", "Claude inceleme alt ajanı"] }, false]);
+await ev(`document.querySelector('#wkCards [data-wk="gemini"]').click()`);
+await until(`document.querySelector('#rtList [data-job="image"] .rt-now').textContent.includes("Gemini")`);
+check("Gemini açılınca: kart açık, görsel ve özet Gemini'ye geçer", [(await worker("gemini")).on, (await route("image")).now, (await route("summary")).now],
+  ["true", "Şu an: Gemini (Nano Banana)", "Şu an: Gemini CLI"]);
+check("işçi ayarı sunucuda", await ev(`fetch("/api/workers").then(r => r.json()).then(d => [d.codex.enabled, d.gemini.enabled])`), [true, true]);
+await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-edit]').click()`); await sleep(200);
+check("Sırayı değiştir: çipler alt alta, yukarı/aşağı düğmeleri, ilkinde yukarı kapalı", await ev(`(() => { const c = document.querySelector('#rtList [data-job="summary"]');
+  return [getComputedStyle(c.querySelector(".rt-chain")).flexDirection, [...c.querySelectorAll("[data-rt-move]")].map(b => b.textContent + (b.disabled ? "-" : "+")), c.querySelector("[data-rt-edit]").textContent]; })()`),
+  ["column", ["↑-", "↓+", "↑+", "↓-"], "Bitti"]);
+check("sıra düğmesi parmakla basılacak boyda (≥ 36 px)", await ev(`Math.min(...[...document.querySelectorAll('#rtList [data-rt-move]')].map(b => b.getBoundingClientRect().height)) >= 36`), true);
+await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-move="1"][data-i="0"]').click()`);
+await until(`document.querySelector('#rtList [data-job="summary"] .rt-now').textContent === "Şu an: Codex"`);
+check("Gemini aşağı: Codex öne geçti ve seçildi, düzenleme açık kalır", [(await route("summary")).chips.map(c => c.split(" [")[0]), await ev(`!!document.querySelector('#rtList [data-job="summary"] .rt-editing')`)],
+  [["Codex", "Gemini CLI", "Claude okur (bağlam ve kota harcar)"], true]);
+check("sıra sunucuda kalıcı", await ev(`fetch("/api/routing").then(r => r.json()).then(d => d.jobs.find(j => j.id === "summary").chain.map(c => c.tool))`), ["codex", "gemini"]);
+await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-edit]').click()`); await sleep(200);
+check("Bitti: zincir yeniden yatay", await ev(`getComputedStyle(document.querySelector('#rtList [data-job="summary"] .rt-chain')).flexDirection`), "row");
+check("şirket işi notu ve üstü çizili örnek", await ev(`(() => { const s = document.querySelector("#setRouting .rt-example .rt-chip.skip .rt-label");
+  return [document.querySelector("#setRouting .rt-company .set-tag").textContent, getComputedStyle(s).textDecorationLine]; })()`), ["Şirket işi", "line-through"]);
+
 const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
-  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile"];
-const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
-  const out = [...document.querySelectorAll("#setAccounts .set-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
+  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile",
+  "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip"];
+const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name, #setWorkers .btn, #setWorkers .set-name, #setRouting .btn, #setRouting .rt-chip, #setRouting .rt-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
+  const out = [...document.querySelectorAll("#setAccounts .set-card *, #setWorkers .set-card *, #setRouting .rt-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card, .rt-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
   return { clipped, out }; })()`);
 
 for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {

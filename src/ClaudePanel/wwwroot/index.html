@@ -156,8 +156,23 @@
             <li><b data-i18n="setKeyFlow4b"></b> <span data-i18n="setKeyFlow4"></span></li>
           </ol></div>
         </section>
-        <section class="set-sec" id="setWorkers" hidden></section>
-        <section class="set-sec" id="setRouting" hidden></section>
+        <section class="set-sec" id="setWorkers">
+          <h2 data-i18n="setNavWorkers"></h2>
+          <p class="set-sub" data-i18n="wkSub"></p>
+          <div class="set-grid" id="wkCards"></div>
+        </section>
+        <section class="set-sec" id="setRouting">
+          <h2 data-i18n="setNavRouting"></h2>
+          <p class="set-sub" data-i18n="rtSub"></p>
+          <div class="rt-list" id="rtList"></div>
+          <p class="set-sub rt-company"><span class="set-tag" data-i18n="rtCompanyTag"></span> <span data-i18n="rtCompanyNote"></span></p>
+          <div class="rt-chain rt-example">
+            <span class="rt-chip skip"><span class="rt-n">1</span><span class="rt-label">Gemini</span></span><span class="rt-arrow" aria-hidden="true">→</span>
+            <span class="rt-chip skip"><span class="rt-n">2</span><span class="rt-label">Higgsfield</span></span><span class="rt-arrow" aria-hidden="true">→</span>
+            <span class="rt-chip fallback use">Claude</span>
+            <span class="rt-example-note" data-i18n="rtCompanyEx"></span>
+          </div>
+        </section>
         <section class="set-sec" id="setGeneral">
           <h2 data-i18n="setNavGeneral"></h2>
           <label class="check"><input type="checkbox" id="sLight"> <span data-i18n="sLight"></span></label>
@@ -553,6 +568,7 @@
   <script src="/assets/i18n-settings.js"></script>
   <script src="/assets/settings-hub.js"></script>
   <script src="/assets/settings-keys.js"></script>
+  <script src="/assets/settings-routing.js"></script>
   <script src="/assets/restart.js"></script>
   <script src="/assets/codex.js"></script>
   <script src="/assets/cost.js"></script>

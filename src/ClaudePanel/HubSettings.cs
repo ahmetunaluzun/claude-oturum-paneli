@@ -9,7 +9,9 @@ public static class HubSettings
 {
     /// <param name="ChromeProfile">Anahtar sayfalarının açılacağı Chrome profil klasörü; null = kendiliğinden (bkz. HubEndpoints).
     /// "" = varsayılan tarayıcı.</param>
-    public sealed record Saved(string? ChromeProfile = null);
+    /// <param name="Workers">Yapay zekâ işçisi aç/kapa ("codex", "gemini"); kayıt yoksa Workers.cs'teki varsayılan.</param>
+    /// <param name="Routes">İş türü başına araç sırası (Routing.cs); kayıt yoksa varsayılan sıra.</param>
+    public sealed record Saved(string? ChromeProfile = null, Dictionary<string, bool>? Workers = null, Dictionary<string, List<string>>? Routes = null);
 
     static readonly string File_ = Path.Combine(Handoff.DataDir, "hub.json");
     static readonly object Lock = new();

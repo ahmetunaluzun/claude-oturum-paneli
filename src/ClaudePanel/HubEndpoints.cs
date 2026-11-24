@@ -2,6 +2,8 @@ namespace ClaudePanel;
 
 public sealed record HubKeyRequest(string? Provider, string? Key);
 public sealed record HubProfileRequest(string? Dir);
+public sealed record HubWorkerRequest(string? Id, bool? Enabled);
+public sealed record HubRouteRequest(string? Job, List<string>? Order);
 
 /// <summary>
 /// Ayarlar sekmesinin "Hesaplar" bölümü: /api/hub. Claude hesapları (Accounts.cs) kotaları ve varsayılan projeleriyle
@@ -22,6 +24,37 @@ public static class HubEndpoints
             // Chrome profil adları ve e-postaları yalnız bilgisayardaki arayüze gider.
             chrome = isLocal(ctx) ? ChromeCard(mail) : null
         }));
+
+        // ---- Yapay zekâ işçileri (Workers.cs) ve iş yönlendirme (Routing.cs) ----
+        app.MapGet("/api/workers", () => Results.Json(WorkerCards()));
+
+        app.MapPost("/api/workers", async (HttpContext ctx) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<HubWorkerRequest>();
+            if (req?.Id is not { } id || !Workers.Ids.Contains(id) || req.Enabled is not { } on) return Results.BadRequest();
+            Workers.Set(id, on);
+            return Results.Json(WorkerCards());
+        });
+
+        // Gemini CLI'yi hemen yeniden dener (kurulumdan sonra); en çok zaman aşımı kadar sürer.
+        app.MapPost("/api/workers/gemini/check", async (HttpContext ctx) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            await Workers.RecheckGemini();
+            return Results.Json(WorkerCards());
+        });
+
+        // project: oturumun klasörü; şirket işiyse kişisel araçlar (Gemini, Higgsfield) atlanır.
+        app.MapGet("/api/routing", (string? project) => Results.Json(Routing.Snapshot(project)));
+
+        app.MapPost("/api/routing", async (HttpContext ctx) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<HubRouteRequest>();
+            if (Routing.Find(req?.Job) is not { } job || !Routing.SetOrder(job, req!.Order)) return Results.BadRequest();
+            return Results.Json(Routing.Snapshot(null));
+        });
 
         // Anahtar sayfasını seçili Chrome profilinde açar. Panel anahtar oluşturmaz.
         app.MapPost("/api/hub/key/open", async (HttpContext ctx, MailSettings mail) =>
@@ -66,6 +99,17 @@ public static class HubEndpoints
             HubSettings.Update(s => s with { ChromeProfile = dir });
             return Results.Json(ChromeCard(mail));
         });
+    }
+
+    static object WorkerCards()
+    {
+        var (plan, version) = CodexEndpoints.Info();
+        var g = Workers.Gemini();
+        return new
+        {
+            codex = new { enabled = Workers.Enabled("codex"), installed = CodexSessions.Installed, plan, version },
+            gemini = new { enabled = Workers.Enabled("gemini"), state = g.State, version = g.Version, apiKey = ApiKeys.Has("gemini") }
+        };
     }
 
     static IResult KeyResult(ApiKeys.Result r) => r.Error is null
