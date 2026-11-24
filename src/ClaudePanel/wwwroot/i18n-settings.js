@@ -62,6 +62,16 @@
     rtCompanyTag: "Şirket işi",
     rtCompanyNote: "Şirket ve müşteri projelerinde Google ve Higgsfield adımları atlanır (üstü çizili görünür); sıra Codex ve Claude ile devam eder.",
     rtCompanyEx: "örnek: Simphony projesinde görsel",
+    ggTitle: "Google ile neler yapılır (Claude kotası harcamadan)",
+    ggSub: "İş bu araçlarda yapılır; Claude yalnız isteği yazar ve sonucu dosyaya koyar. Ücret ve ücretsiz sınırlar değişebilir; güncel bilgi Google'ın kendi sayfasındadır.",
+    ggThJob: "İş", ggThTool: "Araç", ggThNote: "Not",
+    ggJob1: "Görsel üretme, görsel düzenleme", ggNote1: "Gemini API anahtarıyla; ücretsiz kotası sınırlı",
+    ggJob2: "Kısa video", ggNote2: "Ücretli; kişisel işte",
+    ggJob3: "Uzun PDF, kayıt, video özetleme", ggNote3: "Büyük bağlam; Claude'a yalnız özet gelir",
+    ggJob4: "Toplu çeviri, metin sınıflama", ggNote4: "Ucuz model; sonucu Claude denetler",
+    ggJob5: "Seslendirme denemesi", ggNote5: "Kuralımız ElevenLabs; yalnız taslak için",
+    ggJob6: "Mail, takvim, Drive, Sheets", ggTool6: "Doğrudan Google API", ggNote6: "Panel kendisi yapar, model gerekmez",
+    ggFoot: "Google hesabı kişisel. Şirket ya da müşteri verisi bu araçlara gönderilmez; şirket işinde bu araçlar iş yönlendirmede atlanır.",
     setKeyFlow4b: "Sakla:", setKeyFlow4: "doğrulanan anahtar işletim sisteminin şifreli kasasında tutulur (Windows'ta DPAPI, Mac'te Anahtar Zinciri). Loga ve dosyaya düz yazılmaz; kartta yalnız son 4 karakter görünür."
   });
   Object.assign(window.I18N.en, {
@@ -124,6 +134,16 @@
     rtCompanyTag: "Company work",
     rtCompanyNote: "In company and customer projects the Google and Higgsfield steps are skipped (shown struck through); the order continues with Codex and Claude.",
     rtCompanyEx: "example: an image in a Simphony project",
+    ggTitle: "What Google can do (without spending Claude quota)",
+    ggSub: "The work happens in these tools; Claude only writes the request and puts the result in a file. Prices and free limits can change; Google's own pages have the current details.",
+    ggThJob: "Job", ggThTool: "Tool", ggThNote: "Note",
+    ggJob1: "Image generation, image editing", ggNote1: "With a Gemini API key; limited free quota",
+    ggJob2: "Short video", ggNote2: "Paid; personal work",
+    ggJob3: "Summarising long PDFs, recordings, videos", ggNote3: "Large context; only the summary comes back to Claude",
+    ggJob4: "Bulk translation, text classification", ggNote4: "Cheap model; Claude checks the result",
+    ggJob5: "Voice-over draft", ggNote5: "Our rule is ElevenLabs; drafts only",
+    ggJob6: "Mail, calendar, Drive, Sheets", ggTool6: "Google APIs directly", ggNote6: "The panel does it itself, no model needed",
+    ggFoot: "The Google account is personal. Company or customer data is never sent to these tools; in company work they're skipped in job routing.",
     setKeyFlow4b: "Store:", setKeyFlow4: "the verified key is kept in the operating system's encrypted store (DPAPI on Windows, Keychain on Mac). It's never written to a log or a plain file; the card only shows the last 4 characters."
   });
 })();

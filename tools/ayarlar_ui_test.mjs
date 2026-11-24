@@ -207,7 +207,12 @@ check("şirket işi notu ve üstü çizili örnek", await ev(`(() => { const s =
 
 const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
   "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile",
-  "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip"];
+  "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip", "#setGoogle .gg-table tbody tr:nth-child(6) td:last-child"];
+
+// ---- (e) Google ile neler yapılır: statik tablo, ücret/sınır rakamı yok ----
+check("Google tablosu: altı iş, araçlar, rakam yok, kişisel notu", await ev(`(() => { const tb = document.querySelector("#setGoogle .gg-table");
+  return [[...tb.querySelectorAll("tbody tr")].map(r => r.cells[1].textContent), /\\d/.test(tb.textContent), document.querySelector("#setGoogle .gg-foot .set-tag").textContent]; })()`),
+  [["Gemini (Nano Banana), Imagen", "Veo", "Gemini CLI / API", "Gemini Flash", "Gemini TTS", "Doğrudan Google API"], false, "Kişisel"]);
 const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name, #setWorkers .btn, #setWorkers .set-name, #setRouting .btn, #setRouting .rt-chip, #setRouting .rt-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
   const out = [...document.querySelectorAll("#setAccounts .set-card *, #setWorkers .set-card *, #setRouting .rt-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card, .rt-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
   return { clipped, out }; })()`);
