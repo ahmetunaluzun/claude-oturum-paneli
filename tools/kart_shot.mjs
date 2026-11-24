@@ -55,7 +55,7 @@ for (const w of widthsArg.split(",").map(Number)) {
     await ev(`document.getElementById("btnSettings").click()`); await sleep(700);
     // Ayarlar: onay kutulu satırlar kabın genişliğini kullanıyor mu, metin kutuları üst üste biniyor mu?
     console.log(w, "ayarlar:", await ev(`(() => {
-      const d = document.getElementById("dlgSettings"); const dw = d.getBoundingClientRect().width;
+      const d = document.getElementById("viewSettings"); const dw = d.getBoundingClientRect().width;
       const dar = [...d.querySelectorAll("label.check")].filter(l => l.offsetParent).map(l => ({ id: l.querySelector("input").id, w: Math.round(l.getBoundingClientRect().width), kap: Math.round(l.parentElement.getBoundingClientRect().width) })).filter(x => x.w < x.kap * 0.8);
       const els = [...d.querySelectorAll("label, legend, p, .hint, button, select, input:not([type=checkbox])")].filter(e => e.offsetParent && e.getBoundingClientRect().width);
       const cak = [];
@@ -68,7 +68,7 @@ for (const w of widthsArg.split(",").map(Number)) {
     })()`));
     const sh1 = await send("Page.captureScreenshot", { format: "png" });
     writeFileSync(`${outDir}/ayar_${w}_ust.png`, Buffer.from(sh1.result.data, "base64"));
-    await ev(`[...document.querySelectorAll("#dlgSettings, #dlgSettings *")].forEach(e => { if (e.scrollHeight > e.clientHeight + 4) e.scrollTop = e.scrollHeight; })`); await sleep(300);
+    await ev(`[...document.querySelectorAll("#viewSettings, #viewSettings *")].forEach(e => { if (e.scrollHeight > e.clientHeight + 4) e.scrollTop = e.scrollHeight; })`); await sleep(300);
     const sh2 = await send("Page.captureScreenshot", { format: "png" });
     writeFileSync(`${outDir}/ayar_${w}_alt.png`, Buffer.from(sh2.result.data, "base64"));
   }

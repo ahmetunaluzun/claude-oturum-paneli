@@ -151,7 +151,7 @@ await shot("son-oturumlar");
 await load({ ...desk, height: 2000 });
 await click("#btnSettings");
 await sleep(2500);
-const box = JSON.parse(await ev(`JSON.stringify(document.getElementById("dlgSettings").getBoundingClientRect())`));
+const box = JSON.parse(await ev(`JSON.stringify(document.getElementById("viewSettings").getBoundingClientRect())`));
 const pad = 24;
 await shot("ayarlar", { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + 2 * pad, height: Math.min(2000, box.height + 2 * pad) });
 

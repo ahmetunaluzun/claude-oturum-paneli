@@ -74,8 +74,8 @@ const box = () => ev(`(() => { const d = document.querySelector("#dlgAsk[open]")
   return { title: document.getElementById("askTitle").textContent, buttons: [...document.querySelectorAll("#askButtons button")].map(b => b.textContent) }; })()`);
 const press = async (value) => { await ev(`document.querySelector('#dlgAsk[open] button[value="${value}"]').click()`); await sleep(500); };
 const mailApi = () => ev(`fetch("/api/mail").then(r => r.json())`);
-const settingsOpen = async () => { await click(`document.getElementById("btnSettings")`, 900); await until(`!!document.querySelector("#dlgSettings[open]")`); };
-const settingsClose = async () => { await ev(`document.getElementById("dlgSettings").close()`); await sleep(400); };
+const settingsOpen = async () => { await click(`document.getElementById("btnSettings")`, 900); await until(`!!document.querySelector("#viewSettings:not([hidden])")`); };
+const settingsClose = async () => { await ev(`document.querySelector('#nav button[data-view="follow"]').click()`); await sleep(400); };
 const toWiz = async () => { await ev(`document.getElementById("mailBox").scrollIntoView({ block: "start" })`); await sleep(250); };
 const typeIn = (id, v) => ev(`(() => { const e = document.getElementById(${J(id)}); e.focus(); e.value = ${J(v)}; e.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 const txt = (id) => ev(`document.getElementById(${J(id)}).textContent`);
@@ -90,10 +90,10 @@ const rowBtn = (email, label) => `[...document.querySelectorAll("#smAccounts .ma
 const sen = (sirkMod, sirkIcalDurum = 200, sirkIcalIcerik = "sirket") => writeFileSync(join(tmpRoot, "senaryo.json"), J({
   hesaplar: { [KISI]: { parola: PW1, mod: "ok", set: "kisisel" }, [SIRK]: { parola: PW2, mod: sirkMod, set: "sirket" } },
   ical: { "kisisel-ICALGIZLI1": { durum: 200, icerik: "kisisel" }, "sirket-ICALGIZLI2": { durum: sirkIcalDurum, icerik: sirkIcalIcerik } } }));
-const measureSet = () => ev(`(() => { const d = document.querySelector("#dlgSettings form"), r = document.getElementById("mailBox").getBoundingClientRect(), phone = matchMedia("(max-width: 640px)").matches;
+const measureSet = () => ev(`(() => { const d = document.querySelector("#viewSettings"), r = document.getElementById("mailBox").getBoundingClientRect(), phone = matchMedia("(max-width: 640px)").matches;
   const out = [...document.querySelectorAll("#mailBox *")].filter(e => e.offsetWidth && (e.getBoundingClientRect().right > r.right + 1 || e.getBoundingClientRect().left < r.left - 1)).slice(0, 4).map(e => e.tagName + "." + e.className);
   const clipped = [...document.querySelectorAll("#mailBox .btn")].filter(b => b.offsetWidth && b.scrollWidth > b.clientWidth + 1).map(b => b.textContent);
-  const squeezed = [...document.querySelectorAll("#dlgSettings label.check")].filter(l => l.offsetWidth && l.getBoundingClientRect().height < 18).map(l => l.textContent.trim().slice(0, 25));
+  const squeezed = [...document.querySelectorAll("#viewSettings label.check")].filter(l => l.offsetWidth && l.getBoundingClientRect().height < 18).map(l => l.textContent.trim().slice(0, 25));
   const small = phone ? [...document.querySelectorAll("#mailBox .btn, #mailBox summary")].filter(b => b.offsetWidth && b.getBoundingClientRect().height < 44).map(b => b.textContent.trim()) : [];
   const inputs = [...document.querySelectorAll("#mwWizard input")].filter(i => i.offsetWidth && i.getBoundingClientRect().right > r.right).map(i => i.id);
   return { tasan: out, kirpilan: clipped, ezilenSatir: squeezed, kucukHedef: small, girisTasan: inputs, yatay: d.scrollWidth - d.clientWidth }; })()`);

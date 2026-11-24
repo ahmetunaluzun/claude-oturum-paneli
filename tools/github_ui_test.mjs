@@ -231,7 +231,7 @@ await ev(`document.getElementById("sGithub").scrollIntoView({ block: "center" })
 await shot("ayarlar");
 await click(`document.getElementById("sGithub")`, 900);
 check("kapatınca durum metni", await ev(`[document.getElementById("sGithub").checked, document.getElementById("sGithubState").textContent]`), [false, "Kapalı: GitHub'a bağlanılmaz."]);
-await ev(`document.getElementById("dlgSettings").close()`);
+await ev(`document.querySelector('#nav button[data-view="follow"]').click()`);
 await until(`!document.getElementById("fu-github")`, 6000);
 c = await chips();
 check("kapalıyken: bölüm ve çip yok, Tümü'nden bekleyenler düştü", [await ev(`!!document.getElementById("fu-github")`), "github" in c, c.all], [false, false, before - 4]);
@@ -240,7 +240,7 @@ check("sayfa yenilenince kapalı kaldı (sunucuda kalıcı)", [await ev(`!!docum
 await click(`document.getElementById("btnSettings")`, 700);
 check("Ayarlar yeniden açılınca anahtar kapalı görünür", await ev(`document.getElementById("sGithub").checked`), false);
 await click(`document.getElementById("sGithub")`, 900);
-await ev(`document.getElementById("dlgSettings").close()`);
+await ev(`document.querySelector('#nav button[data-view="follow"]').click()`);
 await until(`fetch("/api/followup").then(r => r.json()).then(d => d.github.state === "ok" && !d.github.fetching)`);
 await until(`!!document.getElementById("fu-github")`, 6000);
 check("yeniden açınca bölüm geri geldi", (await chips()).github, 5);

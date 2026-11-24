@@ -23,7 +23,7 @@ const shot = async (name) => {
   const s = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(`${out}_${name}.png`, Buffer.from(s.result.data, "base64"));
 };
-const measure = () => ev(`JSON.stringify((() => { const b = document.getElementById("tqBox"), d = document.querySelector("#dlgSettings form");
+const measure = () => ev(`JSON.stringify((() => { const b = document.getElementById("tqBox"), d = document.querySelector("#viewSettings");
   return { box: Math.round(b.getBoundingClientRect().width), boxScroll: b.scrollWidth - b.clientWidth, dlgScroll: d.scrollWidth - d.clientWidth,
     state: document.getElementById("tqState").textContent, checked: document.getElementById("tqEnabled").checked }; })())`);
 await ev(`document.getElementById("btnSettings").click()`);

@@ -81,8 +81,8 @@ const box = () => ev(`(() => { const d = document.querySelector("#dlgAsk[open]")
 const press = async (value) => { await ev(`document.querySelector('#dlgAsk[open] button[value="${value}"]').click()`); await sleep(500); };
 const mailApi = () => ev(`fetch("/api/mail").then(r => r.json())`);
 const fu = () => ev(`fetch("/api/followup").then(r => r.json())`);
-const settingsOpen = async () => { await click(`document.getElementById("btnSettings")`, 900); await until(`!!document.querySelector("#dlgSettings[open]")`); };
-const settingsClose = async () => { await ev(`document.getElementById("dlgSettings").close()`); await sleep(400); };
+const settingsOpen = async () => { await click(`document.getElementById("btnSettings")`, 900); await until(`!!document.querySelector("#viewSettings:not([hidden])")`); };
+const settingsClose = async () => { await ev(`document.querySelector('#nav button[data-view="follow"]').click()`); await sleep(400); };
 const toMail = async () => { await ev(`document.getElementById("mailBox").scrollIntoView({ block: "start" })`); await sleep(250); };
 const setFile = async (path) => {
   const root = (await send("DOM.getDocument", { depth: 0 })).result.root.nodeId;
@@ -95,10 +95,10 @@ const acct = () => ev(`[...document.querySelectorAll("#smAccounts .mail-acct")].
 const vis = (id) => ev(`(() => { const e = document.getElementById(${J(id)}); return !!e && !!e.offsetWidth; })()`);
 const visible = (sel) => ev(`!!document.querySelector(${J(sel)})?.offsetWidth`);
 // Ayarlar ölçümü: mail kutusundan dışarı taşan öğe, kırpılan düğme; Ayarlar'daki TÜM onay satırları ezilmemiş (§BB); telefonda ≥ 44 px.
-const measureSet = () => ev(`(() => { const d = document.querySelector("#dlgSettings form"), r = document.getElementById("mailBox").getBoundingClientRect(), phone = matchMedia("(max-width: 640px)").matches;
+const measureSet = () => ev(`(() => { const d = document.querySelector("#viewSettings"), r = document.getElementById("mailBox").getBoundingClientRect(), phone = matchMedia("(max-width: 640px)").matches;
   const out = [...document.querySelectorAll("#mailBox *")].filter(e => e.offsetWidth && (e.getBoundingClientRect().right > r.right + 1 || e.getBoundingClientRect().left < r.left - 1)).slice(0, 4).map(e => e.tagName + "." + e.className);
   const clipped = [...document.querySelectorAll("#mailBox .btn")].filter(b => b.offsetWidth && b.scrollWidth > b.clientWidth + 1).map(b => b.textContent);
-  const squeezed = [...document.querySelectorAll("#dlgSettings label.check")].filter(l => l.offsetWidth && l.getBoundingClientRect().height < 18).map(l => l.textContent.trim().slice(0, 25));
+  const squeezed = [...document.querySelectorAll("#viewSettings label.check")].filter(l => l.offsetWidth && l.getBoundingClientRect().height < 18).map(l => l.textContent.trim().slice(0, 25));
   const small = phone ? [...document.querySelectorAll("#mailBox .btn")].filter(b => b.offsetWidth && b.getBoundingClientRect().height < 44).map(b => b.textContent) : [];
   return { tasan: out, kirpilan: clipped, ezilenSatir: squeezed, kucukHedef: small, yatay: d.scrollWidth - d.clientWidth }; })()`);
 const SET_CLEAN = { tasan: [], kirpilan: [], ezilenSatir: [], kucukHedef: [], yatay: 0 };
@@ -183,7 +183,7 @@ await click(`document.getElementById("smCc")`, 700);
 check("kutu değişince anında kaydedildi", [await lastToast(), (await mailApi()).filter.cc], ["Süzgeç kaydedildi", true]);
 await ev(`(() => { const i = document.getElementById("smKeywords"); i.focus(); i.value = "rapor,  fatura ,"; i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); })()`);
 await sleep(800);
-check("metin + Enter: kaydedildi, Ayarlar açık kaldı", [(await mailApi()).filter.keywords, await ev(`document.getElementById("dlgSettings").open`)], [["rapor", "fatura"], true]);
+check("metin + Enter: kaydedildi, Ayarlar açık kaldı", [(await mailApi()).filter.keywords, await ev(`!document.getElementById("viewSettings").hidden`)], [["rapor", "fatura"], true]);
 await ev(`document.getElementById("smCc").focus()`); await sleep(300);
 check("kutu temiz değerle yeniden yazıldı", await ev(`document.getElementById("smKeywords").value`), "rapor, fatura");
 await click(`document.getElementById("smCc")`, 700);

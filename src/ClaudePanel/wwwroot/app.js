@@ -1216,13 +1216,17 @@
 
   // ---- Görünüm geçişi ----
   function setView(v) {
+    // Ayarlar sekmesi ⚙ düğmesinin yoluyla açılır: ayarları dolduran her modül o düğmenin tıklamasını dinler.
+    if (v === "settings" && !settingsOpening) { $("btnSettings").click(); return; }
+    if (view === "settings" && v !== "settings") leaveSettings();
     view = v;
     document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
     $("viewSessions").hidden = v !== "sessions";
     $("viewRecent").hidden = v !== "recent";
     $("viewSkills").hidden = v !== "skills";
     $("viewFollow").hidden = v !== "follow";
-    $("search").hidden = v === "skills" || v === "follow";
+    $("viewSettings").hidden = v !== "settings";
+    $("search").hidden = v === "skills" || v === "follow" || v === "settings";
     if (v === "recent") loadRecent();
     if (v === "skills") loadSkills();
     if (v === "follow") F.open();
@@ -1793,11 +1797,17 @@
   });
 
   // ---- Ayarlar ----
+  // Ayarlar ayrı bir sekmedir (0.21.0'dan önce pencereydi); bölüm menüsü settings-hub.js'te.
+  let settingsOpening = false;
+  const H = window.PanelSettingsHub({ t });
   $("btnSettings").addEventListener("click", () => {
     $("sNotify").checked = settings.notify; $("sSound").checked = settings.sound;
     $("sLight").checked = settings.light; $("sLang").value = settings.lang;
     fillNight(); loadNight(); loadRemote(); loadTermQuota();
-    $("dlgSettings").showModal();
+    const already = view === "settings";
+    settingsOpening = true;
+    try { setView("settings"); } finally { settingsOpening = false; }
+    H.open(!already);
   });
 
   // ---- Terminal oturumlarında kota (durum satırı + kota koruması, ~/.claude/settings.json) ----
@@ -1954,7 +1964,7 @@
   // Ayarlar açıkken kurulum adımları 3 sn'de bir yenilenir (Tailscale kurulunca/giriş yapılınca kendiliğinden ✓).
   let remotePoll = null;
   $("btnSettings").addEventListener("click", () => { clearInterval(remotePoll); remotePoll = setInterval(() => { if (!pairTimer) loadRemote(); }, REMOTE ? 15000 : 3000); });
-  $("dlgSettings").addEventListener("close", () => { clearInterval(remotePoll); if (pairTimer) stopPairing(true); });
+  function leaveSettings() { clearInterval(remotePoll); if (pairTimer) stopPairing(true); }
   document.querySelectorAll("[data-help=phone]").forEach(b => b.addEventListener("click", () => {
     $("phoneGuide").innerHTML = t("phoneGuide"); // sabit, kendi metnimiz (kullanıcı verisi yok)
     $("dlgPhoneHelp").showModal();
@@ -2042,7 +2052,7 @@
 
   // Adresten açılış: ?view=recent|skills|follow, ?open=<oturum kimliği>
   const qs = new URLSearchParams(location.search);
-  if (["recent", "skills", "follow"].includes(qs.get("view"))) setView(qs.get("view"));
+  if (["recent", "skills", "follow", "settings"].includes(qs.get("view"))) setView(qs.get("view"));
   const openId = qs.get("open");
   if (openId && /^[0-9a-f-]{36}$/i.test(openId)) {
     getJson("/api/recent").then(list => {

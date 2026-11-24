@@ -149,7 +149,7 @@ await press("cancel");
 check("Vazgeç: panel yeniden başlamadı, bekleme yok", [(await version()).pid === pid0, (await state()).restartWaiting], [true, false]);
 
 // ================= 5. Kapat: yalnız uyarı + "Yine de kapat" =================
-await ev(`document.getElementById("dlgSettings").close()`); await sleep(300);
+await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`); await sleep(300);
 await click(`document.getElementById("btnSettings")`, 800);
 await click(`document.getElementById("btnQuit")`, 700);
 let q = await dlgInfo();
@@ -161,7 +161,7 @@ check("Kapat: arka plan uyarısı, iş listesi, yalnız Vazgeç / Yine de kapat 
 await shot("1280_kapat");
 await press("cancel");
 check("Kapat'tan vazgeçince panel açık", (await version())?.pid === pid0, true);
-await ev(`document.getElementById("dlgSettings").close()`); await sleep(300);
+await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`); await sleep(300);
 
 // ================= 6. Telefon: yalnız "İşler bitince yeniden başlat" =================
 await open(390, { remote: true });
@@ -174,7 +174,7 @@ check("telefon: 'Yine de şimdi' yok (zorlama yalnız bilgisayardan)", dp?.butto
 await shot("390_onay");
 check("telefon: uyarı penceresi taşmıyor", await ev(`(() => { const d = ${dlg}; const r = d.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && d.scrollWidth <= d.clientWidth + 1; })()`), true);
 await press("cancel");
-await ev(`document.getElementById("dlgSettings").close()`); await sleep(300);
+await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`); await sleep(300);
 check("390 px: rozet ve alt bilgi taşmıyor", await ev(`(() => { const f = document.querySelector("footer.bottom"), c = ${cardOf}, e = c.querySelector(".abj-chip");
   return [f.scrollWidth <= f.clientWidth + 1, e.getBoundingClientRect().right <= c.getBoundingClientRect().right + 1, document.documentElement.scrollWidth <= innerWidth]; })()`), [true, true, true]);
 await ev(`document.querySelector("footer.bottom").scrollIntoView()`);
@@ -201,7 +201,7 @@ await press("yes", 900);
 await until(`${dlg}.open && document.getElementById("askTitle").textContent === "Arka planda iş sürüyor"`, 10000);
 await press("idle", 900);
 check("bekle: bildirim", (await toasts()).includes("İşler bitince panel yeniden başlatılacak."), true);
-await ev(`document.getElementById("dlgSettings").close()`); await sleep(300);
+await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`); await sleep(300);
 check("bekle: sunucu bekliyor", (await state()).restartWaiting, true);
 const f2 = await until(`!document.getElementById("abjWait").hidden`, 10000) && await foot();
 check("alt bilgide 'işler bitince yeniden başlatılacak · İptal'", [f2.bekle, f2.bekleMetin], [true, "işler bitince yeniden başlatılacak · İptal"]);
@@ -215,7 +215,7 @@ await click(`document.getElementById("btnRestart")`, 700);
 await press("yes", 900);
 await until(`${dlg}.open && document.getElementById("askTitle").textContent === "Arka planda iş sürüyor"`, 10000);
 await press("idle", 900);
-await ev(`document.getElementById("dlgSettings").close()`); await sleep(300);
+await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`); await sleep(300);
 for (const k of ["aUI000001", "bUI000002", "aUI000003"]) kayit(file, "bitti", k, "completed");
 check("işler bitince rozet ve alt bilgi temizlenir", await until(`(() => { const c = ${cardOf}; return !c || c.querySelector(".abj-chip").hidden; })()`, 15000), true);
 let pid1 = pid0;

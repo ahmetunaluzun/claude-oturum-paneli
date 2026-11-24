@@ -12,6 +12,7 @@
   <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/app.css">
   <link rel="stylesheet" href="/assets/cost.css">
+  <link rel="stylesheet" href="/assets/settings.css">
 </head>
 <body>
   <div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -30,6 +31,7 @@
       <button data-view="recent" data-i18n="navRecent"></button>
       <button data-view="skills" data-i18n="navSkills"></button>
       <button data-view="follow"><span data-i18n="navFollow"></span><span class="pill" id="navFollow" hidden>0</span></button>
+      <button data-view="settings" data-i18n="settings"></button>
     </nav>
     <div class="usage" id="usage" hidden></div>
     <div class="codex-quota" id="codexQuota" hidden></div>
@@ -119,6 +121,177 @@
           <section class="guide" id="skillGuide"></section>
           <div class="skill-grid" id="skillGrid"></div>
         </div>
+      </div>
+    </div>
+    <!-- Ayarlar sekmesi: sol bölüm menüsü + bölümler (settings-hub.js, settings-routing.js; eski Ayarlar penceresinin her ayarı burada) -->
+    <div class="view set-view" id="viewSettings" hidden>
+      <nav class="set-nav" id="setNav">
+        <button type="button" data-sec="setAccounts"><span data-i18n="setNavAccounts"></span><span class="set-dot" id="setDotAccounts" hidden></span></button>
+        <button type="button" data-sec="setWorkers"><span data-i18n="setNavWorkers"></span></button>
+        <button type="button" data-sec="setRouting"><span data-i18n="setNavRouting"></span></button>
+        <button type="button" data-sec="setGeneral"><span data-i18n="setNavGeneral"></span></button>
+        <button type="button" data-sec="setNotify"><span data-i18n="setNavNotify"></span></button>
+        <button type="button" data-sec="setNight"><span data-i18n="setNavNight"></span></button>
+        <button type="button" data-sec="setMail"><span data-i18n="setNavMail"></span></button>
+        <button type="button" data-sec="setPhone"><span data-i18n="setNavPhone"></span></button>
+        <button type="button" data-sec="setGoogle"><span data-i18n="setNavGoogle"></span></button>
+        <button type="button" data-sec="setAdvanced"><span data-i18n="setNavAdvanced"></span></button>
+      </nav>
+      <div class="set-main">
+        <section class="set-sec" id="setAccounts" hidden></section>
+        <section class="set-sec" id="setWorkers" hidden></section>
+        <section class="set-sec" id="setRouting" hidden></section>
+        <section class="set-sec" id="setGeneral">
+          <h2 data-i18n="setNavGeneral"></h2>
+          <label class="check"><input type="checkbox" id="sLight"> <span data-i18n="sLight"></span></label>
+          <label><span data-i18n="sLang"></span>
+            <select id="sLang"><option value="tr">Türkçe</option><option value="en">English</option></select>
+          </label>
+          <label class="check"><input type="checkbox" id="sGithub"> <span data-i18n="sGithub"></span></label>
+          <p class="hint wide" id="sGithubState"></p>
+          <fieldset class="tquota local-only" id="tqBox">
+            <legend data-i18n="tqTitle"></legend>
+            <label class="check"><input type="checkbox" id="tqEnabled"> <span data-i18n="tqEnabled"></span></label>
+            <p class="hint wide" id="tqState"></p>
+          </fieldset>
+        </section>
+        <section class="set-sec" id="setNotify">
+          <h2 data-i18n="setNavNotify"></h2>
+          <label class="check"><input type="checkbox" id="sNotify"> <span data-i18n="sNotify"></span></label>
+          <label class="check"><input type="checkbox" id="sSound"> <span data-i18n="sSound"></span></label>
+        </section>
+        <section class="set-sec set-own-title" id="setNight">
+          <h2 data-i18n="setNavNight"></h2>
+          <fieldset class="night">
+            <legend data-i18n="nightTitle"></legend>
+            <label class="check"><input type="checkbox" id="nEnabled"> <span data-i18n="nEnabled"></span></label>
+            <div class="row two">
+              <label><span data-i18n="nStart"></span><input type="time" id="nStart" required></label>
+              <label><span data-i18n="nEnd"></span><input type="time" id="nEnd" required></label>
+            </div>
+            <label class="check" id="nAutoRow"><input type="checkbox" id="nAutostart"> <span data-i18n="nAutostart"></span></label>
+            <p class="hint wide" data-i18n="nHint"></p>
+            <p class="hint wide night-wait" id="nWaiting" hidden></p>
+            <button type="button" class="btn small" id="btnNightLog" data-i18n="nLog"></button>
+          </fieldset>
+        </section>
+        <section class="set-sec set-own-title" id="setMail">
+          <h2 data-i18n="setNavMail"></h2>
+          <fieldset class="mail-set" id="mailBox">
+            <legend data-i18n="smTitle"></legend>
+            <p class="mail-note" data-i18n="smIntro"></p>
+            <ol class="mw local-only" id="mwWizard">
+              <li class="mw-step" id="mwS1">
+                <span class="mw-mark" id="mwM1" aria-hidden="true"></span>
+                <div class="mw-body">
+                  <b class="mw-title" data-i18n="mwS1Title"></b>
+                  <input type="text" id="mwEmail" inputmode="email" autocomplete="off" spellcheck="false" data-i18n-ph="mwEmailPh">
+                  <p class="mw-msg" id="mwMsg1" role="status"></p>
+                </div>
+              </li>
+              <li class="mw-step" id="mwS2">
+                <span class="mw-mark" id="mwM2" aria-hidden="true"></span>
+                <div class="mw-body">
+                  <b class="mw-title" data-i18n="mwS2Title"></b>
+                  <p class="mw-hint" data-i18n="mwS2Text"></p>
+                  <button type="button" class="btn small" id="btnMwApp" data-i18n="mwS2Btn"></button>
+                  <p class="mw-msg" id="mwMsg2" role="status"></p>
+                  <details class="mw-more">
+                    <summary data-i18n="mwNoPageTitle"></summary>
+                    <p class="mw-hint" data-i18n="mwNoPage1"></p>
+                    <button type="button" class="btn small" id="btnMwTwosv" data-i18n="mwTwosvBtn"></button>
+                    <p class="mw-hint" data-i18n="mwNoPage2"></p>
+                  </details>
+                </div>
+              </li>
+              <li class="mw-step" id="mwS3">
+                <span class="mw-mark" id="mwM3" aria-hidden="true"></span>
+                <div class="mw-body">
+                  <b class="mw-title" data-i18n="mwS3Title"></b>
+                  <input type="text" id="mwPass" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwPassPh">
+                  <p class="mw-msg" id="mwMsg3a" role="status"></p>
+                  <button type="button" class="btn small primary" id="btnMwConnect" data-i18n="mwConnect"></button>
+                  <p class="mw-msg" id="mwMsg3" role="status"></p>
+                </div>
+              </li>
+              <li class="mw-step" id="mwS4">
+                <span class="mw-mark" id="mwM4" aria-hidden="true"></span>
+                <div class="mw-body">
+                  <b class="mw-title" data-i18n="mwS4Title"></b>
+                  <p class="mw-hint" data-i18n="mwS4Text"></p>
+                  <button type="button" class="btn small" id="btnMwCal" data-i18n="mwS4Btn"></button>
+                  <input type="text" id="mwIcal" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwIcalPh">
+                  <p class="mw-msg" id="mwMsg4a" role="status"></p>
+                  <button type="button" class="btn small" id="btnMwIcal" data-i18n="mwIcalTry"></button>
+                  <p class="mw-msg" id="mwMsg4" role="status"></p>
+                </div>
+              </li>
+            </ol>
+            <ul class="mail-accounts" id="smAccounts"></ul>
+            <details class="mw-adv local-only" id="mwAdv">
+              <summary data-i18n="mwAdvTitle"></summary>
+              <div class="mail-client" id="smClient">
+                <ol class="mail-steps" id="smSteps">
+                  <li data-i18n="smStep1"></li><li data-i18n="smStep2"></li><li data-i18n="smStep3"></li><li data-i18n="smStep4"></li>
+                </ol>
+                <p class="mail-note" id="smClientOk" data-i18n="smClientOk" hidden></p>
+                <button type="button" class="btn small" id="btnSmClient"></button>
+                <input type="file" id="smClientFile" accept=".json,application/json" hidden>
+              </div>
+              <div class="mail-wait" id="smLogin" hidden>
+                <p class="mail-note" data-i18n="smWaiting"></p>
+                <button type="button" class="btn small" id="btnSmCancel" data-i18n="smCancel"></button>
+              </div>
+              <button type="button" class="btn small local-only" id="btnSmAdd" data-i18n="smAdd"></button>
+            </details>
+            <p class="mail-note remote-only" data-i18n="smRemoteNote"></p>
+            <div class="mail-filter" id="smFilter">
+              <p class="mail-sub" data-i18n="smFilterTitle"></p>
+              <label class="check"><input type="checkbox" id="smDirect"> <span data-i18n="smDirect"></span></label>
+              <label class="check"><input type="checkbox" id="smCc"> <span data-i18n="smCc"></span></label>
+              <label class="check"><input type="checkbox" id="smAwaiting"> <span data-i18n="smAwaiting"></span></label>
+              <label class="mail-field"><span data-i18n="smSenders"></span><input type="text" id="smSenders" autocomplete="off" spellcheck="false"></label>
+              <label class="mail-field"><span data-i18n="smKeywords"></span><input type="text" id="smKeywords" autocomplete="off"></label>
+              <label class="mail-field"><span data-i18n="smLabels"></span><input type="text" id="smLabels" autocomplete="off"></label>
+            </div>
+          </fieldset>
+        </section>
+        <section class="set-sec set-own-title" id="setPhone">
+          <h2 data-i18n="setNavPhone"></h2>
+          <fieldset class="remote local-only" id="remoteBox">
+            <legend data-i18n="rTitle"></legend>
+            <ol class="steps" id="rSteps"></ol>
+            <label class="check"><input type="checkbox" id="rEnabled"> <span data-i18n="rEnabled"></span></label>
+            <p class="hint wide" id="rState"></p>
+            <div class="remote-pair" id="rPair" hidden>
+              <div class="qr" id="rQr"></div>
+              <div><p class="hint" data-i18n="rPairHint"></p><p class="pair-code" id="rCode"></p><p class="hint" id="rExpire"></p></div>
+            </div>
+            <button type="button" class="btn small" id="btnPair" data-i18n="rAdd"></button>
+            <ul class="devices" id="rDevices"></ul>
+            <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
+          </fieldset>
+          <fieldset class="remote remote-only">
+            <legend data-i18n="rTitle"></legend>
+            <p class="hint wide" id="rmState"></p>
+            <ul class="devices" id="rmDevices"></ul>
+            <p class="hint wide" data-i18n="rOnPhone"></p>
+            <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
+            <button type="button" class="btn small primary" id="btnInstall" data-i18n="rInstall"></button>
+            <p class="hint wide" id="installHint" hidden></p>
+            <button type="button" class="btn small danger" id="btnForget" data-i18n="rForget"></button>
+          </fieldset>
+        </section>
+        <section class="set-sec" id="setGoogle" hidden></section>
+        <section class="set-sec" id="setAdvanced">
+          <h2 data-i18n="setNavAdvanced"></h2>
+          <button type="button" class="btn small local-only" id="btnResetTabs" data-i18n="resetTabs"></button>
+          <p class="hint wide rs-ready" id="rsReady" hidden></p>
+          <div class="rs-settings-actions">
+            <button type="button" class="btn" id="btnRestart" data-i18n="rsGo"></button>
+            <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
+          </div>
+        </section>
       </div>
     </div>
   </main>
@@ -249,146 +422,6 @@
     </form>
   </dialog>
 
-  <!-- Ayarlar -->  <dialog id="dlgSettings">
-    <form method="dialog">
-      <h3 data-i18n="settings"></h3>
-      <label class="check"><input type="checkbox" id="sNotify"> <span data-i18n="sNotify"></span></label>
-      <label class="check"><input type="checkbox" id="sSound"> <span data-i18n="sSound"></span></label>
-      <label class="check"><input type="checkbox" id="sLight"> <span data-i18n="sLight"></span></label>
-      <label class="check"><input type="checkbox" id="sGithub"> <span data-i18n="sGithub"></span></label>
-      <p class="hint wide" id="sGithubState"></p>
-      <label><span data-i18n="sLang"></span>
-        <select id="sLang"><option value="tr">Türkçe</option><option value="en">English</option></select>
-      </label>
-      <fieldset class="tquota local-only" id="tqBox">
-        <legend data-i18n="tqTitle"></legend>
-        <label class="check"><input type="checkbox" id="tqEnabled"> <span data-i18n="tqEnabled"></span></label>
-        <p class="hint wide" id="tqState"></p>
-      </fieldset>
-      <fieldset class="mail-set" id="mailBox">
-        <legend data-i18n="smTitle"></legend>
-        <p class="mail-note" data-i18n="smIntro"></p>
-        <ol class="mw local-only" id="mwWizard">
-          <li class="mw-step" id="mwS1">
-            <span class="mw-mark" id="mwM1" aria-hidden="true"></span>
-            <div class="mw-body">
-              <b class="mw-title" data-i18n="mwS1Title"></b>
-              <input type="text" id="mwEmail" inputmode="email" autocomplete="off" spellcheck="false" data-i18n-ph="mwEmailPh">
-              <p class="mw-msg" id="mwMsg1" role="status"></p>
-            </div>
-          </li>
-          <li class="mw-step" id="mwS2">
-            <span class="mw-mark" id="mwM2" aria-hidden="true"></span>
-            <div class="mw-body">
-              <b class="mw-title" data-i18n="mwS2Title"></b>
-              <p class="mw-hint" data-i18n="mwS2Text"></p>
-              <button type="button" class="btn small" id="btnMwApp" data-i18n="mwS2Btn"></button>
-              <p class="mw-msg" id="mwMsg2" role="status"></p>
-              <details class="mw-more">
-                <summary data-i18n="mwNoPageTitle"></summary>
-                <p class="mw-hint" data-i18n="mwNoPage1"></p>
-                <button type="button" class="btn small" id="btnMwTwosv" data-i18n="mwTwosvBtn"></button>
-                <p class="mw-hint" data-i18n="mwNoPage2"></p>
-              </details>
-            </div>
-          </li>
-          <li class="mw-step" id="mwS3">
-            <span class="mw-mark" id="mwM3" aria-hidden="true"></span>
-            <div class="mw-body">
-              <b class="mw-title" data-i18n="mwS3Title"></b>
-              <input type="text" id="mwPass" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwPassPh">
-              <p class="mw-msg" id="mwMsg3a" role="status"></p>
-              <button type="button" class="btn small primary" id="btnMwConnect" data-i18n="mwConnect"></button>
-              <p class="mw-msg" id="mwMsg3" role="status"></p>
-            </div>
-          </li>
-          <li class="mw-step" id="mwS4">
-            <span class="mw-mark" id="mwM4" aria-hidden="true"></span>
-            <div class="mw-body">
-              <b class="mw-title" data-i18n="mwS4Title"></b>
-              <p class="mw-hint" data-i18n="mwS4Text"></p>
-              <button type="button" class="btn small" id="btnMwCal" data-i18n="mwS4Btn"></button>
-              <input type="text" id="mwIcal" class="mw-secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="mwIcalPh">
-              <p class="mw-msg" id="mwMsg4a" role="status"></p>
-              <button type="button" class="btn small" id="btnMwIcal" data-i18n="mwIcalTry"></button>
-              <p class="mw-msg" id="mwMsg4" role="status"></p>
-            </div>
-          </li>
-        </ol>
-        <ul class="mail-accounts" id="smAccounts"></ul>
-        <details class="mw-adv local-only" id="mwAdv">
-          <summary data-i18n="mwAdvTitle"></summary>
-          <div class="mail-client" id="smClient">
-            <ol class="mail-steps" id="smSteps">
-              <li data-i18n="smStep1"></li><li data-i18n="smStep2"></li><li data-i18n="smStep3"></li><li data-i18n="smStep4"></li>
-            </ol>
-            <p class="mail-note" id="smClientOk" data-i18n="smClientOk" hidden></p>
-            <button type="button" class="btn small" id="btnSmClient"></button>
-            <input type="file" id="smClientFile" accept=".json,application/json" hidden>
-          </div>
-          <div class="mail-wait" id="smLogin" hidden>
-            <p class="mail-note" data-i18n="smWaiting"></p>
-            <button type="button" class="btn small" id="btnSmCancel" data-i18n="smCancel"></button>
-          </div>
-          <button type="button" class="btn small local-only" id="btnSmAdd" data-i18n="smAdd"></button>
-        </details>
-        <p class="mail-note remote-only" data-i18n="smRemoteNote"></p>
-        <div class="mail-filter" id="smFilter">
-          <p class="mail-sub" data-i18n="smFilterTitle"></p>
-          <label class="check"><input type="checkbox" id="smDirect"> <span data-i18n="smDirect"></span></label>
-          <label class="check"><input type="checkbox" id="smCc"> <span data-i18n="smCc"></span></label>
-          <label class="check"><input type="checkbox" id="smAwaiting"> <span data-i18n="smAwaiting"></span></label>
-          <label class="mail-field"><span data-i18n="smSenders"></span><input type="text" id="smSenders" autocomplete="off" spellcheck="false"></label>
-          <label class="mail-field"><span data-i18n="smKeywords"></span><input type="text" id="smKeywords" autocomplete="off"></label>
-          <label class="mail-field"><span data-i18n="smLabels"></span><input type="text" id="smLabels" autocomplete="off"></label>
-        </div>
-      </fieldset>
-      <fieldset class="night">
-        <legend data-i18n="nightTitle"></legend>
-        <label class="check"><input type="checkbox" id="nEnabled"> <span data-i18n="nEnabled"></span></label>
-        <div class="row two">
-          <label><span data-i18n="nStart"></span><input type="time" id="nStart" required></label>
-          <label><span data-i18n="nEnd"></span><input type="time" id="nEnd" required></label>
-        </div>
-        <label class="check" id="nAutoRow"><input type="checkbox" id="nAutostart"> <span data-i18n="nAutostart"></span></label>
-        <p class="hint wide" data-i18n="nHint"></p>
-        <p class="hint wide night-wait" id="nWaiting" hidden></p>
-        <button type="button" class="btn small" id="btnNightLog" data-i18n="nLog"></button>
-      </fieldset>
-      <fieldset class="remote local-only" id="remoteBox">
-        <legend data-i18n="rTitle"></legend>
-        <ol class="steps" id="rSteps"></ol>
-        <label class="check"><input type="checkbox" id="rEnabled"> <span data-i18n="rEnabled"></span></label>
-        <p class="hint wide" id="rState"></p>
-        <div class="remote-pair" id="rPair" hidden>
-          <div class="qr" id="rQr"></div>
-          <div><p class="hint" data-i18n="rPairHint"></p><p class="pair-code" id="rCode"></p><p class="hint" id="rExpire"></p></div>
-        </div>
-        <button type="button" class="btn small" id="btnPair" data-i18n="rAdd"></button>
-        <ul class="devices" id="rDevices"></ul>
-        <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
-      </fieldset>
-      <fieldset class="remote remote-only">
-        <legend data-i18n="rTitle"></legend>
-        <p class="hint wide" id="rmState"></p>
-        <ul class="devices" id="rmDevices"></ul>
-        <p class="hint wide" data-i18n="rOnPhone"></p>
-        <button type="button" class="btn small" data-help="phone" data-i18n="rHelp"></button>
-        <button type="button" class="btn small primary" id="btnInstall" data-i18n="rInstall"></button>
-        <p class="hint wide" id="installHint" hidden></p>
-        <button type="button" class="btn small danger" id="btnForget" data-i18n="rForget"></button>
-      </fieldset>
-      <button type="button" class="btn small local-only" id="btnResetTabs" data-i18n="resetTabs"></button>
-      <p class="hint wide rs-ready" id="rsReady" hidden></p>
-      <div class="row between">
-        <div class="rs-settings-actions">
-          <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
-          <button type="button" class="btn" id="btnRestart" data-i18n="rsGo"></button>
-        </div>
-        <button class="btn primary" data-i18n="ok"></button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- Telefondan erişim rehberi -->
   <dialog id="dlgPhoneHelp" class="wide">
@@ -500,6 +533,8 @@
   <script src="/assets/followup-pushguard.js"></script>
   <script src="/assets/settings-mail.js"></script>
   <script src="/assets/bgjobs.js"></script>
+  <script src="/assets/i18n-settings.js"></script>
+  <script src="/assets/settings-hub.js"></script>
   <script src="/assets/restart.js"></script>
   <script src="/assets/codex.js"></script>
   <script src="/assets/cost.js"></script>

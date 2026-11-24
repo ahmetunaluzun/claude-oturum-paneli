@@ -144,7 +144,7 @@ const loads0 = await ev(`Number(sessionStorage.getItem("__loads"))`);
 await press("yes", 50);
 check("bekleme katmanı açıldı", await until(`document.querySelector(".rs-layer .rs-box.wait")`, 3000), true);
 check("katman metni", await ev(`document.querySelector(".rs-layer h2")?.textContent`), "Yeniden başlatılıyor…");
-check("Ayarlar penceresi kapandı (katman üstte)", await ev(`!document.getElementById("dlgSettings").open`), true);
+check("açık pencere kalmadı (katman üstte)", await ev(`!document.querySelector("dialog[open]")`), true);
 check("katman görünür (elementFromPoint)", await visible(".rs-layer .rs-box"), true);
 await shot("390_bekliyor");
 check("yeni süreç gelince sayfa kendini yeniledi", await until(`Number(sessionStorage.getItem("__loads")) > ${loads0} && document.getElementById("ver")?.textContent === "v${newVer}"`, 60000), true);
