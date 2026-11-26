@@ -849,6 +849,7 @@
       el.innerHTML = `<span class="tool-name">${esc(it.tool || t("tool"))}</span><span class="tool-text">${esc(it.text)}</span>`;
     } else if (it.kind === "assistant") {
       el.innerHTML = md(it.text);
+      addCopyButtons(el, it.text);
     } else {
       el.textContent = it.text;
     }
@@ -860,6 +861,73 @@
       el.appendChild(stamp);
     }
     return el;
+  }
+  // Kopyala: her kod bloğunun sağ üstünde ve asistan mesajının altında simge (Claude uygulamasındaki gibi).
+  // Kod bloğu yalnız kendi içini, mesaj düğmesi markdown işaretsiz düz metni kopyalar. Basınca ✓, 1,5 sn sonra geri.
+  const COPY_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  const DONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+  function copyButton(getText) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "msg-copy-btn";
+    b.innerHTML = COPY_ICON;
+    b.title = t("msgCopy");
+    b.setAttribute("aria-label", t("msgCopy"));
+    b.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!(await copyText(getText(), b))) { toast(t("msgCopyFail"), "warn"); return; }
+      b.innerHTML = DONE_ICON;
+      b.classList.add("done");
+      b.setAttribute("aria-label", t("msgCopied"));
+      clearTimeout(b._reset);
+      b._reset = setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); b.setAttribute("aria-label", t("msgCopy")); }, 1500);
+    });
+    return b;
+  }
+  function addCopyButtons(el, src) {
+    for (const pre of el.querySelectorAll("pre")) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg-copy-code";
+      pre.replaceWith(wrap);
+      wrap.append(pre, copyButton(() => pre.textContent));
+    }
+    const bar = document.createElement("div");
+    bar.className = "msg-copy-bar";
+    bar.appendChild(copyButton(() => mdPlain(src)));
+    el.appendChild(bar);
+  }
+  // Markdown → okunur düz metin: ``` satırları, > alıntı, # başlık, ** ve ` işaretleri, tablo ayırıcı satırı atılır.
+  // Kod bloğunun içi olduğu gibi kalır.
+  function mdPlain(src) {
+    let inCode = false;
+    const out = [];
+    for (const l of String(src).replace(/\r/g, "").split("\n")) {
+      if (l.startsWith("```")) { inCode = !inCode; continue; }
+      if (inCode) { out.push(l); continue; }
+      if (/^\|[\s:|-]+\|\s*$/.test(l)) continue;
+      out.push(l.replace(/^\s*>\s?/, "").replace(/^#{1,4}\s+/, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1"));
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  // Pano: güvenli bağlamda navigator.clipboard; HTTP (ör. Tailscale) ya da izin yoksa gizli textarea + execCommand.
+  // Textarea düğmenin yanına eklenir: çekmece dışına (body) eklenen öğe odak alamayabilir.
+  async function copyText(text, near) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(text); return true; } catch { /* yedek yola düş */ }
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.className = "msg-copy-ta";
+    (near?.parentNode || document.body).appendChild(ta);
+    ta.focus({ preventScroll: true });
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    near?.focus({ preventScroll: true });
+    return ok;
   }
   // Mesajdaki yollar (C:\…, %LOCALAPPDATA%\…, ~/…, /Users/…): sunucu bu bilgisayarda var olan en uzun ön eki söyler,
   // yalnız o kısım bağlantı olur. Tıklayınca klasör Gezgin'de açılır, dosya seçili gösterilir. Telefonda yok (uç kapalı).

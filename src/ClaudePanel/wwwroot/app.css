@@ -290,6 +290,20 @@ input[type=checkbox] { accent-color: var(--accent); width: 17px; height: 17px; }
 .msg.assistant table { border-collapse: collapse; font-size: 13px; }
 .msg.assistant th, .msg.assistant td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
 .msg.assistant th { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Kopyala simgeleri (kod bloğu sağ üstü, asistan mesajı altı): görünüm küçük, dokunma alanı 40 px. */
+.msg-copy-code { position: relative; }
+.msg-copy-code pre { padding-right: 44px; }
+.msg-copy-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: 0;
+  border: none; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.msg-copy-btn:hover, .msg-copy-btn:focus-visible { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.msg-copy-btn.done { color: var(--accent); }
+.msg-copy-code .msg-copy-btn { position: absolute; top: 1px; right: 1px; background: color-mix(in srgb, var(--bg) 85%, transparent); }
+.msg-copy-bar { display: flex; margin: -4px 0 -6px -12px; }
+.msg-copy-ta { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* Telefonda uzun basış yalnız mesaj metnini seçsin, çekmecenin kabuğunu (başlık, düğmeler, saat) değil. */
+.drawer { -webkit-user-select: none; user-select: none; }
+.drawer .msg.user, .drawer .msg.assistant, .drawer textarea, .drawer input { -webkit-user-select: text; user-select: text; }
+.drawer .msg-time, .drawer .msg-copy-btn { -webkit-user-select: none; user-select: none; }
 .msg.tool { align-self: flex-start; display: flex; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 2px 4px; max-width: 100%; }
 .tool-name { flex: none; font-weight: 600; color: color-mix(in srgb, var(--busy) 75%, var(--muted)); }
 .tool-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
