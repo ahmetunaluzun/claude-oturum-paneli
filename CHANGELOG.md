@@ -4,7 +4,6 @@ Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içinde
 
 ## Yayınlanmamış
 - **Yeni oturumda yeni klasör.** Yeni oturum → Klasörler'de "＋ Yeni klasör" düğmesi: bulunulan klasörün içine ad yazılır, Enter (ya da Oluştur) ile panel klasörü açar, içine girer ve seçer; oturum orada başlatılır. Esc yalnız ad satırını kapatır. Ad Windows ve Mac'te aynı kurallarla denetlenir (`\ / : * ? " < > |` yok, nokta/boşlukla bitmez, CON/NUL/COM1… gibi ayrılmış adlar yok, en çok 120 karakter); aynı adla klasör ya da dosya varsa üstüne yazılmaz, uyarı çıkar; üst klasörün dışına çıkılamaz. Telefondan da çalışır (`POST /api/dirs/create`, oturum anahtarı + aynı köken). "Bu bilgisayar" (sürücü listesi) görünümünde düğme gizli. git init yapılmaz. Test: `tools/yeni_klasor_test.sh` (API ad denetimleri + arayüz geniş/telefon)
-
 - **"Bu bilgisayar" sürücü listesi hızlandı.** Bağlı olmayan ağ sürücüleri (ör. V:–Z:) her biri 5-6 sn bekletiyordu, liste 28 sn'de açılıyordu. Artık sürücüler birlikte soruluyor, 1,5 sn içinde cevap vermeyen listeye girmiyor (ölçüm: 1,6 sn)
 
 ## 0.22.0 — 2026-11-26
