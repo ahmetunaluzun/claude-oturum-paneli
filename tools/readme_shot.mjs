@@ -151,9 +151,11 @@ await shot("son-oturumlar");
 await load({ ...desk, height: 2000 });
 await click("#btnSettings");
 await sleep(2500);
+// 0.21.0'dan beri Ayarlar bir sekme ve uzun: görüntü Hesaplar + Yapay zekâ işçileri bölümleriyle sınırlanır (altı kesik/boş kalmasın).
 const box = JSON.parse(await ev(`JSON.stringify(document.getElementById("viewSettings").getBoundingClientRect())`));
+const workersBottom = await ev(`document.getElementById("setWorkers").getBoundingClientRect().bottom`);
 const pad = 24;
-await shot("ayarlar", { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + 2 * pad, height: Math.min(2000, box.height + 2 * pad) });
+await shot("ayarlar", { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + 2 * pad, height: Math.min(2000, workersBottom - box.y + 2 * pad) });
 
 // 9-10) Telefon (telefondan erişim görünümü: bilgisayara özel düğmeler gizli)
 const phone = { lang: "tr", light: false, remote: true, width: 390, height: 844 };

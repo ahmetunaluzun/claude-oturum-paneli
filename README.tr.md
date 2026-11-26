@@ -32,6 +32,7 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 
 - **Konuşma paneli** (karta tıkla): oturumun mesajları ve araç adımları canlı akar.
 - **Panelde oturum**: yeni oturum panelin içinde çalışır (`claude -p --input-format stream-json`); mesaj buradan yazılır, iş durdurulur, oturum kapatılır. Kapalı bir oturuma yazınca `--resume` ile kaldığı yerden sürer.
+- **Taslak kaybolmaz** (0.22.0): konuşmaya yazıp göndermediğiniz metin oturum başına saklanır; çekmeceyi ✕ ile kapatıp açınca, başka oturuma geçip dönünce ya da panel yeniden açılınca yerinde durur, gönderince silinir. Taslak bu cihazda (tarayıcı deposunda) tutulur, öteki cihaza geçmez.
 - **Kaydet ve temizle / Kaydet ve kapat** (panel oturumları): oturum önce durumunu kaydeder (`/smart-clear` varsa o, yoksa CLAUDE_MEMORY.md + NEXT_SESSION.md güncelleme mesajı); temizlede ardından `/clear` + `devam` ile temiz bağlamda sürer, kapatta kapanır. Kartta duruma göre birincil düğme (Devam et / Kaydet ve temizle / Panele al) ve ⋯ menüsü; çalışan oturuma "iş bitince devam et / temizle / kapat". Başlıktaki **Toplu ▾ → Seç…** (ya da Ctrl + tık) ile seçilen oturumlara uygulanır (terminaldeki oturumlar da seçilir; toplu **Panele al** ile panele taşınır); "Hepsini …" seçenekleri de aynı menüde.
 
 ![Konuşma çekmecesi: bir panel oturumunun mesajları, araç adımları (Grep, Read, Edit, Bash), model, bağlam ve maliyet satırı, altta mesaj yazma alanı](docs/img/konusma.png)
@@ -54,7 +55,7 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 - **Bilgisayar açılınca başlat** (Windows: Run kaydı, Mac: LaunchAgent): yeniden başlatmadan sonra panel penceresiz açılır, oturumları geri bağlar; yarıda kalan işe devam ettirir. Gece penceresinde bilgisayar boşta uyumaz (Windows `SetThreadExecutionState`, Mac `caffeinate`).
 - **Paneli yeniden başlat** (0.18.0, Ayarlar; telefondan da): çalışan oturum yokken panel kendini aynı portta yeniden başlatır; diskte daha yeni sürüm varsa "Yeni sürüm hazır" notu çıkar. Arka planda iş sürüyorsa iş listelenir, "İşler bitince yeniden başlat" seçilebilir.
 
-<img src="docs/img/ayarlar.png" alt="Ayarlar penceresi: bildirim ve ses, terminalde kota kutusu (açık), gece modu 23:30–07:00 ve açılışta başlatma, telefondan erişim adımları ve iki eşleşmiş cihaz" width="420">
+<img src="docs/img/ayarlar.png" alt="Ayarlar sekmesi: solda bölüm menüsü; Hesaplar bölümünde Claude hesap kartı ve kotası, Google, GitHub, ElevenLabs, OpenRouter, Gemini API bağlantı kartları ve anahtarın nasıl bağlandığı; altında Yapay zekâ işçileri (Codex ve Gemini aç/kapa)" width="640">
 
 ### Son oturumlar
 
@@ -190,6 +191,8 @@ MIT — bkz. [LICENSE](LICENSE). Bağımsız bir projedir; Anthropic tarafından
 
 | Sürüm | Tarih | Değişen alan | Eski değer | Yeni değer | Neden |
 |---|---|---|---|---|---|
+| 0.22.0 | 2026-11-26 | Konuşma: yazma kutusu | Gönderilmeyen metin çekmece kapanınca siliniyordu | Taslak oturum başına saklanır, açınca ve panel yeniden açılınca geri gelir, gönderince silinir | Kullanıcı: yazıp bırakılan metin kayboluyordu |
+| 0.22.0 | 2026-11-26 | Ekran görüntüleri | 0.12.1 düzeni (Ayarlar penceresi) | 0.22.0 ile yeniden üretildi; Ayarlar görseli sekme düzeninde (Hesaplar, Yapay zekâ işçileri) | Görseller güncel arayüzü göstersin |
 | 0.21.0 | 2026-11-25 | Ayarlar | Ayarlar tek pencerede, dış bağlantılar elle kuruluyordu, telefonda kota yenilenme süresi görünmüyordu | Ayrı Ayarlar sekmesi: Hesaplar, anahtar bağlama, Yapay zekâ işçileri, İş yönlendirme, Google tablosu; telefonda yenilenme süresi | Kullanıcı isteği (taslak onayı 24.11) |
 | 0.20.0 | 2026-11-24 | Oturumlar: Claude hesabı | Panel yalnız tek Claude hesabını görüyordu | İki hesap: hesap başına kota, kartta hesap, öteki hesapta devam et, proje başına hesap, kota azalınca geçiş önerisi, gece modu hesap başına kota | Kişisel ve şirket hesabını birlikte kullanma ihtiyacı |
 | 0.19.0 | 2026-11-23 | Konuşmadaki klasör yolu; alt bilgideki arka plan göstergesi; Sekmeye git / VS Code'a git | Sonu \ olan yol Belgeler'i açıyordu; gösterge yalnız sayı veriyordu; Windows öne getirmeyi reddedince panel yine "oldu" diyordu, alt klasördeki oturumda yanlış VS Code penceresi geliyordu | Yol doğru klasörü açar; göstergeye basınca oturum, iş, tür ve süre listesi; öne gelme ölçülür, olmazsa uyarı; başlık eşleşmesinde üst klasörler de denenir | Kullanıcı bildirimi ve GitHub issue #1 (madde 4) |

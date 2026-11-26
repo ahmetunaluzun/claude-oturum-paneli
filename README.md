@@ -32,6 +32,7 @@ can reach (`127.0.0.1`).
 
 - **Conversation drawer** (click a card): the session's messages and tool steps stream in live.
 - **Sessions inside the panel**: a new session can run inside the panel (`claude -p --input-format stream-json`). You type messages here, stop the current job, or close the session. Write to a closed session and it picks up where it left off with `--resume`.
+- **Drafts are kept** (0.22.0): text you type into a conversation but don't send is saved per session; it is still there after closing the drawer with ✕, switching to another session and back, or restarting the panel, and is removed once sent. The draft stays on this device (browser storage) and does not move to your other devices.
 - **Save and clear / Save and close** (panel sessions): the session first saves its state (`/smart-clear` if you have it, otherwise a message asking it to update CLAUDE_MEMORY.md + NEXT_SESSION.md). "Clear" then continues in a fresh context with `/clear` + `devam` ("continue"); "close" shuts it down. Each card has a primary button that depends on its state (Continue / Save and clear / Move here) plus a ⋯ menu; a working session can be told to "continue / clear / close when done". **Bulk ▾ → Select…** in the lane header (or Ctrl + click) applies an action to the selected sessions (terminal sessions can be selected too, and bulk **Move here** moves them into the panel); the "All …" options live in the same menu.
 
 ![Conversation drawer: a panel session's messages and tool steps (Grep, Read, Edit, Bash), the model, context and cost line, and the message box at the bottom](docs/img/konusma.png)
@@ -54,7 +55,7 @@ can reach (`127.0.0.1`).
 - **Start when the computer starts** (Windows: Run key, macOS: LaunchAgent): after a restart the panel opens without a window, reattaches the sessions and resumes interrupted work. During the night window the computer doesn't go to sleep while idle (Windows `SetThreadExecutionState`, macOS `caffeinate`).
 - **Restart the panel** (0.18.0, Settings; also from the phone): when no session is working the panel restarts itself on the same port; if a newer version is on disk a "New version ready" note appears. If background work is running it is listed and "Restart when the work is done" can be chosen.
 
-<img src="docs/img/ayarlar.png" alt="Settings window: notifications and sound, quota-in-terminal box (on), night mode 23:30–07:00 with start at login, phone access steps and two paired devices" width="420">
+<img src="docs/img/ayarlar.png" alt="Settings tab: section menu on the left; the Accounts section with the Claude account card and quota, connection cards for Google, GitHub, ElevenLabs, OpenRouter and Gemini API, and how a key is connected; below it AI workers (Codex and Gemini on/off)" width="640">
 
 ### Recent sessions
 
@@ -192,6 +193,8 @@ The detailed changelog is in Turkish: [CHANGELOG.md](CHANGELOG.md).
 
 | Version | Date | Area | Before | After | Why |
 |---|---|---|---|---|---|
+| 0.22.0 | 2026-11-26 | Conversation: message box | Unsent text was lost when the drawer was closed | The draft is kept per session, comes back when reopened and after the panel restarts, and is removed once sent | User: text typed and left unsent disappeared |
+| 0.22.0 | 2026-11-26 | Screenshots | 0.12.1 layout (Settings dialog) | Regenerated with 0.22.0; the Settings image shows the tab layout (Accounts, AI workers) | Screenshots should match the current UI |
 | 0.21.0 | 2026-11-25 | Settings | Settings in one dialog, external connections set up by hand, reset time not visible on phones | Separate Settings tab: Accounts, key connection, AI workers, Task routing, Google table; reset time on phones | User request (draft approved 24.11) |
 | 0.20.0 | 2026-11-24 | Sessions: Claude account | The panel only saw one Claude account | Two accounts: per-account quota, account on the card, continue in the other account, per-project account, suggestion to switch when quota runs low, night mode per-account quota | Need to use a personal and a work account together |
 | 0.19.0 | 2026-11-23 | Folder paths in the conversation; background indicator in the footer; Go to tab / Go to VS Code | A path ending in \ opened Documents; the indicator only showed a count; when Windows refused to bring the window forward the panel still reported success, and a session in a subfolder brought up the wrong VS Code window | The path opens the right folder; clicking the indicator lists session, job, type and duration; bringing the window forward is measured, with a warning if it fails; parent folders are tried when matching the title | User report and GitHub issue #1 (item 4) |

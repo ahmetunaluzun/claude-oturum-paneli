@@ -2,8 +2,9 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
-## Yayınlanmamış
+## 0.22.0 — 2026-11-26
 - **Gönderilmemiş mesaj kaybolmuyor.** Konuşma çekmecesine yazılıp gönderilmeyen metin, çekmece ✕ ile kapanınca siliniyordu (her açılışta kutu boşaltılıyordu). Artık taslak oturum başına saklanır (`localStorage["panel.drafts"]`, cihaz başına): başka oturuma geçip dönünce, panel yeniden açılınca geri gelir; gönderilince ya da kutu boşaltılınca silinir, 30 günden eskisi kendiliğinden temizlenir. Test: `tools/taslak_test.sh`.
+- **Ekran görüntüleri yenilendi.** README görselleri 0.22.0 ile yeniden üretildi; Ayarlar görseli artık sekme düzenini (Hesaplar, Yapay zekâ işçileri) gösterir (`tools/readme_shot.mjs` Ayarlar görüntüsünü bu iki bölümle sınırlar).
 
 ## 0.21.0 — 2026-11-25
 - **Telefonda kota yenilenme süresi görünür.** İki hesap varken küçük kota halkalarında yenilenmeye kalan süre yalnız fareyle üzerine gelince (ipucu) görünüyordu; telefonda hiç görünmüyordu. Artık her halkanın altında "… kaldı" yazar, dar ekranda iki satıra kırılır, taşmaz. Test: `tools/hesap_ui_test.sh` (her halkada süre görünür, koyu/açık × geniş/dar/telefon).
