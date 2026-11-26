@@ -130,6 +130,19 @@ check("sunucu ad denetimi: 41 karakter 400, kontrol karakteri 400, bilinmeyen he
    await post("/api/hub/account/name", { id: "claude-yok", name: "x" }),
    await ev(`fetch("/api/hub/account/name", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"id":"claude-is","name":"x"}' }).then(r => r.status)`)],
   [400, 400, 404, 403]);
+// Öğenin görüntüsü (geniş ve telefon) ve içinde kartın dışına taşan öğe var mı
+async function elShot(sel, name, what) {
+  for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"]]) {
+    await size(w, h, mob);
+    await ev(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: "center", behavior: "instant" })`); await sleep(250);
+    const b = await ev(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth, r.width + 16), height: r.height + 16 }; })()`);
+    const s = await send("Page.captureScreenshot", { format: "png", clip: { ...b, scale: 1 } });
+    writeFileSync(`_onizleme/${name}_${n}.png`, Buffer.from(s.result.data, "base64"));
+    check(`${what} ${n}: taşan öğe yok`, await ev(`(() => { const root = document.querySelector(${JSON.stringify(sel)}), c = root.getBoundingClientRect();
+      return [...root.querySelectorAll("*")].filter(e => { if (!e.offsetWidth) return false; const b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).map(e => e.className || e.tagName); })()`), []);
+  }
+  await size(1280, 900, false);
+}
 // Görüntü: düzenleme açıkken (geniş ve telefon)
 for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"]]) {
   await size(w, h, mob);
@@ -172,32 +185,48 @@ await ev(`document.getElementById("sGithub").click()`); await sleep(1500);
 for (const need of ["setAccounts"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
 
 // ---- (c) Anahtar bağlama: Bağlan → gizli kutu → Dene ve kaydet (sahte deneme sunucusu) ----
-const key = (id) => ev(`(() => { const c = document.querySelector('#setConns [data-key="${id}"]'); if (!c) return null;
+const key = (id) => ev(`(() => { const c = document.querySelector('#setKeys [data-key="${id}"]'); if (!c) return null;
   const vis = (e) => !!e && !e.closest("[hidden]") && getComputedStyle(e).display !== "none";
   return { state: c.querySelector(".set-state").textContent, uses: c.querySelector(".set-uses").textContent,
-    btns: [...c.querySelectorAll("button")].filter(vis).map(b => b.textContent), box: vis(c.querySelector(".set-keybox")),
-    msg: c.querySelector(".set-msg").textContent, kind: c.querySelector(".set-msg").dataset.kind || "" }; })()`);
-const keyBtn = (id, label) => ev(`[...document.querySelectorAll('#setConns [data-key="${id}"] button')].find(b => b.textContent === ${JSON.stringify(label)} && b.offsetWidth)?.click()`);
-const keyType = (id, v) => ev(`document.querySelector('#setConns [data-key="${id}"] .set-keyinput').value = ${JSON.stringify(v)}`);
-check("üç anahtar kartı sırayla (Google ve GitHub'dan sonra)", await ev(`[...document.querySelectorAll("#setConns .set-card")].map(c => c.dataset.conn || c.dataset.key)`),
-  ["google", "github", "elevenlabs", "openrouter", "gemini"]);
+    btns: [...c.querySelectorAll("button:not(.linkbtn)")].filter(vis).map(b => b.textContent), box: vis(c.querySelector(".set-keybox")),
+    msg: c.querySelector(".set-msg").textContent, kind: c.querySelector(".set-msg").dataset.kind || "",
+    steps: [...c.querySelectorAll(".key-steps li")].filter(vis).map(li => li.className || "-").join(" "),
+    page: vis(c.querySelector('[data-step="1"] .ks-note')) ? c.querySelector('[data-step="1"] .ks-note').textContent : "" }; })()`);
+const keyBtn = (id, label) => ev(`[...document.querySelectorAll('#setKeys [data-key="${id}"] button')].find(b => b.textContent === ${JSON.stringify(label)} && b.offsetWidth)?.click()`);
+const keyType = (id, v) => ev(`document.querySelector('#setKeys [data-key="${id}"] .set-keyinput').value = ${JSON.stringify(v)}`);
+check("yapay zekâ servisleri ayrı grupta, Google ve GitHub 'Diğer hesaplar'da", await ev(`[[...document.querySelectorAll("#setKeys .set-card")].map(c => c.dataset.key), [...document.querySelectorAll("#setConns .set-card")].map(c => c.dataset.conn)]`),
+  [["elevenlabs", "openrouter", "gemini"], ["google", "github"]]);
+check("grup başlıkları ve profil seçimi başlık satırında", await ev(`[...document.querySelectorAll("#setAccounts .set-group")].map(h => h.textContent).concat(!!document.querySelector(".set-grouprow #setProfileRow"))`),
+  ["Claude", "Yapay zekâ servisleri (API anahtarı)", "Diğer hesaplar", true]);
+check("eski ortak 'Anahtar nasıl bağlanır' kutusu yok", await ev(`!!document.querySelector("#setAccounts .key-flow")`), false);
+check("bağlı olmayan kart: ne işe yarar, panelde nerede (yönlendirme bağlantısı), ücret", await ev(`(() => { const c = document.querySelector('#setKeys [data-key="openrouter"]');
+  return [...c.querySelectorAll(".key-facts > div")].filter(d => !d.hidden).map(d => d.querySelector("dt").textContent + ": " + d.querySelector("dd").textContent.trim()); })()`),
+  ["Panelde: İş yönlendirme → Görsel üretme. İş yönlendirmeyi gör", "Ücret: Bazı modellerin ücretsiz (:free) sürümü var, günlük istek sınırıyla; öbürleri yüklenen krediden düşer."]);
+check("ElevenLabs'ta yönlendirme bağlantısı yok (yönlendirmede satırı yok)", await ev(`document.querySelector('#setKeys [data-key="elevenlabs"] [data-go]').hidden`), true);
 check("OpenRouter: bağlı değil, Bağlan düğmesi, gizli kutu kapalı", await key("openrouter"),
-  { state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.", btns: ["Bağlan"], box: false, msg: "", kind: "" });
+  { state: "Bağlı değil", uses: "Tek anahtarla birçok sağlayıcının modeline erişim; panelde görsel üretmek için.", btns: ["Bağlan"], box: false, msg: "", kind: "", steps: "", page: "" });
 check("Chrome profil seçimi: varsayılan + iki uydurma profil", await ev(`[!document.getElementById("setProfileRow").hidden, [...document.querySelectorAll("#setKeyProfile option")].map(o => o.textContent), document.getElementById("setKeyProfile").value]`),
   [true, ["Varsayılan tarayıcı", "İş (is@ornek.com.tr)", "Kişisel (kisi@ornek.com)"], ""]);
 await ev(`(() => { const s = document.getElementById("setKeyProfile"); s.value = "Profile 1"; s.dispatchEvent(new Event("change")); })()`); await sleep(500);
 check("profil seçimi kalıcı (sunucuda)", await ev(`fetch("/api/hub").then(r => r.json()).then(d => d.chrome.selected)`), "Profile 1");
 await keyBtn("openrouter", "Bağlan"); await sleep(600);
-check("Bağlan: gizli kutu açık, sayfa açıldı notu, kutu parola türünde ve odakta", [await key("openrouter"), await ev(`(() => { const i = document.querySelector('[data-key="openrouter"] .set-keyinput'); return [i.type, document.activeElement === i]; })()`)],
-  [{ state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.", btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true,
-    msg: "Anahtar sayfası tarayıcıda açıldı. Anahtarı oluşturup aşağıya yapıştırın.", kind: "" }, ["password", true]]);
-check("gizli kutu ekranda görünür", await seen('#setConns [data-key="openrouter"] .set-keyinput'), "görünür");
+check("Bağlan: üç adım kartta, 1 bitti, 2 etkin, sayfa açıldı notu, kutu parola türünde ve odakta", [await key("openrouter"), await ev(`(() => { const i = document.querySelector('[data-key="openrouter"] .set-keyinput'); return [i.type, document.activeElement === i]; })()`)],
+  [{ state: "Bağlı değil", uses: "Tek anahtarla birçok sağlayıcının modeline erişim; panelde görsel üretmek için.", btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true,
+    msg: "", kind: "", steps: "done now -", page: "Anahtar sayfası tarayıcıda açıldı. Anahtarı oluşturup aşağıya yapıştırın." }, ["password", true]]);
+check("2. adımda servise özel ipucu", await ev(`document.querySelector('[data-key="openrouter"] [data-step="2"] .ks-note').textContent`),
+  "Anahtara bir ad verin; harcama sınırı (credit limit) koymanız önerilir. Oluşan anahtarı hemen kopyalayın.");
+await ev(`(() => { const i = document.querySelector('[data-key="openrouter"] .set-keyinput'); i.value = "x"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+check("yapıştırınca 3. adım etkin", (await key("openrouter")).steps, "done done now");
+await elShot('#setKeys [data-key="openrouter"]', "anahtar_adimlar", "anahtar adımları");
+await keyType("openrouter", "");
+check("gizli kutu ekranda görünür", await seen('#setKeys [data-key="openrouter"] .set-keyinput'), "görünür");
 await keyBtn("openrouter", "Dene ve kaydet"); await sleep(300);
 check("boş kutu: önce yapıştırın", (await key("openrouter")).msg, "Önce anahtarı yapıştırın.");
 await keyType("openrouter", "sahte-kotu-anahtar-9991"); await keyBtn("openrouter", "Dene ve kaydet");
 await until(`document.querySelector('[data-key="openrouter"] .set-msg').dataset.kind === "warn"`);
-check("yanlış anahtar: nedeni yazar, kutu açık kalır", await key("openrouter"), { state: "Bağlı değil", uses: "Anahtar sayfasını açar, yapıştırırsınız, panel bir deneme isteğiyle doğrular.",
-  btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true, msg: "Anahtar yanlış ya da geçersiz. Kopyalarken eksik kalmış olabilir.", kind: "warn" });
+check("yanlış anahtar: nedeni yazar, kutu açık kalır", await key("openrouter"), { state: "Bağlı değil", uses: "Tek anahtarla birçok sağlayıcının modeline erişim; panelde görsel üretmek için.",
+  btns: ["Sayfayı yeniden aç", "Dene ve kaydet", "Vazgeç"], box: true, msg: "Anahtar yanlış ya da geçersiz. Kopyalarken eksik kalmış olabilir.", kind: "warn",
+  steps: "done done now", page: "Anahtar sayfası tarayıcıda açıldı. Anahtarı oluşturup aşağıya yapıştırın." });
 await keyType("openrouter", "sahte-bos-anahtar-9996"); await keyBtn("openrouter", "Dene ve kaydet");
 await until(`document.querySelector('[data-key="openrouter"] .set-msg').textContent.includes("bakiye")`);
 check("bakiye yok: ayrı neden", (await key("openrouter")).msg, "Anahtar çalışıyor ama bakiye ya da kota kalmamış.");
@@ -219,7 +248,7 @@ check("Kaldır: panelin kendi onay penceresi", await ev(`document.getElementById
 await ev(`document.querySelector('#askButtons button[value="yes"]').click()`);
 await until(`document.querySelector('[data-key="openrouter"] .set-state').textContent === "Bağlı değil"`);
 check("kaldırıldı: bağlı değil, Bağlan düğmesi geri geldi", [(await key("openrouter")).btns, (await key("openrouter")).msg], [["Bağlan"], "Anahtar kaldırıldı."]);
-check("anahtar akış anlatımı görünür", await seen("#setAccounts .key-flow"), "görünür");
+check("bağlı kartta ücret satırı yok, panelde satırı var", await ev(`[...document.querySelectorAll('#setKeys [data-key="elevenlabs"] .key-facts > div')].map(d => d.hidden)`), [false, true]);
 
 // ---- (d) Yapay zekâ işçileri ve iş yönlendirme ----
 const worker = (id) => ev(`(() => { const c = document.querySelector('#wkCards [data-worker="${id}"]'); if (!c) return null;
@@ -227,6 +256,24 @@ const worker = (id) => ev(`(() => { const c = document.querySelector('#wkCards [
 await until(`document.querySelector('#wkCards [data-worker="gemini"] .set-who')?.textContent.includes("0.1.7")`, 8000);
 check("Codex kartı: plan, CLI sürümü, açık", await worker("codex"), { who: "go · codex CLI 0.171.0", on: "true", role: "switch" });
 check("Gemini kartı: CLI sürümü (sahte betik), kapalı", await worker("gemini"), { who: "gemini CLI 0.1.7", on: "false", role: "switch" });
+check("işçi kartı: ne yapar / ne yapmaz; kurulu olanda kurulum kutusu yok", await ev(`(() => { const c = document.querySelector('#wkCards [data-worker="codex"]');
+  return [[...c.querySelectorAll(".key-facts dt")].map(d => d.textContent), !!c.querySelector(".wk-setup")]; })()`), [["Ne yapar", "Ne yapmaz"], false]);
+check("Gemini notu: CLI ile API anahtarı ayrı yollar, anahtar bağlama bağlantısı", await ev(`(() => { const n = document.querySelector('#wkCards [data-worker="gemini"] .wk-note');
+  return [n.textContent.startsWith("Gemini iki yoldan bağlanır"), n.querySelector("[data-go]")?.dataset.go]; })()`), [true, "setAccounts"]);
+await ev(`(() => { window.__fetch = window.fetch; window.fetch = (u, o) => String(u).startsWith("/api/workers") && !o?.method
+  ? Promise.resolve(new Response(JSON.stringify({ codex: { enabled: true, installed: false }, gemini: { enabled: false, state: "none", apiKey: false } }), { headers: { "Content-Type": "application/json" } }))
+  : window.__fetch(u, o); })()`);
+await ev(`document.getElementById("btnSettings").click()`);
+await until(`!!document.querySelector('#wkCards [data-worker="codex"] .wk-setup')`, 6000);
+check("kurulu değil: kurulum ve giriş komutları, kopyala ve yeniden dene", await ev(`(() => { const c = document.querySelector('#wkCards [data-worker="codex"] .wk-setup');
+  return [c.querySelector(".wk-setup-h").textContent, [...c.querySelectorAll("code")].map(x => x.textContent), [...c.querySelectorAll("button")].map(b => b.textContent)]; })()`),
+  ["Kurulum (bilgisayarda bir kez)", ["npm install -g @openai/codex", "codex"], ["Kopyala", "Kopyala", "Yeniden dene"]]);
+check("Gemini CLI kurulu değil: gemini-cli komutu", await ev(`[...document.querySelectorAll('#wkCards [data-worker="gemini"] .wk-setup code')].map(x => x.textContent)`),
+  ["npm install -g @google/gemini-cli", "gemini"]);
+await elShot("#wkCards", "isci_kurulum", "işçi kurulum kutusu");
+await ev(`(() => { window.fetch = window.__fetch; })()`);
+await ev(`document.getElementById("btnSettings").click()`);
+await until(`!document.querySelector('#wkCards .wk-setup')`, 6000);
 const route = (job) => ev(`(() => { const c = document.querySelector('#rtList [data-job="${job}"]'); if (!c) return null;
   return { now: c.querySelector(".rt-now").textContent, chips: [...c.querySelectorAll(".rt-chip")].map(x => (x.querySelector(".rt-label")?.textContent || x.textContent) + (x.querySelector(".rt-st") ? " [" + x.querySelector(".rt-st").textContent + "]" : "") + (x.classList.contains("use") ? " *" : "")) }; })()`);
 check("iş türleri taslaktaki sırada", await ev(`[...document.querySelectorAll("#rtList .rt-card")].map(c => c.querySelector(".rt-name").textContent)`),
@@ -257,7 +304,7 @@ check("şirket işi notu ve üstü çizili örnek", await ev(`(() => { const s =
   return [document.querySelector("#setRouting .rt-company .set-tag").textContent, getComputedStyle(s).textDecorationLine]; })()`), ["Şirket işi", "line-through"]);
 
 const CARDS = ["#setAbout .about-card .set-name", "#abVer", "#abData", "#abOpenData", "#abNew li", "#setAbout .about-links a", "#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] [data-act=acct-edit]", "#setClaude .set-add b",
-  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile",
+  "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setKeys [data-key='elevenlabs'] .set-state", "#setKeys [data-key='gemini'] button", "#setKeyProfile",
   "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip", "#setGoogle .gg-table tbody tr:nth-child(6) td:last-child"];
 
 // ---- (e) Google ile neler yapılır: statik tablo, ücret/sınır rakamı yok ----

@@ -18,6 +18,25 @@ window.PanelSettingsRouting = function (d) {
   const editing = new Set();
 
   // ---- Yapay zekâ işçileri ----
+  // Kurulum ve giriş komutları resmi depolardan (github.com/openai/codex, github.com/google-gemini/gemini-cli README, 26.11.2026).
+  const SETUP = {
+    codex: { install: "npm install -g @openai/codex", login: "codex", loginNote: "wkCodexLoginNote" },
+    gemini: { install: "npm install -g @google/gemini-cli", login: "gemini", loginNote: "wkGeminiLoginNote" }
+  };
+  const cmd = (c) => `<span class="wk-cmd"><code>${esc(c)}</code><button type="button" class="btn small" data-wk-copy="${esc(c)}">${esc(t("wkCopy"))}</button></span>`;
+
+  // Kurulu değilse kurulum + giriş; Codex kurulu ama hiç oturum açılmamışsa (plan yok) yalnız giriş.
+  function setupBlock(id, w) {
+    const missing = id === "codex" ? !w.installed : w.state === "none";
+    const noLogin = id === "codex" && w.installed && !w.plan;
+    if (!missing && !noLogin) return "";
+    const s = SETUP[id];
+    const rows = (missing ? [`<li><b>${esc(t("wkInstall"))}</b> ${cmd(s.install)}</li>`] : []).concat(
+      `<li><b>${esc(t("wkLogin"))}</b> ${cmd(s.login)} <span class="wk-note">${esc(t(s.loginNote))}</span></li>`,
+      `<li><b>${esc(t("wkThen"))}</b> <button type="button" class="btn small" data-wk-act="recheck">${esc(t("setKeyRecheck"))}</button></li>`);
+    return `<div class="wk-setup local-only"><div class="wk-setup-h">${esc(t(missing ? "wkSetupTitle" : "wkLoginTitle"))}</div><ol>${rows.join("")}</ol></div>`;
+  }
+
   function workerCard(id, w) {
     const on = !!w.enabled;
     let who, extra = "", btn = "";
@@ -28,15 +47,17 @@ window.PanelSettingsRouting = function (d) {
       who = w.state === "ok" ? t("wkGeminiCli", w.version) : w.state === "checking" ? t("wkChecking") : t("wkNotInstalled", "gemini CLI");
       if (w.apiKey) who += " · " + t("wkGeminiKey");
       if (on && w.state === "none" && !w.apiKey) extra = t("wkOnButMissing");
-      if (w.state !== "ok") btn = `<div class="set-btns"><button type="button" class="btn small" data-wk-act="gemini-check">${esc(t("setKeyRecheck"))}</button></div>`;
+      // Gemini CLI ile Gemini API anahtarı ayrı yollardır; ikisinden biri işçiyi çalıştırır (Routing.cs).
+      btn = `<p class="wk-note">${esc(t(w.apiKey ? "wkGeminiKeyNote" : "wkGeminiNoKeyNote"))}${w.apiKey ? "" : ` <button type="button" class="linkbtn" data-go="setAccounts">${esc(t("wkGoKeys"))}</button>`}</p>`;
     }
     const name = id === "codex" ? "Codex" : `Gemini <span class="set-tag">${esc(t("setConnPersonal"))}</span>`;
     return `<div class="set-card" data-worker="${id}">
       <div class="set-card-top"><span class="set-logo">${id === "codex" ? "◎" : "✦"}</span>
         <div class="set-card-id"><div class="set-name">${name}</div><div class="set-who">${esc(who)}</div></div>
         <button type="button" class="wk-switch" role="switch" aria-checked="${on}" aria-label="${esc(id === "codex" ? "Codex" : "Gemini")}" data-wk="${id}"><i></i></button></div>
-      <div class="set-uses">${esc(t(id === "codex" ? "wkCodexUse" : "wkGeminiUse"))}</div>
-      ${extra ? `<p class="set-msg" data-kind="warn">${esc(extra)}</p>` : ""}${btn}</div>`;
+      <dl class="key-facts"><div><dt>${esc(t("wkDoLbl"))}</dt><dd>${esc(t(id === "codex" ? "wkCodexUse" : "wkGeminiUse"))}</dd></div>
+        <div><dt>${esc(t("wkDontLbl"))}</dt><dd>${esc(t(id === "codex" ? "wkCodexDont" : "wkGeminiDont"))}</dd></div></dl>
+      ${extra ? `<p class="set-msg" data-kind="warn">${esc(extra)}</p>` : ""}${setupBlock(id, w)}${btn}</div>`;
   }
 
   function renderWorkers() {
@@ -113,9 +134,15 @@ window.PanelSettingsRouting = function (d) {
       if (r.ok) { workers = r.data; renderWorkers(); load(); } else { sw.setAttribute("aria-checked", !on); toast(t("err_generic"), "warn"); }
       return;
     }
-    if (e.target.closest("[data-wk-act=gemini-check]")) {
+    const cp = e.target.closest("[data-wk-copy]");
+    if (cp) {
+      try { await navigator.clipboard.writeText(cp.dataset.wkCopy); cp.textContent = t("wkCopied"); setTimeout(() => { cp.textContent = t("wkCopy"); }, 1500); }
+      catch { toast(t("wkCopyFail"), "warn"); } // güvenli olmayan bağlamda (telefon, http) pano yok
+      return;
+    }
+    if (e.target.closest("[data-wk-act=recheck]")) {
       const b = e.target.closest("button"); b.disabled = true; b.textContent = t("setKeyTesting");
-      const r = await api("/api/workers/gemini/check", {});
+      const r = await api("/api/workers/gemini/check", {}); // Codex durumu her okumada taze; Gemini önbelleği burada yenilenir
       if (r.ok) workers = r.data;
       load();
       return;
