@@ -1312,6 +1312,7 @@
     if (!r.ok) { if (path) return openDir(""); return; }
     dirView.path = r.data.path; dirView.data = r.data;
     if (pick && r.data.path) { $("fCwd").value = r.data.path; searchPending = false; }
+    if (dirView.newDir && dirView.newDir.at !== r.data.path) dirView.newDir = null;
     settings.browseDir = r.data.path; save();
     $("projSearch").value = ""; searchPending = false;
     searchDeep(); // bekleyen alt klasör aramasını iptal eder
@@ -1347,6 +1348,7 @@
     });
     crumbs.scrollLeft = crumbs.scrollWidth;
     $("dirUp").disabled = !d.path;
+    $("dirNew").hidden = !d.path;
     $("dirRoots").innerHTML = "";
     for (const root of dirRoots()) {
       const b = document.createElement("button");
@@ -1358,6 +1360,7 @@
     const sel = $("fCwd").value.trim().toLowerCase();
     const list = d.dirs.filter(x => !q || norm(x.name).includes(q));
     box.innerHTML = list.length ? "" : `<p class="muted">${t(d.dirs.length ? "noProject" : "dirEmpty")}</p>`;
+    if (dirView.newDir && d.path) renderNewDir(box);
     // Bulunulan klasörün kendisi de seçilebilir
     if (d.path) {
       const self = document.createElement("button");
@@ -1379,6 +1382,57 @@
     });
     renderDeepDirs(q, sel, list.length);
   }
+  // Yeni klasör (0.23.0): bulunulan klasörün içinde ad yazılır, panel açar, içine girip seçer. Enter = oluştur, Esc = vazgeç.
+  function renderNewDir(box) {
+    const nd = dirView.newDir;
+    const row = document.createElement("div");
+    row.className = "dir-new";
+    row.innerHTML = `<span class="ico">📁</span><input id="dirNewName" maxlength="120" autocomplete="off" spellcheck="false">` +
+      `<button type="button" class="btn small primary" id="dirNewOk"></button><button type="button" class="btn small" id="dirNewCancel"></button>` +
+      `<p class="dir-new-err" id="dirNewErr" role="alert"></p>`;
+    const inp = row.querySelector("input");
+    inp.value = nd.name; inp.placeholder = t("dirNewPh");
+    row.querySelector("#dirNewOk").textContent = t("dirCreate");
+    row.querySelector("#dirNewCancel").textContent = t("cancel");
+    row.querySelector("#dirNewErr").textContent = nd.err || "";
+    inp.addEventListener("input", () => { nd.name = inp.value; nd.err = ""; row.querySelector("#dirNewErr").textContent = ""; });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); createDir(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeNewDir(); }
+    });
+    row.querySelector("#dirNewOk").addEventListener("click", createDir);
+    row.querySelector("#dirNewCancel").addEventListener("click", closeNewDir);
+    box.appendChild(row);
+    if (nd.focus) { nd.focus = false; setTimeout(() => inp.focus(), 0); }
+  }
+  function closeNewDir() { dirView.newDir = null; renderDirs(); }
+  async function createDir() {
+    const nd = dirView.newDir;
+    if (!nd || nd.busy) return;
+    const name = nd.name.trim();
+    if (!name) { nd.err = t("dirNewErr_empty"); nd.focus = true; renderDirs(); return; }
+    nd.busy = true;
+    const ok = $("dirNewOk"); if (ok) ok.disabled = true;
+    const r = await api("/api/dirs/create", { path: nd.at, name });
+    nd.busy = false;
+    if (dirView.newDir !== nd) return;
+    if (r.ok && r.data?.path) {
+      dirView.newDir = null;
+      await openDir(r.data.path, true);
+      $("fPrompt").focus();
+      return;
+    }
+    const code = r.data?.error;
+    nd.err = t(["empty", "long", "chars", "dots", "reserved", "exists", "notfound", "denied"].includes(code) ? "dirNewErr_" + code : "dirNewErr_other");
+    nd.focus = true;
+    renderDirs();
+  }
+  $("dirNew").addEventListener("click", () => {
+    if (!dirView.path) return;
+    if (dirView.newDir) { dirView.newDir.focus = true; renderDirs(); return; }
+    dirView.newDir = { at: dirView.path, name: "", err: "", focus: true, busy: false };
+    renderDirs();
+  });
   // Alt klasörlerde arama: yazmayı 250 ms bekler; geç gelen eski yanıt yenisini ezmez (sıra numarası).
   let deepSeq = 0, deepTimer = 0;
   function searchDeep() {

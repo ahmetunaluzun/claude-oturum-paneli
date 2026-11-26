@@ -494,6 +494,18 @@ app.MapPost("/api/dirs", async (HttpContext ctx, Transcripts tr) =>
     }
 });
 
+// Klasörler → Yeni klasör: gezilen klasörün içinde klasör açar (telefondan da). Var olan klasöre dokunmaz.
+app.MapPost("/api/dirs/create", async (HttpContext ctx) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    var req = await ctx.Request.ReadFromJsonAsync<DirCreateRequest>();
+    var (path, error) = DirCreate.Create(req?.Path?.Trim(), req?.Name);
+    if (error is not null)
+        return Results.Json(new { error }, statusCode: error switch { "exists" => 409, "notfound" => 404, "denied" => 403, _ => 400 });
+    RemoteLog.Info($"Yeni klasör açıldı: {path}");
+    return Results.Json(new { path });
+});
+
 // Klasörler aramasında alt klasörlere iner (2. düzey ve altı; sınırlar DirSearch'te). Kökte ("Bu bilgisayar") çalışmaz.
 app.MapPost("/api/dirs/search", async (HttpContext ctx, Transcripts tr) =>
 {
@@ -675,6 +687,7 @@ public record SwitchAccountRequest(int? Pid, string? Key, string? Account);
 public record NewSessionRequest(string? Cwd, string? Prompt, string? Name, string? Mode = null, string? Account = null);
 public record DirsRequest(string? Path, string? Q = null);
 public record DirEntry(string Name, string Path, bool Known);
+public record DirCreateRequest(string? Path, string? Name);
 public record WrapRequest(bool Close);
 public record NightRequest(NightSettings? Settings, bool? Autostart);
 record ClaimRequest(string? Code, string? Secret, string? Name);
