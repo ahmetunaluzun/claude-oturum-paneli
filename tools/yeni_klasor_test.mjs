@@ -63,8 +63,12 @@ for (const [w, h, label] of [[1200, 900, "geniş"], [390, 844, "telefon"]]) {
 await ev(`document.getElementById("btnNew").click()`); await sleep(800);
 await ev(`document.querySelector('#projTabs [data-tab="browse"]').click()`); await sleep(800);
 await ev(`document.querySelector('#dirCrumbs button')?.click()`);
-// Sürücü listesi bağlı olmayan ağ sürücülerinde 30 sn sürebilir (DriveInfo.IsReady)
+// Sürücü listesi: bağlı olmayan ağ sürücüsü listeyi bekletmemeli (önceden 28 sn, DriveInfo.IsReady)
+const t0 = Date.now();
 for (let i = 0; i < 240 && !(await ev(`document.getElementById("dirUp").disabled`)); i++) await sleep(250);
+const ms = Date.now() - t0;
+check("sürücü listesi 5 sn içinde geldi", ms < 5000, `${ms} ms`);
+check("sürücü listesinde C: var", await ev(`[...document.querySelectorAll("#projList .dir-pick b")].some(b => b.textContent === "C:")`));
 check("sürücü listesinde Yeni klasör gizli", await ev(`document.getElementById("dirNew").hidden`), await ev(`JSON.stringify({crumbs: document.getElementById("dirCrumbs").textContent, tab: document.querySelector("#projTabs .active")?.dataset.tab, open: document.getElementById("dlgNew").open})`));
 check("sayfada JS hatası yok", jsErrors.length === 0, jsErrors.join(" | ").slice(0, 400));
 ws.close();

@@ -59,9 +59,18 @@ static class Native
         Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"/select,\"{path}\"", UseShellExecute = false });
 
     /// <summary>Klasör gezgininin başlangıç noktaları: sürücüler.</summary>
-    public static List<DirEntry> FolderRoots() =>
-        DriveInfo.GetDrives().Where(d => d.IsReady)
-            .Select(d => new DirEntry(d.Name.TrimEnd('\\'), d.RootDirectory.FullName, false)).ToList();
+    /// <summary>Hazır sürücüler. Bağlı olmayan ağ sürücüsünde IsReady 5-6 sn bekletiyor (5 sürücüde liste 28 sn sürdü,
+    /// 26.11.2026): sürücüler birlikte sorulur, süre içinde cevap vermeyen listeye girmez.</summary>
+    public static List<DirEntry> FolderRoots()
+    {
+        var checks = DriveInfo.GetDrives()
+            .Select(d => (Drive: d, Ready: Task.Run(() => { try { return d.IsReady; } catch (IOException) { return false; } })))
+            .ToList();
+        Task.WaitAll(checks.Select(c => (Task)c.Ready).ToArray(), DriveWait);
+        return checks.Where(c => c.Ready.IsCompletedSuccessfully && c.Ready.Result)
+            .Select(c => new DirEntry(c.Drive.Name.TrimEnd('\\'), c.Drive.RootDirectory.FullName, false)).ToList();
+    }
+    static readonly TimeSpan DriveWait = TimeSpan.FromMilliseconds(1500);
 
     public static async Task<bool> Confirm(string text, bool warning = false) =>
         await Box(text, MessageBoxButtons.YesNo, warning ? MessageBoxIcon.Warning : MessageBoxIcon.Question) == DialogResult.Yes;
