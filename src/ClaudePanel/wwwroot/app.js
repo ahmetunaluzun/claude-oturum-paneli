@@ -702,12 +702,31 @@
   // ---- Çekmece (konuşma) ----
   const drawer = { target: null, timer: null, rendered: new Set(), sending: false };
 
+  // Gönderilmemiş mesaj taslağı oturum başına kalıcı (localStorage["panel.drafts"]); çekmece kapanınca/panel yeniden açılınca geri gelir.
+  // Anahtar sessionId, yoksa id (yeni panel oturumunda sessionId sonradan gelir → iki anahtar da aranır). 30 günden eski taslak silinir.
+  const DRAFT_STORE = "panel.drafts", DRAFT_TTL_MS = 30 * 864e5;
+  const drafts = (() => { try { return JSON.parse(localStorage.getItem(DRAFT_STORE) || "{}"); } catch { return {}; } })();
+  for (const k of Object.keys(drafts)) if (!(Date.now() - (drafts[k]?.at || 0) < DRAFT_TTL_MS)) delete drafts[k];
+  const saveDrafts = () => { try { localStorage.setItem(DRAFT_STORE, JSON.stringify(drafts)); } catch { /* kota dolu: taslak yalnız bellekte */ } };
+  const draftKeys = (tg) => [tg?.sessionId, tg?.id].filter(Boolean);
+  function draftLoad(tg) {
+    for (const k of draftKeys(tg)) if (drafts[k]?.text) return drafts[k].text;
+    return "";
+  }
+  function draftStore(tg, text) {
+    const keys = draftKeys(tg);
+    if (!keys.length) return;
+    for (const k of keys) delete drafts[k];
+    if (text.trim()) drafts[keys[0]] = { text, at: Date.now() };
+    saveDrafts();
+  }
+
   function openDrawer(s) {
     if (!s) return;
     drawer.target = { ...s };
     drawer.rendered.clear();
     $("dMessages").innerHTML = `<p class="muted center">${t("loading")}</p>`;
-    $("dInput").value = "";
+    $("dInput").value = draftLoad(drawer.target);
     syncComposer();
     document.body.classList.add("drawer-open");
     $("drawer").setAttribute("aria-hidden", "false");
@@ -993,7 +1012,7 @@
         r = await startHosted({ cwd: tg.cwd, prompt: text, resumeId: tg.sessionId, name: null, model: null });
         if (r.ok && !r.data.sent && !r.data.queued) { tg.id = "h:" + r.data.key; tg.kind = "panel"; tg.key = r.data.key; }
         // Mesaj projedeki öteki oturuma gittiyse o oturumun konuşması açılır.
-        else if (r.ok) { $("dInput").value = ""; syncComposer(); openDrawer(items.find(s => s.key === r.data.key) || tg); return; }
+        else if (r.ok) { $("dInput").value = ""; syncComposer(); draftStore(tg, ""); openDrawer(items.find(s => s.key === r.data.key) || tg); return; }
       }
       if (r.ok) {
         $("dInput").value = "";
@@ -1568,6 +1587,7 @@
   const COMPOSER_MAX_LINES = 5;
   function syncComposer() {
     const el = $("dInput");
+    if (drawer.target) draftStore(drawer.target, el.value);
     $("dSend").classList.toggle("send-empty", !el.value.trim());
     el.rows = PHONE.matches ? 1 : 2;
     if (!PHONE.matches) { el.style.height = ""; return; }

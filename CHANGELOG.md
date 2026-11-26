@@ -2,6 +2,9 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
+## Yayınlanmamış
+- **Gönderilmemiş mesaj kaybolmuyor.** Konuşma çekmecesine yazılıp gönderilmeyen metin, çekmece ✕ ile kapanınca siliniyordu (her açılışta kutu boşaltılıyordu). Artık taslak oturum başına saklanır (`localStorage["panel.drafts"]`, cihaz başına): başka oturuma geçip dönünce, panel yeniden açılınca geri gelir; gönderilince ya da kutu boşaltılınca silinir, 30 günden eskisi kendiliğinden temizlenir. Test: `tools/taslak_test.sh`.
+
 ## 0.21.0 — 2026-11-25
 - **Telefonda kota yenilenme süresi görünür.** İki hesap varken küçük kota halkalarında yenilenmeye kalan süre yalnız fareyle üzerine gelince (ipucu) görünüyordu; telefonda hiç görünmüyordu. Artık her halkanın altında "… kaldı" yazar, dar ekranda iki satıra kırılır, taşmaz. Test: `tools/hesap_ui_test.sh` (her halkada süre görünür, koyu/açık × geniş/dar/telefon).
 - **Ayarlar artık ayrı bir sekme.** Ayarlar penceresi kalktı; üst menüde "Ayarlar" sekmesi var, ⚙ düğmesi de onu açar (`?view=settings` ile adresten de açılır). Solda bölüm menüsü (geniş ekranda yapışkan; 760 px ve altında üstte yatay kayan şerit): Genel, Bildirimler, Gece modu, Mail ve takvim, Telefondan erişim, Gelişmiş. Eski penceredeki her ayar aynen duruyor, yalnız bölümlere dağıldı; "Paneli yeniden başlat" ve "Paneli kapat" Gelişmiş'te. Test: `tools/ayarlar_ui_test.sh`.
