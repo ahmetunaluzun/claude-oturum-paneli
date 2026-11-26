@@ -930,10 +930,11 @@
     return ok;
   }
   // Mesajdaki yollar (C:\…, %LOCALAPPDATA%\…, ~/…, /Users/…): sunucu bu bilgisayarda var olan en uzun ön eki söyler,
-  // yalnız o kısım bağlantı olur. Tıklayınca klasör Gezgin'de açılır, dosya seçili gösterilir. Telefonda yok (uç kapalı).
+  // yalnız o kısım bağlantı olur. Tıklayınca klasör Gezgin'de açılır, dosya seçili gösterilir.
+  // Telefonda: yalnız proje kökü altındaki dosyalar (gizli ad yok, sunucu süzer) bağlantı olur, tıklayınca indirilir.
   const PATH_RE = /(?:[A-Za-z]:\\|%[A-Za-z_][A-Za-z0-9_]*%[\\/]|~[\\/]|\/(?:Users|Volumes|Applications|home|opt|tmp|private)\/)(?:(?!\s(?:[A-Za-z]:\\|%[A-Za-z_]))[^\n<>"|?*`])*/g;
   async function linkPaths(els) {
-    if (REMOTE || !els.length) return;
+    if (!els.length) return;
     const hits = [];
     for (const el of els) {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -946,7 +947,7 @@
     const uniq = [...new Set(hits.map(h => h.text))].slice(0, 200);
     let lens;
     try {
-      const res = await fetch("/api/path-links", { method: "POST", headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(uniq) });
+      const res = await fetch(REMOTE ? "/api/files/links" : "/api/path-links", { method: "POST", headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(uniq) });
       if (!res.ok) return;
       lens = await res.json();
     } catch { return; }
@@ -961,7 +962,7 @@
       a.className = "path-link";
       a.href = "#";
       a.dataset.path = tail.nodeValue;
-      a.title = t("revealPath");
+      a.title = t(REMOTE ? "downloadPath" : "revealPath");
       tail.replaceWith(a);
       a.appendChild(tail);
     }
@@ -970,9 +971,29 @@
     const a = e.target.closest("a.path-link");
     if (!a) return;
     e.preventDefault();
+    if (REMOTE) return downloadPath(a);
     const res = await fetch("/api/reveal", { method: "POST", headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ path: a.dataset.path }) });
     if (!res.ok) toast(t("pathMissing"), "warn");
   });
+  // Telefonda dosyayı indir: belirteç başlıkta gider, yanıt blob olarak kaydedilir. Sürerken ikinci dokunuş yok sayılır.
+  async function downloadPath(a) {
+    if (a.dataset.busy) return;
+    a.dataset.busy = "1";
+    toast(t("downloading"));
+    try {
+      const res = await fetch("/api/files/download", { method: "POST", headers: { "X-Panel-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ path: a.dataset.path }) });
+      if (!res.ok) { toast(t("pathMissing"), "warn"); return; }
+      const url = URL.createObjectURL(await res.blob());
+      const dl = document.createElement("a");
+      dl.href = url;
+      dl.download = a.dataset.path.split(/[\\/]/).pop();
+      document.body.appendChild(dl);
+      dl.click();
+      dl.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch { toast(t("pathMissing"), "warn"); }
+    finally { delete a.dataset.busy; }
+  }
   // Mesaj saati: bugünse yalnız saat, değilse gün.ay + saat.
   function msgTime(ts) {
     const d = new Date(ts), now = new Date();

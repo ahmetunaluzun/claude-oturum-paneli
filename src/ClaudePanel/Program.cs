@@ -300,6 +300,26 @@ app.MapPost("/api/reveal", async (HttpContext ctx) =>
     return body?.Path is { } p && PathLinks.Reveal(p) ? Results.Ok() : Results.NotFound();
 });
 
+// Telefon: konuşmadaki yollardan indirilebilir dosyalar (proje kökü altı, gizli ad yok) — her aday için bağlantı uzunluğu.
+app.MapPost("/api/files/links", async (HttpContext ctx) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    var list = await ctx.Request.ReadFromJsonAsync<string[]>();
+    if (list is null || list.Length > PathLinks.MaxCandidates) return Results.BadRequest();
+    return Results.Json(await Task.Run(() => list.Select(RemoteFiles.Match).ToArray()));
+});
+
+// Telefon: dosyayı indir (salt okuma). Belirteç başlıkta: ön yüz fetch + blob ile indirir, düz bağlantı çalışmaz.
+app.MapPost("/api/files/download", async (HttpContext ctx) =>
+{
+    if (!Authorized(ctx)) return Results.StatusCode(403);
+    var body = await ctx.Request.ReadFromJsonAsync<PathRequest>();
+    if (body?.Path is not { } req || RemoteFiles.Allowed(req) is not { } p) return Results.NotFound();
+    RemoteLog.Info($"Dosya indirildi ({(IsLocal(ctx) ? "yerel" : "telefon")}): {p}");
+    return Results.File(new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
+        "application/octet-stream", Path.GetFileName(p));
+});
+
 app.MapPost("/api/sessions", async (HttpContext ctx, ProjectGuard guard) =>
 {
     if (!Authorized(ctx)) return Results.StatusCode(403);
