@@ -41,6 +41,22 @@ public static class ProjectAccounts
         lock (Lock) return Load();
     }
 
+    /// <summary>Hesabın kayıtlı projesini kaldırır (proje varsayılan hesaba döner). Yol, kayıttaki kökle aynı olmalı
+    /// (klasör silinmiş olsa da kaldırılabilir). Kayıt yoksa ya da başka hesaba aitse false.</summary>
+    public static bool Remove(string accountId, string root)
+    {
+        lock (Lock)
+        {
+            var d = Load();
+            var key = root.TrimEnd('\\', '/').ToLowerInvariant();
+            if (!d.TryGetValue(key, out var id) || !id.Equals(accountId, StringComparison.OrdinalIgnoreCase)) return false;
+            d.Remove(key);
+            Save(d);
+            RemoteLog.Info($"Proje hesaptan çıkarıldı ({accountId}): {root}");
+            return true;
+        }
+    }
+
     public static void Set(string cwd, string accountId)
     {
         lock (Lock)
@@ -49,17 +65,22 @@ public static class ProjectAccounts
             var key = Key(cwd);
             if (Accounts.Find(accountId) is { IsDefault: false } a) d[key] = a.Id;
             else if (!d.Remove(key)) return;
-            try
-            {
-                Directory.CreateDirectory(Handoff.DataDir);
-                var tmp = File_ + ".tmp";
-                File.WriteAllText(tmp, JsonSerializer.Serialize(d));
-                File.Move(tmp, File_, overwrite: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                RemoteLog.Info($"Proje hesabı kaydedilemedi: {ex.Message}");
-            }
+            Save(d);
+        }
+    }
+
+    static void Save(Dictionary<string, string> d)
+    {
+        try
+        {
+            Directory.CreateDirectory(Handoff.DataDir);
+            var tmp = File_ + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(d));
+            File.Move(tmp, File_, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RemoteLog.Info($"Proje hesabı kaydedilemedi: {ex.Message}");
         }
     }
 

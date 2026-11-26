@@ -102,6 +102,57 @@ check("sıfırlanma tarihi yazıyor", await ev(`/Haftalık sıfırlanma: \\d{2} 
 check("hesap ekle kartı yalnız yönlendirme notu (düğme yok)", await ev(`(() => { const a = document.querySelector("#setClaude .set-add");
   return [a.querySelector("b").textContent, a.textContent.includes("CLAUDE_CONFIG_DIR"), a.querySelectorAll("button, input").length]; })()`), ["+ Claude hesabı ekle", true, 0]);
 check("menüde Hesaplar noktası (haftalık kotası azalan hesap)", await ev(`[document.getElementById("setDotAccounts").hidden, document.getElementById("setDotAccounts").title]`), [false, "Haftalık kotası azalan hesap: Kişisel"]);
+// ---- (b2) Hesap düzenleme: görünen ad (boş = Claude'daki ad), hesaba kayıtlı projeyi çıkarma ----
+const IS = `#setClaude [data-acct="claude-is"]`;
+const isCard = () => ev(`(() => { const c = document.querySelector('${IS}'); const i = c.querySelector("[data-act=acct-name]");
+  return { name: c.querySelector(".set-name").textContent, input: i ? [i.value, i.placeholder, document.activeElement === i] : null,
+    proj: [...c.querySelectorAll(".acct-edit-path b")].map(s => s.textContent), msg: c.querySelector(".set-msg")?.textContent || "" }; })()`);
+const typeName = async (v) => { await ev(`(() => { const i = document.querySelector('${IS} [data-act=acct-name]'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`); };
+const pressKey = (key) => ev(`document.querySelector('${IS} [data-act=acct-name]').dispatchEvent(new KeyboardEvent("keydown", { key: "${key}", bubbles: true }))`);
+const hubName = () => ev(`fetch("/api/hub").then(r => r.json()).then(h => { const a = h.accounts.find(x => x.id === "claude-is"); return [a.label, a.orgLabel, a.custom]; })`);
+check("hesap kartında Düzenle düğmesi", await ev(`[...document.querySelectorAll("#setClaude .set-card [data-act=acct-edit]")].length`), 2);
+await ev(`document.querySelector('${IS} [data-act=acct-edit]').click()`); await sleep(250);
+check("Düzenle: ad kutusu boş, öneri Claude'daki ad, odakta; projeler listede", await isCard(),
+  { name: "Örnek Şirket A.Ş.", input: ["", "Örnek Şirket A.Ş.", true], proj: ["Muhasebe Projesi"], msg: "" });
+await typeName("Örnek Holding"); await pressKey("Escape"); await sleep(250);
+check("Esc düzenlemeyi kapatır, ad değişmez", [(await isCard()).input, (await hubName())[0]], [null, "Örnek Şirket A.Ş."]);
+await ev(`document.querySelector('${IS} [data-act=acct-edit]').click()`); await sleep(250);
+await typeName("  Protel A.Ş.  "); await pressKey("Enter"); await until(`!document.querySelector('${IS} [data-act=acct-name]')`);
+check("Enter ile kaydedilir: kartta ve sunucuda yeni ad (boşluklar kırpılır)", [(await isCard()).name, await hubName()], ["Protel A.Ş.", ["Protel A.Ş.", "Örnek Şirket A.Ş.", true]]);
+await until(`document.querySelector(".acct-name") && [...document.querySelectorAll(".acct-name")].some(e => e.textContent === "Protel A.Ş.")`, 9000);
+check("yeni ad üst çubuktaki hesap kotasında da görünür", await ev(`[...document.querySelectorAll(".acct-name")].map(e => e.textContent).includes("Protel A.Ş.")`), true);
+await ev(`document.querySelector('${IS} [data-act=acct-edit]').click()`); await sleep(250);
+check("yeniden düzenlemede kutuda verilen ad", (await isCard()).input.slice(0, 2), ["Protel A.Ş.", "Örnek Şirket A.Ş."]);
+const TOK = `document.querySelector('meta[name="panel-token"]').content`;
+const post = (path, body) => ev(`fetch("${path}", { method: "POST", headers: { "X-Panel-Token": ${TOK}, "Content-Type": "application/json" }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.status)`);
+check("sunucu ad denetimi: 41 karakter 400, kontrol karakteri 400, bilinmeyen hesap 404, belirteçsiz 403",
+  [await post("/api/hub/account/name", { id: "claude-is", name: "x".repeat(41) }), await post("/api/hub/account/name", { id: "claude-is", name: "a\u0007b" }),
+   await post("/api/hub/account/name", { id: "claude-yok", name: "x" }),
+   await ev(`fetch("/api/hub/account/name", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"id":"claude-is","name":"x"}' }).then(r => r.status)`)],
+  [400, 400, 404, 403]);
+// Görüntü: düzenleme açıkken (geniş ve telefon)
+for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"]]) {
+  await size(w, h, mob);
+  await ev(`document.querySelector('${IS}').scrollIntoView({ block: "center", behavior: "instant" })`); await sleep(250);
+  const b = await ev(`(() => { const r = document.querySelector('${IS}').getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth, r.width + 16), height: r.height + 16 }; })()`);
+  const s = await send("Page.captureScreenshot", { format: "png", clip: { ...b, scale: 1 } });
+  writeFileSync(`_onizleme/hesap_duzenle_${n}.png`, Buffer.from(s.result.data, "base64"));
+  check(`hesap düzenleme ${n}: kartta taşan öğe yok`, await ev(`(() => { const c = document.querySelector('${IS}').getBoundingClientRect();
+    return [...document.querySelectorAll('${IS} *')].filter(e => { if (!e.offsetWidth) return false; const b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).map(e => e.className || e.tagName); })()`), []);
+}
+await size(1280, 900);
+await typeName(""); await ev(`document.querySelector('${IS} [data-act=acct-save]').click()`); await until(`!document.querySelector('${IS} [data-act=acct-name]')`);
+check("ad boşaltılınca Claude'daki ada döner", [(await isCard()).name, await hubName()], ["Örnek Şirket A.Ş.", ["Örnek Şirket A.Ş.", "Örnek Şirket A.Ş.", false]]);
+await ev(`document.querySelector('${IS} [data-act=acct-edit]').click()`); await sleep(250);
+await ev(`document.querySelector('${IS} [data-act=acct-proj-rm]').click()`);
+await until(`document.querySelector('${IS} .set-msg')?.textContent.includes("varsayılan")`);
+check("projeyi hesaptan çıkar: liste boşalır, bilgi yazar, kayıt silinir", [(await isCard()).proj, (await isCard()).msg,
+  await ev(`fetch("/api/hub").then(r => r.json()).then(h => h.accounts.find(x => x.id === "claude-is").projects.length)`)],
+  [[], "Muhasebe Projesi varsayılan hesaba döndü.", 0]);
+check("aynı projeyi ikinci kez çıkarmak 404", await post("/api/hub/account/project-remove", { id: "claude-is", project: "C:\\yok" }), 404);
+await ev(`document.querySelector('${IS} [data-act=acct-cancel]').click()`); await sleep(200);
+check("düzenleme kapandı", (await isCard()).input, null);
+
 const conn = (id) => ev(`(() => { const c = document.querySelector('#setConns [data-conn="${id}"]'); if (!c) return null;
   return { state: c.querySelector(".set-state").textContent, who: c.querySelector(".set-who").textContent, btns: [...c.querySelectorAll("button")].map(b => b.textContent), msg: c.querySelector(".set-msg")?.textContent || "" }; })()`);
 check("Google kartı: bağlı değil, yalnız kişisel, Mail ve takvime götürür", await conn("google"),
@@ -205,7 +256,7 @@ check("Bitti: zincir yeniden yatay", await ev(`getComputedStyle(document.querySe
 check("şirket işi notu ve üstü çizili örnek", await ev(`(() => { const s = document.querySelector("#setRouting .rt-example .rt-chip.skip .rt-label");
   return [document.querySelector("#setRouting .rt-company .set-tag").textContent, getComputedStyle(s).textDecorationLine]; })()`), ["Şirket işi", "line-through"]);
 
-const CARDS = ["#setAbout .about-card .set-name", "#abVer", "#abData", "#abOpenData", "#abNew li", "#setAbout .about-links a", "#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
+const CARDS = ["#setAbout .about-card .set-name", "#abVer", "#abData", "#abOpenData", "#abNew li", "#setAbout .about-links a", "#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] [data-act=acct-edit]", "#setClaude .set-add b",
   "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile",
   "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip", "#setGoogle .gg-table tbody tr:nth-child(6) td:last-child"];
 

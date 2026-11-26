@@ -78,6 +78,9 @@ window.PanelSettingsHub = function (d) {
   };
   const folderName = (p) => (p || "").split(/[\\/]/).filter(Boolean).pop() || p || "";
   let hub = null, mail = null, github = null, ghNote = "";
+  // Düzenlenen hesap kartları: kimlik → { name: yazılan ad, msg, kind }. Yeniden çizimde yazılan metin kaybolmasın.
+  const editing = new Map();
+  const baseName = (a) => a.orgLabel || (a.isDefault ? t("acctPersonal") : a.id.replace(/^\.claude-?/, "") || a.id);
 
   function claudeCard(a, i) {
     const week = a.usage?.seven_day?.used, five = a.usage?.five_hour?.used;
@@ -91,11 +94,50 @@ window.PanelSettingsHub = function (d) {
     const uses = a.isDefault ? t("setAccDefaultAll") : names.length ? t("setAccProjects", names.join(", ")) : t("setAccNoProjects");
     const list = names.length ? `<details class="set-proj"><summary>${esc(t("setAccProjectsBtn", names.length))}</summary>
       <ul>${a.projects.map(p => `<li>${esc(p)}</li>`).join("")}</ul></details>` : "";
+    const ed = editing.get(a.id);
     return `<div class="set-card" data-acct="${esc(a.id)}">
       <div class="set-card-top"><span class="set-logo set-logo-${i % 2 ? "b" : "a"}">C</span>
         <div class="set-card-id"><div class="set-name">${esc(accountName(a))}</div><div class="set-who">${esc(t(a.isDefault ? "setAccWhoDefault" : "setAccWho", a.id))}</div></div>${state}</div>
       ${meter}<div class="set-meta"><span>${esc(meta[0])}</span><span>${esc(meta[1])}</span></div>
-      <div class="set-uses">${esc(uses)}</div>${list}</div>`;
+      <div class="set-uses">${esc(uses)}</div>${ed ? editForm(a, ed) : list +
+        `<div class="set-btns"><button type="button" class="btn small" data-act="acct-edit">${esc(t("setAccEdit"))}</button></div>`}</div>`;
+  }
+
+  /** Hesap düzenleme: görünen ad (boş = Claude'daki ad) ve hesaba kayıtlı projeler (her biri hesaptan çıkarılabilir). */
+  function editForm(a, ed) {
+    const id = "accName-" + a.id.replace(/[^\w-]/g, "_");
+    const projects = a.isDefault ? `<p class="set-uses">${esc(t("setAccEditDefaultProj"))}</p>`
+      : (a.projects || []).length ? `<ul class="acct-edit-proj">${a.projects.map(p => `<li><span class="acct-edit-path"><b>${esc(folderName(p))}</b><small>${esc(p)}</small></span>
+          <button type="button" class="btn small" data-act="acct-proj-rm" data-path="${esc(p)}">${esc(t("setAccProjRemove"))}</button></li>`).join("")}</ul>`
+      : `<p class="set-uses">${esc(t("setAccNoProjects"))}</p>`;
+    return `<div class="acct-edit">
+      <label for="${id}">${esc(t("setAccNameLabel"))}</label>
+      <input id="${id}" type="text" data-act="acct-name" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(ed.name)}" placeholder="${esc(baseName(a))}">
+      <small class="set-uses">${esc(t("setAccNameHint", baseName(a)))}</small>
+      <div class="acct-edit-h">${esc(t("setAccProjTitle"))}</div>${projects}
+      <div class="set-btns"><button type="button" class="btn small primary" data-act="acct-save">${esc(t("setAccSave"))}</button>
+        <button type="button" class="btn small" data-act="acct-cancel">${esc(t("cancel"))}</button></div>
+      <p class="set-msg" role="status" data-kind="${esc(ed.kind || "")}">${esc(ed.msg || "")}</p></div>`;
+  }
+
+  const acctOf = (el) => (hub?.accounts || []).find(a => a.id === el.closest("[data-acct]")?.dataset.acct);
+  const focusName = (id) => setTimeout(() => { const i = document.querySelector(`#setClaude [data-acct="${CSS.escape(id)}"] [data-act=acct-name]`); if (i) { i.focus(); i.select(); } }, 0);
+
+  async function accountAction(btn) {
+    const a = acctOf(btn); if (!a) return;
+    const act = btn.dataset.act;
+    if (act === "acct-edit") { editing.set(a.id, { name: a.custom ? a.label : "" }); render(); return focusName(a.id); }
+    if (act === "acct-cancel") { editing.delete(a.id); return render(); }
+    const ed = editing.get(a.id); if (!ed) return;
+    btn.disabled = true;
+    const r = act === "acct-save" ? await api("/api/hub/account/name", { id: a.id, name: ed.name })
+      : await api("/api/hub/account/project-remove", { id: a.id, project: btn.dataset.path });
+    btn.disabled = false;
+    if (!r.ok) { ed.msg = t(r.data?.error === "name" ? "setAccNameBad" : "setAccSaveFail"); ed.kind = "warn"; return render(); }
+    hub.accounts = r.data.accounts;
+    if (act === "acct-save") { editing.delete(a.id); d.toast?.(t("setAccSaved")); }
+    else { ed.msg = t("setAccProjRemoved", folderName(btn.dataset.path)); ed.kind = "ok"; }
+    render();
   }
 
   // Google kartı yalnız kişisel hesabı gösterir: panelde bağlı Gmail hesabı (Google girişi ya da gmail adresli IMAP).
@@ -166,7 +208,19 @@ window.PanelSettingsHub = function (d) {
   view.addEventListener("click", (e) => {
     const goBtn = e.target.closest("[data-go]");
     if (goBtn) return go(goBtn.dataset.go);
+    const ab = e.target.closest("#setClaude button[data-act^=acct-]");
+    if (ab) return accountAction(ab);
     if (e.target.closest("[data-act=gh-try]")) tryGithub();
+  });
+  $("setClaude").addEventListener("input", (e) => {
+    if (e.target.dataset.act !== "acct-name") return;
+    const ed = editing.get(e.target.closest("[data-acct]")?.dataset.acct); if (ed) { ed.name = e.target.value; ed.msg = ""; }
+  });
+  $("setClaude").addEventListener("keydown", (e) => {
+    if (e.target.dataset.act !== "acct-name") return;
+    const card = e.target.closest("[data-acct]");
+    if (e.key === "Enter") { e.preventDefault(); card.querySelector("[data-act=acct-save]")?.click(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); card.querySelector("[data-act=acct-cancel]")?.click(); }
   });
   // GitHub takibi Genel'den açılıp kapanınca kart da yenilensin
   $("sGithub").addEventListener("change", () => setTimeout(load, 800));

@@ -3,6 +3,11 @@
 (() => {
   "use strict";
   Object.assign(window.I18N.tr, {
+    setAccEdit: "Düzenle", setAccSave: "Kaydet", setAccNameLabel: "Görünen ad", setAccNameHint: "Kartta, oturum rozetinde ve terminal satırında bu ad görünür. Boş bırakılırsa Claude'daki ad: {0}",
+    setAccProjTitle: "Bu hesaba kayıtlı projeler", setAccProjRemove: "Hesaptan çıkar",
+    setAccEditDefaultProj: "Varsayılan hesap: başka hesaba kayıtlı olmayan her proje bununla açılır.",
+    setAccProjRemoved: "{0} varsayılan hesaba döndü.", setAccSaved: "Hesap adı kaydedildi",
+    setAccNameBad: "Ad en çok 40 karakter olabilir, kontrol karakteri içeremez.", setAccSaveFail: "Kaydedilemedi, tekrar deneyin.",
     abName: "Claude Oturum Paneli",
     abDesc: "Bilgisayardaki tüm Claude Code oturumlarını tek ekranda gösterir: ne yaptıklarını, kotayı, bağlamı; oturum açar, sürdürür, kapatır. Telefondan da erişilir.",
     abOs: "İşletim sistemi", abRuntime: "Çalışma ortamı", abData: "Veri klasörü", abOpen: "Aç", abOpenFail: "Klasör açılamadı",
@@ -88,6 +93,11 @@
     setKeyFlow4b: "Sakla:", setKeyFlow4: "doğrulanan anahtar işletim sisteminin şifreli kasasında tutulur (Windows'ta DPAPI, Mac'te Anahtar Zinciri). Loga ve dosyaya düz yazılmaz; kartta yalnız son 4 karakter görünür."
   });
   Object.assign(window.I18N.en, {
+    setAccEdit: "Edit", setAccSave: "Save", setAccNameLabel: "Display name", setAccNameHint: "This name shows on the card, the session badge and the terminal line. If left empty, the name from Claude: {0}",
+    setAccProjTitle: "Projects assigned to this account", setAccProjRemove: "Remove from account",
+    setAccEditDefaultProj: "Default account: every project not assigned to another account opens with it.",
+    setAccProjRemoved: "{0} is back on the default account.", setAccSaved: "Account name saved",
+    setAccNameBad: "The name can be at most 40 characters and cannot contain control characters.", setAccSaveFail: "Could not save, try again.",
     abName: "Claude Session Panel",
     abDesc: "Shows every Claude Code session on this computer on one screen: what each is doing, quota and context; starts, resumes and closes sessions. Also reachable from your phone.",
     abOs: "Operating system", abRuntime: "Runtime", abData: "Data folder", abOpen: "Open", abOpenFail: "Could not open the folder",

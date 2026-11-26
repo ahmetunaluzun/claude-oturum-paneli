@@ -4,6 +4,7 @@ public sealed record HubKeyRequest(string? Provider, string? Key);
 public sealed record HubProfileRequest(string? Dir);
 public sealed record HubWorkerRequest(string? Id, bool? Enabled);
 public sealed record HubRouteRequest(string? Job, List<string>? Order);
+public sealed record HubAccountRequest(string? Id, string? Name, string? Project);
 
 /// <summary>
 /// Ayarlar sekmesinin "Hesaplar" bölümü: /api/hub. Claude hesapları (Accounts.cs) kotaları ve varsayılan projeleriyle
@@ -24,6 +25,25 @@ public static class HubEndpoints
             // Chrome profil adları ve e-postaları yalnız bilgisayardaki arayüze gider.
             chrome = isLocal(ctx) ? ChromeCard(mail) : null
         }));
+
+        // ---- Claude hesabını düzenleme: görünen ad (boş = Claude'daki ad), hesaba kayıtlı projeyi çıkarma ----
+        app.MapPost("/api/hub/account/name", async (HttpContext ctx, SessionStore store, NightMode night) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<HubAccountRequest>();
+            if (req?.Id is not { } id || Accounts.Find(id) is null) return Results.NotFound();
+            if (!Accounts.Rename(id, req.Name)) return Results.Json(new { error = "name" }, statusCode: 400);
+            return Results.Json(new { accounts = AccountCards(store, night) });
+        });
+
+        app.MapPost("/api/hub/account/project-remove", async (HttpContext ctx, SessionStore store, NightMode night) =>
+        {
+            if (!authorized(ctx)) return Results.StatusCode(403);
+            var req = await ctx.Request.ReadFromJsonAsync<HubAccountRequest>();
+            if (req?.Id is not { } id || req.Project is not { Length: > 0 } p) return Results.BadRequest();
+            if (!ProjectAccounts.Remove(id, p)) return Results.NotFound();
+            return Results.Json(new { accounts = AccountCards(store, night) });
+        });
 
         // ---- Yapay zekâ işçileri (Workers.cs) ve iş yönlendirme (Routing.cs) ----
         app.MapGet("/api/workers", () => Results.Json(WorkerCards()));
@@ -154,7 +174,7 @@ public static class HubEndpoints
             .ToDictionary(g => g.Key, g => g.Select(p => RealCase(p.Key)).Order(StringComparer.OrdinalIgnoreCase).ToList(), StringComparer.OrdinalIgnoreCase);
         return Accounts.List().Select(a => new
         {
-            id = a.Id, label = a.Label, isDefault = a.IsDefault,
+            id = a.Id, label = a.Label, isDefault = a.IsDefault, orgLabel = a.OrgLabel, custom = a.Custom,
             usage = a.IsDefault ? store.Usage(night.RefreshUsageSoon) : store.Usage(a.Dir, () => night.RefreshUsageSoon(a.Dir)),
             // Varsayılan hesapta kayıt tutulmaz: kaydı olmayan her proje onundur.
             projects = a.IsDefault ? [] : byAccount.GetValueOrDefault(a.Id) ?? []

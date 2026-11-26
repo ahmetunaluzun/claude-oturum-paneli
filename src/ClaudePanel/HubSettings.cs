@@ -11,7 +11,10 @@ public static class HubSettings
     /// "" = varsayılan tarayıcı.</param>
     /// <param name="Workers">Yapay zekâ işçisi aç/kapa ("codex", "gemini"); kayıt yoksa Workers.cs'teki varsayılan.</param>
     /// <param name="Routes">İş türü başına araç sırası (Routing.cs); kayıt yoksa varsayılan sıra.</param>
-    public sealed record Saved(string? ChromeProfile = null, Dictionary<string, bool>? Workers = null, Dictionary<string, List<string>>? Routes = null);
+    /// <param name="AccountNames">Claude hesabına kullanıcının verdiği görünen ad (hesap kimliği → ad; Accounts.cs). Kayıt yoksa
+    /// Claude'daki kuruluş adı ya da "Kişisel".</param>
+    public sealed record Saved(string? ChromeProfile = null, Dictionary<string, bool>? Workers = null, Dictionary<string, List<string>>? Routes = null,
+        Dictionary<string, string>? AccountNames = null);
 
     static readonly string File_ = Path.Combine(Handoff.DataDir, "hub.json");
     static readonly object Lock = new();
@@ -23,7 +26,11 @@ public static class HubSettings
 
     static Saved Load()
     {
-        try { return File.Exists(File_) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(File_)) ?? new() : new(); }
+        try
+        {
+            var s = File.Exists(File_) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(File_)) ?? new() : new();
+            return s.AccountNames is { } n ? s with { AccountNames = new(n, StringComparer.OrdinalIgnoreCase) } : s;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return new(); }
     }
 

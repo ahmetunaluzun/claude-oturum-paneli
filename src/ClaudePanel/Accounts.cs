@@ -5,8 +5,11 @@ namespace ClaudePanel;
 
 /// <summary>Bir Claude hesabı: kendi ayar klasörü (CLAUDE_CONFIG_DIR) ve girişiyle.</summary>
 /// <param name="Id">Klasör adı (".claude", ".claude-is"); arayüz ve ayarlar bununla anar.</param>
-/// <param name="Label">Görünen ad: kişisel hesapta null (arayüz "Kişisel" yazar), kurumsal hesapta kuruluş adı.</param>
-public sealed record Account(string Id, string? Label, string Dir, bool IsDefault);
+/// <param name="Label">Görünen ad: kullanıcının Ayarlar → Hesaplar'da verdiği ad; yoksa kurumsal hesapta kuruluş adı, kişisel
+/// hesapta null (arayüz "Kişisel" yazar).</param>
+/// <param name="OrgLabel">Claude'daki kuruluş adı (kullanıcı adı yokken görünecek ad); düzenleme kutusunda öneri olarak.</param>
+/// <param name="Custom">Ad kullanıcı tarafından verildi mi.</param>
+public sealed record Account(string Id, string? Label, string Dir, bool IsDefault, string? OrgLabel = null, bool Custom = false);
 
 /// <summary>
 /// Bilgisayardaki Claude hesapları. Varsayılan hesap ~/.claude; ek hesaplar aynı üst klasörde ".claude-*" adlı ve içinde
@@ -50,12 +53,42 @@ public static class Accounts
         return id.Length > 0 ? id : a.Id;
     }
 
+    public const int MaxNameLength = 40;
+
+    /// <summary>
+    /// Kullanıcının verdiği görünen ad; boş ya da yalnız boşluk = kaldır (Claude'daki ada dönülür). Denetim: en çok
+    /// <see cref="MaxNameLength"/> karakter, kontrol karakteri yok. Hesap yoksa ya da ad geçersizse false.
+    /// </summary>
+    public static bool Rename(string id, string? name)
+    {
+        if (Find(id) is not { } a) return false;
+        var n = (name ?? "").Trim();
+        if (n.Length > MaxNameLength || n.Any(char.IsControl)) return false;
+        HubSettings.Update(s =>
+        {
+            var d = new Dictionary<string, string>(s.AccountNames ?? [], StringComparer.OrdinalIgnoreCase);
+            if (n.Length == 0) d.Remove(a.Id); else d[a.Id] = n;
+            return s with { AccountNames = d.Count == 0 ? null : d };
+        });
+        lock (Lock) _cache = null; // yeni ad hemen görünsün
+        RemoteLog.Info(n.Length == 0 ? $"Hesap adı kaldırıldı: {a.Id}" : $"Hesap adı değişti: {a.Id} → {n}");
+        return true;
+    }
+
     public static Account? Find(string? id) => id is null ? null : List().FirstOrDefault(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
     static List<Account> Scan()
     {
         var def = Quota.ClaudeDir.TrimEnd('\\', '/');
-        var list = new List<Account> { new(Path.GetFileName(def), LabelOf(def, isDefault: true), def, true) };
+        var names = HubSettings.Get().AccountNames;
+        Account Make(string dir, bool isDefault)
+        {
+            var id = Path.GetFileName(dir);
+            var org = LabelOf(dir, isDefault);
+            var custom = names is not null && names.TryGetValue(id, out var n) && !string.IsNullOrWhiteSpace(n) ? n : null;
+            return new(id, custom ?? org, dir, isDefault, org, custom is not null);
+        }
+        var list = new List<Account> { Make(def, true) };
         var parent = Path.GetDirectoryName(def);
         if (parent is null || !Directory.Exists(parent)) return list;
         try
@@ -63,7 +96,7 @@ public static class Accounts
             foreach (var dir in Directory.EnumerateDirectories(parent, Path.GetFileName(def) + "-*").Order(StringComparer.OrdinalIgnoreCase))
             {
                 if (!File.Exists(Path.Combine(dir, ".credentials.json")) && !(OperatingSystem.IsMacOS() && HasAccount(dir))) continue;
-                list.Add(new(Path.GetFileName(dir), LabelOf(dir, isDefault: false), dir, false));
+                list.Add(Make(dir, false));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
