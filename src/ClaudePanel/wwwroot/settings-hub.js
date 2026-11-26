@@ -140,7 +140,8 @@ window.PanelSettingsHub = function (d) {
     render();
   }
 
-  // Google kartı yalnız kişisel hesabı gösterir: panelde bağlı Gmail hesabı (Google girişi ya da gmail adresli IMAP).
+  // Google kartı: mail/takvim Claude hesabının claude.ai bağlayıcısıyla okunur (0.25.0), panel bağlantı durumunu bilemez → durum
+  // rozeti yok. Önceki sürümde panele bağlanmış Gmail hesabı (Google girişi ya da gmail adresli IMAP) varsa o gösterilir.
   const isGmail = (a) => a.provider === "google" || /@(gmail|googlemail)\.com$/i.test(a.email || "");
   const maskMail = (e) => { const [u, dom] = String(e).split("@"); return (u.length > 5 ? u.slice(0, 5) + "…" : u) + "@" + (dom || ""); };
 
@@ -148,9 +149,9 @@ window.PanelSettingsHub = function (d) {
     const acct = (mail?.accounts || []).find(isGmail);
     return `<div class="set-card" data-conn="google">
       <div class="set-card-top"><span class="set-logo">G</span>
-        <div class="set-card-id"><div class="set-name">Google <span class="set-tag">${esc(t("setConnPersonal"))}</span></div>
+        <div class="set-card-id"><div class="set-name">Google${acct ? ` <span class="set-tag">${esc(t("setConnPersonal"))}</span>` : ""}</div>
           <div class="set-who">${esc(acct ? maskMail(acct.email) : t("setGoogleOnly"))}</div></div>
-        <span class="set-state ${acct ? "ok" : "off"}">${esc(t(acct ? "setConnOn" : "setConnOff"))}</span></div>
+        ${acct ? `<span class="set-state ok">${esc(t("setConnOn"))}</span>` : ""}</div>
       <div class="set-uses">${esc(t(acct ? "setGoogleUse" : "setGoogleNone"))}</div>
       <div class="set-btns"><button type="button" class="btn small" data-go="setMail">${esc(t(acct ? "setGoogleDetail" : "setGoogleConnect"))}</button></div></div>`;
   }

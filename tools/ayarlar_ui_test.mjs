@@ -57,7 +57,7 @@ const layout = () => ev(`(() => { const v = document.getElementById("viewSetting
   return { pageOverflow: document.documentElement.scrollWidth > innerWidth + 1, wide, squeezed }; })()`);
 
 const LEGACY = ["#sLight", "#sLang", "#sGithub", "#tqEnabled", "#sNotify", "#sSound", "#nEnabled", "#nStart", "#nEnd", "#nAutostart", "#btnNightLog",
-  "#mwEmail", "#btnMwApp", "#mwPass", "#btnMwConnect", "#smDirect", "#smSenders", "#rEnabled", "#btnResetTabs", "#btnRestart", "#btnQuit"];
+  "#btnSetMail", "#rEnabled", "#btnResetTabs", "#btnRestart", "#btnQuit"];
 
 await size(1280, 900);
 await send("Page.navigate", { url });
@@ -167,9 +167,9 @@ await ev(`document.querySelector('${IS} [data-act=acct-cancel]').click()`); awai
 check("düzenleme kapandı", (await isCard()).input, null);
 
 const conn = (id) => ev(`(() => { const c = document.querySelector('#setConns [data-conn="${id}"]'); if (!c) return null;
-  return { state: c.querySelector(".set-state").textContent, who: c.querySelector(".set-who").textContent, btns: [...c.querySelectorAll("button")].map(b => b.textContent), msg: c.querySelector(".set-msg")?.textContent || "" }; })()`);
-check("Google kartı: bağlı değil, yalnız kişisel, Mail ve takvime götürür", await conn("google"),
-  { state: "Bağlı değil", who: "Yalnız kişisel Google hesabı", btns: ["Mail ve takvime git"], msg: "" });
+  return { state: c.querySelector(".set-state")?.textContent ?? null, who: c.querySelector(".set-who").textContent, btns: [...c.querySelectorAll("button")].map(b => b.textContent), msg: c.querySelector(".set-msg")?.textContent || "" }; })()`);
+check("Google kartı: Claude bağlayıcısıyla, durum rozeti yok, Mail ve takvime götürür", await conn("google"),
+  { state: null, who: "Claude hesabının bağlayıcısıyla", btns: ["Mail ve takvim"], msg: "" });
 check("Higgsfield ve Slack kartı yok", await ev(`/higgsfield|slack/i.test(document.getElementById("setConns").textContent)`), false);
 await until(`fetch("/api/github").then(r => r.json()).then(d => d.state === "ok")`, 9000);
 await ev(`document.getElementById("btnSettings").click()`); await sleep(900);
@@ -380,6 +380,22 @@ await ev(`document.getElementById("sLight").click()`); await sleep(200);
 // Adresten açılış
 await send("Page.navigate", { url: url + "?view=settings" }); await sleep(3200);
 check("?view=settings Ayarlar'ı açar", await ev(`[!document.getElementById("viewSettings").hidden, document.querySelector("#nav button.active")?.dataset.view]`), [true, "settings"]);
+
+// Maillerimi özetle (0.25.0): iki hesapta önce hangi hesap sorulur; Vazgeç oturum açmaz. Takip başlığındaki düğme telefonda görünür.
+await openSettings();
+await ev(`document.querySelector('#setNav button[data-sec="setMail"]').click()`); await sleep(300);
+check("Mail ve takvim: eski sihirbaz gizli, özet düğmesi var", await ev(`[document.getElementById("mwWizard")?.offsetWidth || 0, document.getElementById("btnSetMail").textContent]`), [0, "Maillerimi özetle"]);
+await ev(`document.getElementById("btnSetMail").click()`);
+await until(`document.getElementById("dlgAsk").open`);
+check("Maillerimi özetle: hesap seçimi sorulur (iki hesap + Vazgeç)", await ev(`[document.getElementById("askTitle").textContent, [...document.querySelectorAll("#askButtons button")].length]`), ["Hangi hesabın mailleri?", 3]);
+await shot("mail_hesap_secimi");
+await ev(`[...document.querySelectorAll("#askButtons button")].find(b => b.value === "cancel" || /Vazgeç/.test(b.textContent))?.click()`); await sleep(400);
+check("Vazgeç: diyalog kapanır, oturum açılmaz", await ev(`fetch("/api/state").then(r => r.json()).then(d => [document.getElementById("dlgAsk").open, (d.hosted || []).length])`), [false, 0]);
+await size(390, 844, true);
+await ev(`document.querySelector('#nav button[data-view="follow"]').click()`); await sleep(700);
+check("Takip (390 px): Maillerimi özetle düğmesi görünür", await seen("#btnFuMail"), "görünür");
+await shot("mail_takip_telefon");
+await size(1280, 900);
 
 ws.close();
 process.exit(fail);
