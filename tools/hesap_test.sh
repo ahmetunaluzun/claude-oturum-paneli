@@ -35,6 +35,10 @@ echo "  şirket satırı: $line"
 case "$line" in *"5sa: %70 kaldı"*"Hafta: %95 kaldı"*) check "durum satırı ek hesabın kotası" 1 1;; *) check "durum satırı ek hesabın kotası" 0 1;; esac
 line=$(echo '{}' | CLAUDE_CONFIG_DIR="$P" "$EXE" --statusline --lang tr)
 case "$line" in *"5sa: %90 kaldı"*"Hafta: %1 kaldı"*) check "durum satırı varsayılan hesap" 1 1;; *) check "durum satırı varsayılan hesap ($line)" 0 1;; esac
+line=$(echo '{}' | CLAUDE_PANEL_CLAUDE_DIR="$P" "$EXE" --statusline --lang tr)  # hesap listesi test klasöründen (gerçek şirket adı elle denendi)
+case "$line" in "Kişisel | "*) check "durum satırı Kişisel ile başlar (e-postalı kuruluş adı yazılmaz)" 1 1;; *) check "durum satırı Kişisel ($line)" 0 1;; esac
+line=$(echo '{}' | CLAUDE_PANEL_CLAUDE_DIR="$P" "$EXE" --statusline --lang en)
+case "$line" in "Personal | "*) check "durum satırı İngilizcede Personal" 1 1;; *) check "durum satırı Personal ($line)" 0 1;; esac
 cache "$I" 98 5
 echo '{"tool_name":"Bash","tool_input":{"command":"git push"}}' | CLAUDE_CONFIG_DIR="$I" "$EXE" --quota-guard --lang tr 2>/dev/null
 check "ek hesapta 5 saat %2: koruma engeller" $? 2

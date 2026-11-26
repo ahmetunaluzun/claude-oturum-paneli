@@ -33,13 +33,15 @@ public static class QuotaCli
         try { ev = JsonNode.Parse(Console.In.ReadToEnd()); }
         catch (System.Text.Json.JsonException) { }
         SaveContextWindow(ev);
-        Write(Console.OpenStandardOutput(), StatusLine(Quota.Read(Quota.CurrentDir, fetch: true), ev, Quota.Plan(Quota.CurrentDir), Turkish(args)) + "\n");
+        Write(Console.OpenStandardOutput(), StatusLine(Quota.Read(Quota.CurrentDir, fetch: true), ev, Quota.Plan(Quota.CurrentDir), Turkish(args),
+            Accounts.NameOf(Quota.CurrentDir, Turkish(args))) + "\n");
         return 0;
     }
 
-    public static string StatusLine(QuotaInfo? q, JsonNode? ev, string? plan, bool tr)
+    public static string StatusLine(QuotaInfo? q, JsonNode? ev, string? plan, bool tr, string? account = null)
     {
         var parts = new List<string>();
+        if (account is not null) parts.Add(account);
         if (plan is not null) parts.Add(plan);
         double? fiveLeft = null, weekLeft = null;
         if (q is null) parts.Add(tr ? "Kota: okunamadı" : "Quota: unavailable");

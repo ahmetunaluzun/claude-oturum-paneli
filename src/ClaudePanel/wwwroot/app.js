@@ -770,6 +770,8 @@
     $("dPath").textContent = tg.cwd || "";
     $("dDot").dataset.lane = live ? live.lane : "closed";
     const meta = [];
+    const acct = live ? acctLabel(live) : ""; // birden çok hesap varsa oturumun hesabı (kart rozetiyle aynı)
+    if (acct) meta.push(acct);
     if (live) meta.push(t(live.lane === "busy" ? "workingFor" : "waitingFor", dur(Date.now() + serverOffset - live.since)));
     const stats = live ? A.statsLine(live) : "";
     if (stats) meta.push(stats);

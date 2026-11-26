@@ -32,6 +32,24 @@ public static class Accounts
         }
     }
 
+    /// <summary>
+    /// Durum satırında gösterilecek hesap adı (panel kartındaki rozetle aynı: kuruluş adı, varsayılan hesapta "Kişisel",
+    /// öteki ek hesapta klasör adı). Tek hesap varsa null: ad kalabalık yapmasın.
+    /// </summary>
+    public static string? NameOf(string dir, bool tr)
+    {
+        var list = List();
+        if (list.Count < 2) return null;
+        var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var full = Path.GetFullPath(dir).TrimEnd('\\', '/');
+        var a = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Dir).TrimEnd('\\', '/'), full, cmp));
+        if (a is null) return null;
+        if (!string.IsNullOrEmpty(a.Label)) return a.Label;
+        if (a.IsDefault) return tr ? "Kişisel" : "Personal";
+        var id = a.Id.StartsWith(".claude-") ? a.Id[".claude-".Length..] : a.Id;
+        return id.Length > 0 ? id : a.Id;
+    }
+
     public static Account? Find(string? id) => id is null ? null : List().FirstOrDefault(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
     static List<Account> Scan()

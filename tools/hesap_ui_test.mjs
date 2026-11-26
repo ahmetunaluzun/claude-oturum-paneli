@@ -66,6 +66,12 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1500, height: 900, dev
 await ev(`localStorage.setItem("panel.settings", JSON.stringify(Object.assign(JSON.parse(localStorage.getItem("panel.settings")||"{}"), {light:false}))); location.reload()`);
 await sleep(3500);
 check("kart rozeti: Terminal · şirket", await ev(`document.querySelector('.card .kind-badge')?.textContent`), "Terminal · Örnek Şirket A.Ş.");
+// Konuşma çekmecesi: bilgi satırı oturumun hesabıyla başlar
+await ev(`document.querySelector('.card').click()`);
+await sleep(1200);
+check("çekmece bilgi satırında hesap", (await ev(`document.getElementById("dMeta")?.textContent`) || "").startsWith("Örnek Şirket A.Ş."), true);
+await ev(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}))`);
+await sleep(500);
 await ev(`document.querySelector('.card .more').click()`);
 await sleep(500);
 const items = await ev(`[...document.querySelectorAll('.pop-menu [role=menuitem]')].map(b => b.textContent)`);
