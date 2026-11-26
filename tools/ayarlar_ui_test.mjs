@@ -205,8 +205,8 @@ check("bağlı olmayan kart: ne işe yarar, panelde nerede (yönlendirme bağlan
 check("ElevenLabs'ta yönlendirme bağlantısı yok (yönlendirmede satırı yok)", await ev(`document.querySelector('#setKeys [data-key="elevenlabs"] [data-go]').hidden`), true);
 check("OpenRouter: bağlı değil, Bağlan düğmesi, gizli kutu kapalı", await key("openrouter"),
   { state: "Bağlı değil", uses: "Tek anahtarla birçok sağlayıcının modeline erişim; panelde görsel üretmek için.", btns: ["Bağlan"], box: false, msg: "", kind: "", steps: "", page: "" });
-check("Chrome profil seçimi: varsayılan + iki uydurma profil", await ev(`[!document.getElementById("setProfileRow").hidden, [...document.querySelectorAll("#setKeyProfile option")].map(o => o.textContent), document.getElementById("setKeyProfile").value]`),
-  [true, ["Varsayılan tarayıcı", "İş (is@ornek.com.tr)", "Kişisel (kisi@ornek.com)"], ""]);
+check("Chrome profil seçimi: otomatik (eşleşme yok) + varsayılan + iki uydurma profil", await ev(`[!document.getElementById("setProfileRow").hidden, [...document.querySelectorAll("#setKeyProfile option")].map(o => o.textContent), document.getElementById("setKeyProfile").value]`),
+  [true, ["Otomatik (eşleşen profil yok: varsayılan tarayıcı)", "Varsayılan tarayıcı", "İş (is@ornek.com.tr)", "Kişisel (kisi@ornek.com)"], ""]);
 await ev(`(() => { const s = document.getElementById("setKeyProfile"); s.value = "Profile 1"; s.dispatchEvent(new Event("change")); })()`); await sleep(500);
 check("profil seçimi kalıcı (sunucuda)", await ev(`fetch("/api/hub").then(r => r.json()).then(d => d.chrome.selected)`), "Profile 1");
 await keyBtn("openrouter", "Bağlan"); await sleep(600);

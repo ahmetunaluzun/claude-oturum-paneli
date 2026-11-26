@@ -171,8 +171,12 @@ window.PanelSettingsKeys = function (d) {
     const list = chrome?.profiles || [];
     row.hidden = REMOTE || !list.length;
     if (row.hidden || document.activeElement === sel) return;
-    sel.innerHTML = `<option value="">${esc(t("setProfDefault"))}</option>` +
-      list.map(p => `<option value="${esc(p.dir)}">${esc(p.email ? `${p.name} (${p.email})` : p.name)}</option>`).join("");
+    // "" = otomatik (kişisel Claude hesabının e-postasıyla eşleşen profil; HubEndpoints.AutoProfile), "-" = varsayılan tarayıcı
+    const label = (p) => p.email ? `${p.name} (${p.email})` : p.name;
+    const auto = list.find(p => p.dir === chrome.auto);
+    sel.innerHTML = `<option value="">${esc(auto ? t("setProfAuto", label(auto)) : t("setProfAutoNone"))}</option>` +
+      `<option value="-">${esc(t("setProfDefault"))}</option>` +
+      list.map(p => `<option value="${esc(p.dir)}">${esc(label(p))}</option>`).join("");
     sel.value = chrome.selected || "";
   }
   $("setKeyProfile").addEventListener("change", async (e) => {

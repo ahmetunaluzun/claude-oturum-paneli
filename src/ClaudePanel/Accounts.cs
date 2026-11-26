@@ -125,6 +125,10 @@ public static class Accounts
 
     static bool HasAccount(string dir) => OauthAccount(dir, false) is not null;
 
+    /// <summary>Claude hesabının giriş e-postası (oauthAccount.emailAddress); bilinmiyorsa null. Arayüze taşınmaz, eşleştirme içindir.</summary>
+    public static string? Email(Account a) =>
+        OauthAccount(a.Dir, a.IsDefault)?["emailAddress"] is JsonValue v && v.TryGetValue<string>(out var s) && s.Contains('@') ? s.Trim() : null;
+
     /// <summary>
     /// Kurumsal hesapta kuruluş adı; kişisel hesapta null. Claude kişisel abonelikte kuruluşa "&lt;e-posta&gt;'s Organization"
     /// adını verir: bu ad e-posta içerdiği için arayüze taşınmaz.

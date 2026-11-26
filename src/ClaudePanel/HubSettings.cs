@@ -7,8 +7,8 @@ namespace ClaudePanel;
 /// </summary>
 public static class HubSettings
 {
-    /// <param name="ChromeProfile">Anahtar sayfalarının açılacağı Chrome profil klasörü; null = kendiliğinden (bkz. HubEndpoints).
-    /// "" = varsayılan tarayıcı.</param>
+    /// <param name="ChromeProfile">Anahtar sayfalarının açılacağı Chrome profil klasörü; null ya da "" = otomatik (bkz. HubEndpoints;
+    /// 0.25.0 öncesi "" varsayılan tarayıcıydı, o sürümde otomatik seçenek yoktu), "-" = varsayılan tarayıcı.</param>
     /// <param name="Workers">Yapay zekâ işçisi aç/kapa ("codex", "gemini"); kayıt yoksa Workers.cs'teki varsayılan.</param>
     /// <param name="Routes">İş türü başına araç sırası (Routing.cs); kayıt yoksa varsayılan sıra.</param>
     /// <param name="AccountNames">Claude hesabına kullanıcının verdiği görünen ad (hesap kimliği → ad; Accounts.cs). Kayıt yoksa

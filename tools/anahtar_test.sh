@@ -15,6 +15,8 @@ freeport() { pwsh -NoProfile -c '$l=[System.Net.Sockets.TcpListener]::new([Syste
 mkdir -p "$T/claude" "$T/data" "$T/tmp"
 printf '{"Notify":false,"Introduced":true}' > "$T/data/tray.json"
 echo '{"claudeAiOauth":{"accessToken":"sahte"}}' > "$T/claude/.credentials.json"
+# Kişisel Claude hesabının giriş e-postası "Profile 1" ile aynı → otomatik profil Profile 1 (HubEndpoints.AutoProfile)
+echo '{"oauthAccount":{"emailAddress":"kisi@ornek.com"}}' > "$T/claude/.claude.json"
 printf '{"profile":{"info_cache":{"Default":{"name":"İş","user_name":"is@ornek.com.tr"},"Profile 1":{"name":"Kişisel","user_name":"kisi@ornek.com"}}}}' > "$T/chrome-state.json"
 
 PORT=$(freeport); KPORT=$(freeport); B="http://127.0.0.1:$PORT"; RH=test.ts.net
@@ -40,7 +42,7 @@ ALL_OUT="$T/yanitlar.txt"; : > "$ALL_OUT"
 
 H=$(hub); echo "$H" >> "$ALL_OUT"
 check "başlangıç: üç servis de bağlı değil" "$(py -3.13 -c "import json,sys; print([(k['id'],k['connected']) for k in json.loads(sys.argv[1])['keys']])" "$H")" "[('elevenlabs', False), ('openrouter', False), ('gemini', False)]"
-check "yerel istekte Chrome profilleri listelenir" "$(py -3.13 -c "import json,sys; c=json.loads(sys.argv[1])['chrome']; print([p['dir'] for p in c['profiles']], repr(c['selected']))" "$H")" "['Default', 'Profile 1'] ''"
+check "yerel istekte Chrome profilleri listelenir" "$(py -3.13 -c "import json,sys; c=json.loads(sys.argv[1])['chrome']; print([p['dir'] for p in c['profiles']], repr(c['selected']), c['auto'])" "$H")" "['Default', 'Profile 1'] '' Profile 1"
 
 # ---- yetki ----
 check "belirteçsiz kaydetme 403" "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "{\"provider\":\"elevenlabs\",\"key\":\"$K_EL\"}" "$B/api/hub/key/save")" 403
@@ -104,7 +106,17 @@ check "durum dosyasında yalnız gizli olmayan bilgi" "$(py -3.13 -c "import jso
 
 # ---- anahtar sayfası: seçili Chrome profilinde ----
 R=$(post /api/hub/key/open '{"provider":"openrouter"}')
-check "profil seçilmemişken sayfa varsayılan tarayıcıda" "$(code "$R") $(tail -1 "$T/acilan.log")" "200 -	https://openrouter.ai/settings/keys"
+check "otomatik: kişisel Claude hesabının e-postasıyla eşleşen profilde" "$(code "$R") $(tail -1 "$T/acilan.log")" "200 Profile 1	https://openrouter.ai/settings/keys"
+R=$(post /api/hub/chrome-profile '{"dir":"-"}')
+check "varsayılan tarayıcı seçimi kaydedildi" "$(code "$R") $(py -3.13 -c "import json,sys; print(json.loads(sys.argv[1])['selected'])" "$(echo "$R" | head -1)")" "200 -"
+post /api/hub/key/open '{"provider":"openrouter"}' >/dev/null
+check "varsayılan tarayıcı seçiliyken sayfa profilsiz açılır" "$(tail -1 "$T/acilan.log")" "-	https://openrouter.ai/settings/keys"
+R=$(post /api/hub/chrome-profile '{"dir":""}')
+check "otomatiğe dönüş" "$(code "$R") $(py -3.13 -c "import json,sys; d=json.loads(sys.argv[1]); print(repr(d['selected']), d['auto'])" "$(echo "$R" | head -1)")" "200 '' Profile 1"
+echo '{"oauthAccount":{"emailAddress":"baska@ornek.org"}}' > "$T/claude/.claude.json"
+post /api/hub/key/open '{"provider":"openrouter"}' >/dev/null
+check "otomatik, eşleşen profil yoksa varsayılan tarayıcı" "$(tail -1 "$T/acilan.log")" "-	https://openrouter.ai/settings/keys"
+echo '{"oauthAccount":{"emailAddress":"kisi@ornek.com"}}' > "$T/claude/.claude.json"
 check "olmayan profil 400" "$(code "$(post /api/hub/chrome-profile '{"dir":"Profile 9"}')")" 400
 R=$(post /api/hub/chrome-profile '{"dir":"Profile 1"}')
 check "profil seçimi kaydedildi" "$(code "$R") $(py -3.13 -c "import json,sys; print(json.loads(sys.argv[1])['selected'])" "$(echo "$R" | head -1)")" "200 Profile 1"

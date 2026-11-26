@@ -115,8 +115,8 @@ public static class HubEndpoints
         {
             if (!Admin(ctx)) return Results.StatusCode(403);
             var dir = (await ctx.Request.ReadFromJsonAsync<HubProfileRequest>())?.Dir;
-            if (dir is null || (dir.Length > 0 && ChromeProfiles.List().All(p => p.Dir != dir))) return Results.BadRequest();
-            HubSettings.Update(s => s with { ChromeProfile = dir });
+            if (dir is null || (dir is not ("" or DefaultBrowser) && ChromeProfiles.List().All(p => p.Dir != dir))) return Results.BadRequest();
+            HubSettings.Update(s => s with { ChromeProfile = dir.Length == 0 ? null : dir });
             return Results.Json(ChromeCard(mail));
         });
     }
@@ -150,23 +150,50 @@ public static class HubEndpoints
         }).ToList();
     }
 
+    /// <summary>Ayarlarda açıkça "Varsayılan tarayıcı" seçimi (hub.json ChromeProfile).</summary>
+    const string DefaultBrowser = "-";
+
     /// <summary>
-    /// Seçili profil: kullanıcı seçtiyse o; seçmediyse panelde bağlı Gmail hesabının (Mail ve takvim) Chrome profili;
-    /// o da yoksa varsayılan tarayıcı (null).
+    /// Seçili profil: kullanıcı elle seçtiyse o ("-" = varsayılan tarayıcı → null); seçmediyse otomatik (AutoProfile).
     /// </summary>
     static string? SelectedProfile(MailSettings mail)
     {
-        var profiles = ChromeProfiles.List();
-        if (HubSettings.Get().ChromeProfile is { } chosen) return chosen.Length > 0 && profiles.Any(p => p.Dir == chosen) ? chosen : null;
-        var emails = mail.Accounts.Select(a => a.Email).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return profiles.FirstOrDefault(p => p.Email is not null && emails.Contains(p.Email))?.Dir;
+        if (HubSettings.Get().ChromeProfile is { Length: > 0 } chosen)
+            return chosen != DefaultBrowser && ChromeProfiles.List().Any(p => p.Dir == chosen) ? chosen : null;
+        return AutoProfile(mail);
     }
 
-    static object ChromeCard(MailSettings mail) => new
+    /// <summary>
+    /// Otomatik profil (kullanıcı 2026-11-26: "ilgili oturuma göre kendisi otomatik davranması lazım"): anahtar sayfaları kişisel
+    /// servislerdir (Gemini, OpenRouter, ElevenLabs; şirket verisi bu servislere gitmez), bu yüzden kişisel Claude hesabının
+    /// (kuruluş adı olmayan; yoksa varsayılan hesap) giriş e-postasıyla oturum açılmış Chrome profili seçilir. Profil klasörü
+    /// ("Profile 1") kuruluma özeldir, e-postadan bulunur. Eşleşme yoksa panelde bağlı Gmail hesabının profili, o da yoksa
+    /// varsayılan tarayıcı (null).
+    /// </summary>
+    static string? AutoProfile(MailSettings mail)
     {
-        profiles = ChromeProfiles.List().Select(p => new { dir = p.Dir, name = p.Name, email = p.Email }),
-        selected = SelectedProfile(mail) ?? ""
-    };
+        var profiles = ChromeProfiles.List().Where(p => p.Email is not null).ToList();
+        var accts = Accounts.List();
+        var personal = accts.FirstOrDefault(a => a.OrgLabel is null) ?? accts.FirstOrDefault();
+        if (personal is not null && Accounts.Email(personal) is { } email
+            && profiles.FirstOrDefault(p => p.Email!.Equals(email, StringComparison.OrdinalIgnoreCase)) is { } byAccount)
+            return byAccount.Dir;
+        var emails = mail.Accounts.Select(a => a.Email).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return profiles.FirstOrDefault(p => emails.Contains(p.Email!))?.Dir;
+    }
+
+    static object ChromeCard(MailSettings mail)
+    {
+        var chosen = HubSettings.Get().ChromeProfile;
+        var list = ChromeProfiles.List();
+        return new
+        {
+            profiles = list.Select(p => new { dir = p.Dir, name = p.Name, email = p.Email }),
+            // "" = otomatik, "-" = varsayılan tarayıcı, ya da elle seçilen profil klasörü
+            selected = chosen is { Length: > 0 } c && (c == DefaultBrowser || list.Any(p => p.Dir == c)) ? c : "",
+            auto = AutoProfile(mail) ?? ""
+        };
+    }
 
     static object AccountCards(SessionStore store, NightMode night)
     {
