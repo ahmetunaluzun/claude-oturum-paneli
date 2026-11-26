@@ -47,6 +47,10 @@ check "izinli listede yazma aracı yok" "$(sed -n 4p "$T/arg.txt" | tr -d '\r')"
 for _ in $(seq 1 40); do grep -q '"Mail":true' "$T/data/hosted.json" 2>/dev/null && break; sleep 0.25; done
 check "hosted.json'da Mail=true ve hesap (yeniden başlatmada aynı kip)" "$(j "[(x['Mail'], x['Account']) for x in d]" "$T/data/hosted.json")" "[(True, 'claude-is')]"
 
+# Yinelenen istek (çift dokunma): ikinci oturum açılmaz, aynı anahtar döner
+check "yinelenen istek 200" "$(post "$TOK" '{"account":"claude-is","lang":"tr"}')" 200
+check "yinelenen istek aynı oturumu döndürür" "$(j "(d['key'] == '$KEY', d['repeated'])")" "(True, True)"
+sleep 1; check "yinelemede yeni süreç açılmadı" "$(grep -c '^ACILIS' "$T/sahte.log")" 1
 check "hesapsız istek 200" "$(post "$TOK" '{"lang":"en"}')" 200
 for _ in $(seq 1 60); do [ "$(grep -c '^HESAP' "$T/sahte.log")" -ge 2 ] && break; sleep 0.25; done
 check "hesapsız istek varsayılan hesapta" "$(grep '^HESAP' "$T/sahte.log" | sed -n 2p | cut -f3 | tr -d '\r')" "-"

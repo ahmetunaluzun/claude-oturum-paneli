@@ -89,9 +89,13 @@ public static class MailSummary
             // Ev klasörü: hiçbir projenin hesabını ya da oturum kilidini etkilemez (proje oturumu değil).
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var account = req?.Account ?? Accounts.List()[0].Id;
-            var key = hosted.Start(home, Prompt(tr), "sonnet", tr ? "Mail özeti" : "Mail summary", null, account: account, mail: true);
-            RemoteLog.Info($"Mail özeti oturumu açıldı {key}: hesap {account}");
-            return Results.Json(new { key, cwd = home });
+            // Yinelenen istek (telefonda çift dokunma, yanıt gecikince yeniden basma) ikinci oturumu açmaz: aynı hesabın 20 sn
+            // içindeki özeti hâlâ açıksa onun anahtarı döner (StartOnce.cs).
+            var (key, repeated) = StartOnce.Run("mail", home, account + "|" + (tr ? "tr" : "en"), null,
+                () => hosted.Start(home, Prompt(tr), "sonnet", tr ? "Mail özeti" : "Mail summary", null, account: account, mail: true),
+                k => k is not null && hosted.Has(k));
+            if (!repeated) RemoteLog.Info($"Mail özeti oturumu açıldı {key}: hesap {account}");
+            return Results.Json(new { key, cwd = home, repeated });
         });
     }
 }
