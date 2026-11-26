@@ -224,7 +224,7 @@ check("Hakkında: sürüm alt bilgiyle aynı", ab.ver.split(" · ")[0], ab.foote
 check("Hakkında: sistem, .NET ve veri klasörü dolu", [ab.os.length > 3, /^\.NET /.test(ab.rt), /data$/i.test(ab.data)], [true, true, true]);
 check("Hakkında: bu sürümün yenilikleri CHANGELOG'dan", [ab.newsShown, ab.news.length >= 1, ab.news.every(n => n.length > 3 && !n.includes("**"))], [true, true, true]);
 check("Hakkında: 8 özellik satırı dolu", ab.feats, 8);
-check("Hakkında: bağlantılar yeni pencerede, depoya", ab.links, [["MIT", "_blank", "R/blob/main/LICENSE"], ["Kaynak kod", "_blank", "R"], ["Sürümler", "_blank", "R/releases"], ["Değişiklik günlüğü", "_blank", "R/blob/main/CHANGELOG.md"]]);
+check("Hakkında: bağlantılar yeni pencerede, depoya", ab.links, [["github.com/ahmetunaluzun/claude-oturum-paneli", "_blank", "R"], ["MIT", "_blank", "R/blob/main/LICENSE"], ["Kaynak kod", "_blank", "R"], ["Sürümler", "_blank", "R/releases"], ["Değişiklik günlüğü", "_blank", "R/blob/main/CHANGELOG.md"]]);
 await ev(`(() => { const s = JSON.parse(localStorage.getItem("panel.settings")||"{}"); document.getElementById("sLang").value = "en"; document.getElementById("sLang").dispatchEvent(new Event("change")); })()`); await sleep(300);
 check("Hakkında: İngilizce", await ev(`[document.querySelector('#setNav button[data-sec="setAbout"]').textContent, document.querySelector("#setAbout .about-card .set-name").textContent, document.querySelector("#setAbout .about-links a").textContent]`), ["About", "Claude Session Panel", "Source code"]);
 await ev(`document.getElementById("sLang").value = "tr"; document.getElementById("sLang").dispatchEvent(new Event("change"))`); await sleep(300);
