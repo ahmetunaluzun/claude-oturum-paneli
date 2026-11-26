@@ -43,6 +43,11 @@ for _ in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$KPORT/x" && bre
 # Yapay zekâ işçileri: sahte Codex ağacı (tools/codex_ortam.py), gerçek gemini yerine sürüm yazan sahte betik
 py -3.13 -I tools/codex_ortam.py "$TW\\codex" kur >/dev/null
 printf '@echo off\r\necho 0.1.7\r\n' > "$T/gemini.cmd"
+# Codex iş özetleri (codex_isci.py biçimi): 2 saat önce başarılı, 30 dk önce başarısız (çıkış 1), bir de bozuk dosya
+mkdir -p "$T/data/codex-isler"
+printf '{"cikis": 0, "bitis": "%s", "engel": 0}' "$(date -u -d '-2 hours' +%Y-%m-%dT%H:%M:%S+00:00)" > "$T/data/codex-isler/20261126-100000-sonuc.json"
+printf '{"cikis": 1, "bitis": "%s", "engel": 0}' "$(date -u -d '-30 minutes' +%Y-%m-%dT%H:%M:%S+00:00)" > "$T/data/codex-isler/20261126-113000-sonuc.json"
+printf '{"cikis": ' > "$T/data/codex-isler/20261126-120000-sonuc.json"
 
 PORT=$(freeport); DPORT=$(freeport); B="http://127.0.0.1:$PORT"
 CLAUDE_PANEL_GEMINI_EXE="$TW\\gemini.cmd" CLAUDE_PANEL_KEYTEST_BASE="http://127.0.0.1:$KPORT" CLAUDE_PANEL_HUB_OPEN_LOG="$TW\\acilan.log" CLAUDE_PANEL_CHROME_STATE="$TW\\chrome-state.json" \
@@ -55,7 +60,7 @@ TOK=$(cat "$T/data/panel-$PORT.token")
 "$CHROME" --headless=new --disable-gpu --hide-scrollbars --no-first-run --user-data-dir="$TW\\chrome" --remote-debugging-port="$DPORT" about:blank >/dev/null 2>&1 &
 for _ in $(seq 1 50); do curl -s "http://127.0.0.1:$DPORT/json/version" >/dev/null 2>&1 && break; sleep 0.2; done
 check "hata ayıklama portu bizim Chrome'da" "$(pwsh -NoProfile -c "\$p=(Get-NetTCPConnection -LocalPort $DPORT -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess; if (\$p -and (Get-CimInstance Win32_Process -Filter \"ProcessId=\$p\").CommandLine -like '*$TW*') { 1 } else { 0 }" | tr -d '\r')" 1
-[ $fail = 0 ] && { node "${AYAR_MJS:-tools/ayarlar_ui_test.mjs}" "$DPORT" "$B/" "_onizleme/ayarlar" || fail=1; }
+[ $fail = 0 ] && { ANAHTAR_RED="$TW\\anahtar.log.red" node "${AYAR_MJS:-tools/ayarlar_ui_test.mjs}" "$DPORT" "$B/" "_onizleme/ayarlar" || fail=1; }
 
 # ---- temizlik ----
 curl -s -o /dev/null -X POST "$B/api/quit?force=1" -H "X-Panel-Token: $TOK" -H "Origin: $B"

@@ -17,8 +17,11 @@ public static class ApiKeys
     public sealed record Provider(string Id, string Name, string KeyPage);
 
     /// <summary>Denemeden gelen, gizli olmayan bilgi. Kasadaki anahtarın kendisi burada yoktur.</summary>
+    /// <param name="At">Son başarılı deneme (Unix ms).</param>
+    /// <param name="FailAt">Son başarılı denemeden SONRA geçmeyen yeniden deneme (Unix ms); başarılı denemede silinir.</param>
+    /// <param name="Fail">O denemenin hata kodu (Result.Error), FailStatus HTTP durumu.</param>
     public sealed record Info(string Last4, long At, long? Remaining = null, long? Limit = null, string? Tier = null,
-        double? Balance = null, bool? NoLimit = null, int? Models = null);
+        double? Balance = null, bool? NoLimit = null, int? Models = null, long? FailAt = null, string? Fail = null, int? FailStatus = null);
 
     /// <summary>Deneme sonucu. Error: null (geçti) | "badkey" | "noperm" | "nobalance" | "network" | "http" | "store".</summary>
     public sealed record Result(string? Error, int? Status = null, Info? Info = null);
@@ -101,12 +104,20 @@ public static class ApiKeys
         return r;
     }
 
-    /// <summary>Kasadaki anahtarı yeniden dener (kalan karakter/limit yenilenir). Anahtar artık geçmiyorsa kayıt silinmez, hata döner.</summary>
+    /// <summary>
+    /// Kasadaki anahtarı yeniden dener (kalan karakter/limit yenilenir). Anahtar artık geçmiyorsa kayıt silinmez, hata döner ve
+    /// hata kayda yazılır (FailAt/Fail): kart "geçerli" demeye devam etmesin.
+    /// </summary>
     public static async Task<Result> Recheck(Provider p)
     {
         if (Get(p.Id) is not { } k) return new("badkey");
         var r = await Test(p, k);
-        if (r.Error is null) Update(d => d[p.Id] = r.Info!);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        Update(d =>
+        {
+            if (r.Error is null) d[p.Id] = r.Info!;
+            else if (d.TryGetValue(p.Id, out var old)) d[p.Id] = old with { FailAt = now, Fail = r.Error, FailStatus = r.Status };
+        });
         return r;
     }
 

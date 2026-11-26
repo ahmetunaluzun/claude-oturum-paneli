@@ -123,6 +123,17 @@
 .wk-cmd { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; vertical-align: middle; }
 .wk-cmd code { font-family: Consolas, "SF Mono", monospace; font-size: 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
   padding: 2px 7px; color: var(--text); overflow-wrap: anywhere; user-select: all; }
+/* Aşama satırı (işçi + servis kartları; settings-hub.js stages). Ad başka ekranda yok: .ai-stages / .ai-mark */
+.ai-stages { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.ai-stages li { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.ai-mark { flex: none; font-weight: 700; }
+.ai-stages [data-s="ok"] .ai-mark { color: var(--ok); }
+.ai-stages [data-s="no"] .ai-mark { color: var(--danger); }
+.ai-stages [data-s="warn"] .ai-mark { color: var(--idle); }
+[data-theme="light"] .ai-stages [data-s="ok"] .ai-mark { color: #1F7A52; }
+[data-theme="light"] .ai-stages [data-s="no"] .ai-mark { color: #B3261E; }
+[data-theme="light"] .ai-stages [data-s="warn"] .ai-mark { color: #9A6400; }
+.ai-stages [data-s="no"], .ai-stages [data-s="warn"] { color: var(--text); }
 .wk-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
 
 /* Yapay zekâ işçileri (settings-routing.js): aç/kapa anahtarı. Dokunmatikte de rahat basılsın: tıklama alanı 44 px. */

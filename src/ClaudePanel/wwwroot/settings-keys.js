@@ -25,6 +25,20 @@ window.PanelSettingsKeys = function (d) {
     return "";
   }
 
+  // Son yeniden deneme geçmediyse (ApiKeys.Recheck kaydeder) kart "geçerli" demez.
+  const FAIL_KIND = { badkey: "crit", noperm: "crit", nobalance: "warn", network: "warn", http: "warn" };
+  const failed = (k) => k.connected && k.failAt != null && k.failAt > (k.at || 0);
+  const failShort = (k) => k.fail === "http" ? t("keyStFail_http", k.failStatus ?? "?") : t("keyStFail_" + (k.fail in FAIL_KIND ? k.fail : "network"));
+  const stamp = (ms) => new Date(ms).toLocaleString(lang(), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  // Aşama satırı: anahtar kayıtlı → son deneme geçti/geçmedi. Panel bu anahtarlarla iş yapmaz; "son iş" yazılmaz.
+  function keyStages(k) {
+    const s = [["ok", t("keyStSaved", k.last4)]];
+    if (failed(k)) s.push([FAIL_KIND[k.fail] === "crit" ? "no" : "warn", t("keyStFailed", stamp(k.failAt))]);
+    else s.push(["ok", t("keyStOk", stamp(k.at))]);
+    return s;
+  }
+
   function paint(k) {
     const m = META[k.id], st = ui[k.id] ||= { open: false, busy: false, msg: "", kind: "" };
     let card = cards[k.id];
@@ -34,7 +48,7 @@ window.PanelSettingsKeys = function (d) {
       card.dataset.key = k.id;
       card.innerHTML = `<div class="set-card-top"><span class="set-logo">${m.logo}</span>
           <div class="set-card-id"><div class="set-name"></div><div class="set-who"></div></div><span class="set-state"></span></div>
-        <div class="set-meter" hidden><i></i></div><div class="set-uses"></div>
+        <div class="set-meter" hidden><i></i></div><div class="key-stages"></div><div class="set-uses"></div>
         <dl class="key-facts"><div><dt class="kf-where"></dt><dd><span class="kf-where-t"></span> <button type="button" class="linkbtn" data-go="setRouting" hidden></button></dd></div>
           <div class="kf-free-row"><dt class="kf-free"></dt><dd class="kf-free-t"></dd></div></dl>
         <div class="set-btns local-only"></div>
@@ -53,8 +67,10 @@ window.PanelSettingsKeys = function (d) {
     const q = (s) => card.querySelector(s);
     q(".set-name").innerHTML = esc(k.name) + (m.personal ? ` <span class="set-tag">${esc(t("setConnPersonal"))}</span>` : "");
     q(".set-who").textContent = t(m.who) + (k.connected && k.tier ? " · " + k.tier : "");
-    q(".set-state").className = "set-state " + (k.connected ? "ok" : "off");
-    q(".set-state").textContent = t(k.connected ? "setKeyValid" : "setConnOff");
+    const bad = failed(k);
+    q(".set-state").className = "set-state " + (!k.connected ? "off" : bad ? FAIL_KIND[k.fail] || "warn" : "ok");
+    q(".set-state").textContent = !k.connected ? t("setConnOff") : bad ? failShort(k) : t("setKeyValid");
+    q(".key-stages").innerHTML = k.connected ? hub.stages(keyStages(k)) : "";
     const meter = q(".set-meter");
     meter.hidden = !(k.connected && k.id === "elevenlabs" && k.limit > 0);
     if (!meter.hidden) {
@@ -62,8 +78,7 @@ window.PanelSettingsKeys = function (d) {
       meter.className = "set-meter " + hub.level(left);
       meter.firstElementChild.style.width = (100 - left) + "%"; // Claude kartlarıyla aynı: çubuk kullanılanı, renk kalanı gösterir
     }
-    const when = k.at ? new Date(k.at).toLocaleString(lang(), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-    q(".set-uses").textContent = k.connected ? [infoLine(k), t("setKeyLast4", k.last4, when)].filter(Boolean).join(" · ") : t("setKeyWhy_" + k.id);
+    q(".set-uses").textContent = k.connected ? infoLine(k) : t("setKeyWhy_" + k.id); // son 4 + deneme zamanı aşama satırında
     // Ne işe yarar / panelde nerede / ücret: bağlı olmayan kartta karar vermeye yetsin. Ücret satırı bağlanınca kalkar.
     q(".kf-where").textContent = t("setKeyWhereLbl");
     q(".kf-where-t").textContent = t("setKeyWhere_" + k.id);
@@ -155,7 +170,8 @@ window.PanelSettingsKeys = function (d) {
       st.busy = true; say(id, t("setKeyTesting")); repaint(id);
       const r = await api("/api/hub/key/check", { provider: id });
       st.busy = false;
-      if (r.ok) { keys = r.data.keys; say(id, t("setKeyStillOk"), "ok"); } else say(id, failText(r), "warn");
+      if (r.data?.keys) keys = r.data.keys; // geçmeyen deneme de kayda yazıldı: kart durumu yenilensin
+      if (r.ok) say(id, t("setKeyStillOk"), "ok"); else say(id, failText(r), "warn");
       repaint(id);
     } else if (what === "remove") {
       if (!await confirmBox({ title: t("setKeyRemoveTitle", name), text: t("setKeyRemoveText"), okText: t("setKeyRemove"), danger: true })) return;

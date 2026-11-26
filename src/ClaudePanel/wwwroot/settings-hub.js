@@ -72,6 +72,11 @@ window.PanelSettingsHub = function (d) {
   const { t, api, getJson, esc, accountName, lang } = d;
   const clamp = (n) => Math.max(0, Math.min(100, n));
   const level = (left) => left < 15 ? "crit" : left < 40 ? "warn" : "ok";
+  // Kartlardaki aşama satırı (işçi ve servis kartları): [[tür, metin], ...]; tür ok | no | warn | unk.
+  // İşaret (✓ ✗ ! ○) rengin yanında durur: renk görmeyen de okur. Telefonda alt satıra kayar.
+  const MARK = { ok: "✓", no: "✗", warn: "!", unk: "○" };
+  const stages = (items) => `<ul class="ai-stages">${items.map(([k, s]) =>
+    `<li data-s="${k}"><span class="ai-mark" aria-hidden="true">${MARK[k]}</span>${esc(s)}</li>`).join("")}</ul>`;
   const when = (iso) => {
     const at = iso ? new Date(iso) : null;
     return at && !isNaN(at) ? at.toLocaleString(lang(), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
@@ -230,5 +235,5 @@ window.PanelSettingsHub = function (d) {
   document.addEventListener("scroll", onScroll, { passive: true, capture: true });
   addEventListener("resize", () => { if (!view.hidden) { measure(); onScroll(); } });
 
-  return { open, go, syncNav, load, render, data: () => hub, onRender: (f) => subs.push(f), clamp, level };
+  return { open, go, syncNav, load, render, data: () => hub, onRender: (f) => subs.push(f), clamp, level, stages };
 };

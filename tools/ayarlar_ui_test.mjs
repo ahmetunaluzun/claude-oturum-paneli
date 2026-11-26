@@ -1,7 +1,7 @@
 // Ayarlar sekmesi: ⚙ ve "Ayarlar" sekmesi aynı görünümü açar, pencere (dialog) açılmaz; eski pencerenin her ayarı bir
 // bölümde ve ekranda görünür (elementFromPoint); bölüm menüsü geniş ekranda yapışkan, dar ekranda yatay şerit; sayfa yana
 // taşmaz; koyu ve açık temada. Kullanım: node ayarlar_ui_test.mjs <debugPort> <url> <çıktı öneki>
-import { writeFileSync } from "node:fs";
+import { writeFileSync, unlinkSync } from "node:fs";
 const [port, url, out] = process.argv.slice(2);
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const page = targets.find(t => t.type === "page");
@@ -184,6 +184,7 @@ check("GitHub takibi kapatılınca kart 'Kapalı' ve Genel'e yönlendirir", awai
 await ev(`document.getElementById("sGithub").click()`); await sleep(1500);
 for (const need of ["setAccounts"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
 
+const stagesOf = (sel) => ev(`[...document.querySelectorAll('${sel} .ai-stages li')].map(li => li.dataset.s + ":" + li.textContent.slice(1))`);
 // ---- (c) Anahtar bağlama: Bağlan → gizli kutu → Dene ve kaydet (sahte deneme sunucusu) ----
 const key = (id) => ev(`(() => { const c = document.querySelector('#setKeys [data-key="${id}"]'); if (!c) return null;
   const vis = (e) => !!e && !e.closest("[hidden]") && getComputedStyle(e).display !== "none";
@@ -233,7 +234,7 @@ check("bakiye yok: ayrı neden", (await key("openrouter")).msg, "Anahtar çalı�
 await keyType("openrouter", "sahte-iyi-openrouter-0002-ASDF"); await keyBtn("openrouter", "Dene ve kaydet");
 await until(`document.querySelector('[data-key="openrouter"] .set-msg').dataset.kind === "ok"`);
 const orOk = await key("openrouter");
-check("geçerli anahtar: bağlı, kalan limit, son 4, kutu kapandı", [orOk.state, /^Anahtarın sınırından kalan: 7,5 \$ · son 4: …ASDF · denendi /.test(orOk.uses), orOk.btns, orOk.box, orOk.msg],
+check("geçerli anahtar: bağlı, kalan limit, son 4, kutu kapandı", [orOk.state, orOk.uses === "Anahtarın sınırından kalan: 7,5 $" && (await stagesOf('#setKeys [data-key="openrouter"]'))[0] === "ok:Kayıtlı (…ASDF)", orOk.btns, orOk.box, orOk.msg],
   ["Anahtar geçerli", true, ["Anahtarı değiştir", "Yeniden dene", "Kaldır"], false, "✓ Anahtar çalışıyor · şifreli kaydedildi"]);
 check("anahtar sayfada yok (kutu boşaltıldı, DOM'da metin yok)", await ev(`[document.querySelector('[data-key="openrouter"] .set-keyinput').value, document.documentElement.outerHTML.includes("sahte-iyi-openrouter")]`), ["", false]);
 await keyBtn("elevenlabs", "Bağlan"); await sleep(400);
@@ -248,6 +249,24 @@ check("Kaldır: panelin kendi onay penceresi", await ev(`document.getElementById
 await ev(`document.querySelector('#askButtons button[value="yes"]').click()`);
 await until(`document.querySelector('[data-key="openrouter"] .set-state').textContent === "Bağlı değil"`);
 check("kaldırıldı: bağlı değil, Bağlan düğmesi geri geldi", [(await key("openrouter")).btns, (await key("openrouter")).msg], [["Bağlan"], "Anahtar kaldırıldı."]);
+{
+  const st = await stagesOf('#setKeys [data-key="elevenlabs"]');
+  check("anahtar kartı aşama satırı: kayıtlı (son 4) → son deneme geçti (zaman)", [st.length, st[0], st[1]?.startsWith("ok:Son deneme geçti: ")], [2, "ok:Kayıtlı (…QWER)", true]);
+}
+// Anahtar sonradan iptal edildi (sahte sunucu her anahtarı reddeder): Yeniden dene → kart "geçerli" demez
+writeFileSync(process.env.ANAHTAR_RED, "");
+await keyBtn("elevenlabs", "Yeniden dene");
+await until(`document.querySelector('[data-key="elevenlabs"] .set-msg').dataset.kind === "warn"`);
+{
+  const st = await stagesOf('#setKeys [data-key="elevenlabs"]');
+  check("iptal edilen anahtar: rozet 'Anahtar reddedildi' (kırmızı), aşama ✗ son deneme geçmedi, bilgi korunur", [await ev(`(() => { const s = document.querySelector('[data-key="elevenlabs"] .set-state'); return [s.textContent, s.className]; })()`), st[1]?.startsWith("no:Son deneme geçmedi: "), (await key("elevenlabs")).btns],
+    [["Anahtar reddedildi", "set-state crit"], true, ["Anahtarı değiştir", "Yeniden dene", "Kaldır"]]);
+}
+await elShot('#setKeys [data-key="elevenlabs"]', "anahtar_gecmedi", "geçmeyen anahtar kartı");
+unlinkSync(process.env.ANAHTAR_RED);
+await keyBtn("elevenlabs", "Yeniden dene");
+await until(`document.querySelector('[data-key="elevenlabs"] .set-msg').dataset.kind === "ok"`);
+check("yeniden geçince 'Anahtar geçerli' ve ✓ son deneme geçti", [await ev(`document.querySelector('[data-key="elevenlabs"] .set-state').textContent`), (await stagesOf('#setKeys [data-key="elevenlabs"]'))[1]?.startsWith("ok:Son deneme geçti: ")], ["Anahtar geçerli", true]);
 check("bağlı kartta ücret satırı yok, panelde satırı var", await ev(`[...document.querySelectorAll('#setKeys [data-key="elevenlabs"] .key-facts > div')].map(d => d.hidden)`), [false, true]);
 
 // ---- (d) Yapay zekâ işçileri ve iş yönlendirme ----
@@ -256,6 +275,14 @@ const worker = (id) => ev(`(() => { const c = document.querySelector('#wkCards [
 await until(`document.querySelector('#wkCards [data-worker="gemini"] .set-who')?.textContent.includes("0.1.7")`, 8000);
 check("Codex kartı: plan, CLI sürümü, açık", await worker("codex"), { who: "go · codex CLI 0.171.0", on: "true", role: "switch" });
 check("Gemini kartı: CLI sürümü (sahte betik), kapalı", await worker("gemini"), { who: "Antigravity CLI 0.1.7", on: "false", role: "switch" });
+{
+  const st = await stagesOf('#wkCards [data-worker="codex"]');
+  check("Codex aşamaları: kurulu, giriş, son iş başarısız (çıkış 1) + son başarılı; bozuk özet atlanır", [st.slice(0, 2), /^warn:Son iş başarısız \(çıkış 1\), 3\d dk önce · son başarılı: 2 sa \d+ dk önce$/.test(st[2]), st.length],
+    [["ok:Kurulu", "ok:Giriş yapılmış"], true, 3]);
+  check("Gemini aşamaları: kurulu, giriş okunamaz (uydurulmaz), son iş henüz yok", await stagesOf('#wkCards [data-worker="gemini"]'),
+    ["ok:Kurulu", "unk:Giriş ilk işte denetlenir", "unk:Son iş: henüz yok"]);
+}
+await elShot("#wkCards", "isci_asamalar", "işçi aşama satırı");
 check("işçi kartı: ne yapar / ne yapmaz; kurulu olanda kurulum kutusu yok", await ev(`(() => { const c = document.querySelector('#wkCards [data-worker="codex"]');
   return [[...c.querySelectorAll(".key-facts dt")].map(d => d.textContent), !!c.querySelector(".wk-setup")]; })()`), [["Ne yapar", "Ne yapmaz"], false]);
 check("Gemini notu: CLI ile API anahtarı ayrı yollar, anahtar bağlama bağlantısı", await ev(`(() => { const n = document.querySelector('#wkCards [data-worker="gemini"] .wk-note');
@@ -270,6 +297,8 @@ check("kurulu değil: kurulum ve giriş komutları, kopyala ve yeniden dene", aw
   ["Kurulum (bilgisayarda bir kez)", ["npm install -g @openai/codex", "codex"], ["Kopyala", "Kopyala", "Yeniden dene"]]);
 check("Antigravity CLI kurulu değil: Windows kurulum komutu ve agy girişi", await ev(`[...document.querySelectorAll('#wkCards [data-worker="gemini"] .wk-setup code')].map(x => x.textContent)`),
   ["irm https://antigravity.google/cli/install.ps1 | iex", "agy"]);
+check("kurulu değilken aşama satırı yalnız ✗ Kurulu değil", [await stagesOf('#wkCards [data-worker="codex"]'), await stagesOf('#wkCards [data-worker="gemini"]')],
+  [["no:Kurulu değil"], ["no:Kurulu değil", "unk:Son iş: henüz yok"]]);
 await elShot("#wkCards", "isci_kurulum", "işçi kurulum kutusu");
 await ev(`(() => { window.fetch = window.__fetch; })()`);
 await ev(`document.getElementById("btnSettings").click()`);
@@ -333,7 +362,7 @@ const cardLayout = () => ev(`(() => { const clipped = [...document.querySelector
 
 for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {
   if (light) { await theme(true); await openSettings(); }
-  for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"]]) {
+  for (const [w, h, mob, n] of [[1280, 900, false, "genis"], [500, 900, true, "telefon"], [390, 844, true, "telefon390"]]) {
     await size(w, h, mob);
     await scrollTop(0);
     const bad = [];

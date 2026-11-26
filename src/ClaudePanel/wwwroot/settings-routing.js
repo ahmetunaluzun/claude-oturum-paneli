@@ -60,7 +60,28 @@ window.PanelSettingsRouting = function (d) {
         <button type="button" class="wk-switch" role="switch" aria-checked="${on}" aria-label="${esc(id === "codex" ? "Codex" : "Gemini")}" data-wk="${id}"><i></i></button></div>
       <dl class="key-facts"><div><dt>${esc(t("wkDoLbl"))}</dt><dd>${esc(t(id === "codex" ? "wkCodexUse" : "wkGeminiUse"))}</dd></div>
         <div><dt>${esc(t("wkDontLbl"))}</dt><dd>${esc(t(id === "codex" ? "wkCodexDont" : "wkGeminiDont"))}</dd></div></dl>
+      ${hub.stages(workerStages(id, w))}
       ${extra ? `<p class="set-msg" data-kind="warn">${esc(extra)}</p>` : ""}${setupBlock(id, w)}${btn}</div>`;
+  }
+
+  // Aşama satırı: kurulu → giriş → son iş. Eksik aşama ✗ ile görünür; ne yapılacağı altındaki kurulum kutusunda.
+  // Gemini'de giriş durumu okunamaz (agy --version yalnız sürüm verir) ve Gemini'ye iş veren betik henüz yok: uydurulmaz.
+  function workerStages(id, w) {
+    const ago = (ms) => t("since", hub.dur(Date.now() - ms));
+    if (id === "codex") {
+      if (!w.installed) return [["no", t("wkStNotInstalled")]];
+      const s = [["ok", t("wkStInstalled")], w.plan ? ["ok", t("wkStLoggedIn")] : ["no", t("wkStNoLogin")]];
+      const j = w.job;
+      if (!j) s.push(["unk", t("wkStNoJob")]);
+      else if (j.lastExit === 0) s.push(["ok", t("wkStJobOk", ago(j.lastAt))]);
+      else s.push(["warn", t("wkStJobFail", j.lastExit, ago(j.lastAt)) + (j.okAt ? " · " + t("wkStJobLastOk", ago(j.okAt)) : "")]);
+      return s;
+    }
+    if (w.state === "checking") return [["unk", t("wkChecking")]];
+    const s = w.state === "ok" ? [["ok", t("wkStInstalled")], ["unk", t("wkStLoginUnknown")]] : [["no", t("wkStNotInstalled")]];
+    if (w.apiKey) s.push(["ok", t("wkStApiKey")]);
+    s.push(["unk", t("wkStNoJob")]);
+    return s;
   }
 
   function renderWorkers() {

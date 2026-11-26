@@ -127,14 +127,14 @@ public static class HubEndpoints
         var g = Workers.Gemini();
         return new
         {
-            codex = new { enabled = Workers.Enabled("codex"), installed = CodexSessions.Installed, plan, version },
+            codex = new { enabled = Workers.Enabled("codex"), installed = CodexSessions.Installed, plan, version, job = CodexJobs.Last() },
             gemini = new { enabled = Workers.Enabled("gemini"), state = g.State, version = g.Version, apiKey = ApiKeys.Has("gemini") }
         };
     }
 
     static IResult KeyResult(ApiKeys.Result r) => r.Error is null
         ? Results.Json(new { keys = KeyCards() })
-        : Results.Json(new { error = r.Error, status = r.Status }, statusCode: 400);
+        : Results.Json(new { error = r.Error, status = r.Status, keys = KeyCards() }, statusCode: 400); // keys: geçmeyen yeniden deneme kayda yazıldı
 
     static object KeyCards()
     {
@@ -145,7 +145,8 @@ public static class HubEndpoints
             return new
             {
                 id = p.Id, name = p.Name, connected = i is not null, last4 = i?.Last4, at = i?.At,
-                remaining = i?.Remaining, limit = i?.Limit, tier = i?.Tier, balance = i?.Balance, noLimit = i?.NoLimit, models = i?.Models
+                remaining = i?.Remaining, limit = i?.Limit, tier = i?.Tier, balance = i?.Balance, noLimit = i?.NoLimit, models = i?.Models,
+                failAt = i?.FailAt, fail = i?.Fail, failStatus = i?.FailStatus
             };
         }).ToList();
     }

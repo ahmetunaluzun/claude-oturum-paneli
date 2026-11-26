@@ -11,9 +11,11 @@
 #   sahte-ag…    → bağlantı yanıtsız kapatılır (ağ hatası)
 #   sahte-500…   → 500
 #   başka her şey → anahtar yanlış (ElevenLabs/OpenRouter 401, Gemini 400 API_KEY_INVALID)
+#   <log dosyası>.red varken HER anahtar 401 (kayıtlı anahtarın sonradan iptal edilmesi: yeniden deneme testi)
 # Log satırı: "<yöntem>\t<yol ve sorgu>\t<anahtar başlığının adı ya da ->". Anahtarın kendisi loga YAZILMAZ; testler adreste (yol/sorgu)
 # anahtar geçmediğini bu dosyadan doğrular.
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -45,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
         expected = {"elevenlabs": "/elevenlabs/v1/user/subscription", "openrouter": "/openrouter/api/v1/key", "gemini": "/gemini/v1beta/models"}
         if expected.get(service) != path:
             return self.reply(404, {"error": "not found"})
+        if os.path.exists(LOG + ".red"):
+            return self.reply(401, {"error": "revoked"})
         if key.startswith("sahte-ag"):
             self.connection.close()  # yanıtsız kapat: istemci ağ hatası görür
             return

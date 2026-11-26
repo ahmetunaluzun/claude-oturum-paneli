@@ -91,6 +91,14 @@ R=$(post /api/hub/key/save "{\"provider\":\"openrouter\",\"key\":\"$K_OR2\"}"); 
 check "anahtar değiştirme: yeni son 4, harcama sınırı yok" "$(field "$R" openrouter last4) $(field "$R" openrouter noLimit) $(field "$R" openrouter balance)" '"TYUI" true null'
 R=$(post /api/hub/key/check '{"provider":"elevenlabs"}'); echo "$R" >> "$ALL_OUT"
 check "yeniden dene: kayıtlı anahtarla 200" "$(code "$R") $(field "$R" elevenlabs remaining)" "200 186000"
+# Kayıtlı anahtar sonradan iptal edildi: yeniden deneme hatayı kayda yazar, kart "geçerli" demez; bağlantı ve son başarılı bilgi kalır
+touch "$T/anahtar.log.red"
+R=$(post /api/hub/key/check '{"provider":"elevenlabs"}'); echo "$R" >> "$ALL_OUT"
+check "iptal edilmiş anahtarı yeniden deneme: 400 badkey, yanıtta kartlar" "$(code "$R")/$(err "$R") $(field "$R" elevenlabs connected) $(field "$R" elevenlabs fail) $(field "$R" elevenlabs failStatus) $(field "$R" elevenlabs remaining)" '400/badkey true "badkey" 401 186000'
+check "geçmeyen deneme son başarılıdan sonra" "$(py -3.13 -c "import json,sys; k=[k for k in json.loads(sys.argv[1])['keys'] if k['id']=='elevenlabs'][0]; print(k['failAt'] >= k['at'])" "$(echo "$R" | head -1)")" "True"
+rm -f "$T/anahtar.log.red"
+R=$(post /api/hub/key/check '{"provider":"elevenlabs"}'); echo "$R" >> "$ALL_OUT"
+check "yeniden geçince hata kaydı silinir" "$(code "$R") $(field "$R" elevenlabs fail) $(field "$R" elevenlabs failAt)" "200 null null"
 hub >> "$ALL_OUT"; curl -s "$B/api/state" >> "$ALL_OUT"
 
 # ---- gizlilik: anahtar hiçbir yanıtta, adreste, düz dosyada, panel çıktısında yok ----
@@ -102,7 +110,7 @@ done
 check "anahtar hiçbir yanıtta ve hiçbir dosyada düz metin değil" "$leak" 0
 check "deneme isteklerinde adres (yol/sorgu) anahtar içermiyor" "$(grep -c -e 'sahte-' -e 'key=' "$T/anahtar.log")" 0
 check "her serviste anahtar doğru başlıkta gitti" "$(cut -f2,3 "$T/anahtar.log" | sort -u | tr '\t\n' ' |')" "/elevenlabs/v1/user/subscription xi-api-key|/gemini/v1beta/models x-goog-api-key|/openrouter/api/v1/key authorization|"
-check "durum dosyasında yalnız gizli olmayan bilgi" "$(py -3.13 -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print(sorted(d), sorted(set(k for v in d.values() for k in v)))" "$TW\\data\\api-keys.json")" "['elevenlabs', 'gemini', 'openrouter'] ['At', 'Balance', 'Last4', 'Limit', 'Models', 'NoLimit', 'Remaining', 'Tier']"
+check "durum dosyasında yalnız gizli olmayan bilgi" "$(py -3.13 -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print(sorted(d), sorted(set(k for v in d.values() for k in v)))" "$TW\\data\\api-keys.json")" "['elevenlabs', 'gemini', 'openrouter'] ['At', 'Balance', 'Fail', 'FailAt', 'FailStatus', 'Last4', 'Limit', 'Models', 'NoLimit', 'Remaining', 'Tier']"
 
 # ---- anahtar sayfası: seçili Chrome profilinde ----
 R=$(post /api/hub/key/open '{"provider":"openrouter"}')
