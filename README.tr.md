@@ -20,7 +20,7 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 - **Pencereye git**: oturumun terminal penceresini öne getirir.
 - **Arka plan işi** (0.18.0): panel oturumunda arka planda süren alt ajan ya da komut kartta rozetle ("arka planda: 1 alt ajan, 1 komut"), alt bilgide toplam sayıyla görünür. Alt bilgideki göstergeye basınca liste açılır (0.19.0): hangi oturumda, ne işi, türü, ne zamandır sürdüğü; takılmış olabilecek iş kırmızı.
 - **Codex oturumları** (0.18.0, salt okuma): Codex CLI kuruluysa açık ve çalışan Codex oturumları ayrı şeritte, Son oturumlar'da "Codex" rozetiyle; üst çubukta Codex kota göstergesi. Panel Codex'e hiçbir şey yazmaz.
-- **İki Claude hesabı** (0.20.0): kişisel ve şirket hesabı aynı bilgisayarda. Ek hesap `~/.claude-<ad>` klasörüdür (`CLAUDE_CONFIG_DIR` ile giriş yapılmış). Üst çubukta her hesabın kotası, kartta oturumun hesabı, ⋯ menüsünde "öteki hesapta devam et" (aynı konuşma o hesapla açılır), yeni oturumda proje başına hesap, bir hesapta kota azalınca boştaki oturumları öteki hesaba geçirme önerisi; gece modu her hesabın kendi kotasına bakar.
+- **İki Claude hesabı** (0.20.0, hesap adı terminal satırında 0.23.0): kişisel ve şirket hesabı aynı bilgisayarda. Ek hesap `~/.claude-<ad>` klasörüdür (`CLAUDE_CONFIG_DIR` ile giriş yapılmış). Üst çubukta her hesabın kotası, kartta oturumun hesabı, ⋯ menüsünde "öteki hesapta devam et" (aynı konuşma o hesapla açılır), yeni oturumda proje başına hesap, bir hesapta kota azalınca boştaki oturumları öteki hesaba geçirme önerisi; gece modu her hesabın kendi kotasına bakar. Birden çok hesapta terminaldeki kota/bağlam satırı ve konuşma çekmecesinin bilgi satırı oturumun hesap adıyla başlar.
 - **Ayarlar sekmesi** (0.21.0): ayarlar ayrı sekmede, solda bölüm menüsü. Hesaplar (her Claude hesabının kotası ve projeleri; ElevenLabs, OpenRouter, Gemini API anahtarını "Bağlan" ile sayfayı açıp yapıştırarak bağlama, anahtar deneme isteğiyle doğrulanıp şifreli kasada saklanır), Yapay zekâ işçileri (Codex/Gemini aç-kapa), İş yönlendirme (görsel, video, belge özeti, çeviri, kod incelemesi için sıralı araç listesi; şirket işinde Google ve Higgsfield atlanır), Google ile neler yapılır.
 - **Sekmeye git**: Windows Terminal'de doğru sekmeyi seçer (sekme adı klasör adıyla eşleşir; eşleşmezse bir kez sorar, seçimi hatırlar).
 - Bir oturum işini bitirince Windows bildirimi + ses.
@@ -40,6 +40,7 @@ Bilgisayarda açık olan tüm Claude Code oturumlarını tek ekranda gösteren k
 ### Yeni oturum
 
 - **Yeni oturum**: klasör ve görev yazılır, `claude --bg` ile arka planda başlar.
+- **Yeni klasör** (0.23.0): Klasörler'de "＋ Yeni klasör" ile bulunulan klasörün içinde klasör açılır, panel içine girip seçer; oturum orada başlar. Ad Windows ve Mac kurallarıyla denetlenir, var olan klasörün üstüne yazılmaz. Telefondan da çalışır. "Bu bilgisayar" sürücü listesi artık bağlı olmayan ağ sürücülerini beklemez (28 sn → 1,6 sn).
 
 ![Yeni oturum penceresi: son kullanılan proje listesi, seçili klasör, oturum adı, model, görev metni, Panelde / Arka planda seçimi](docs/img/yeni-oturum.png)
 
@@ -191,6 +192,9 @@ MIT — bkz. [LICENSE](LICENSE). Bağımsız bir projedir; Anthropic tarafından
 
 | Sürüm | Tarih | Değişen alan | Eski değer | Yeni değer | Neden |
 |---|---|---|---|---|---|
+| 0.23.0 | 2026-11-26 | Yeni oturum: Klasörler | Klasör yalnız seçilebiliyordu | "＋ Yeni klasör": bulunulan klasörün içinde klasör açılır ve seçilir | Kullanıcı: yeni projeyi panelden başlatmak |
+| 0.23.0 | 2026-11-26 | Yeni oturum: "Bu bilgisayar" | Sürücü listesi 28 sn'de açılıyordu | 1,6 sn; cevap vermeyen ağ sürücüsü listeye girmez | Bağlı olmayan ağ sürücüleri her biri 5-6 sn bekletiyordu |
+| 0.23.0 | 2026-11-26 | Terminal durum satırı, konuşma bilgi satırı | Hesap adı yoktu | Birden çok hesapta oturumun hesap adıyla başlar | Hangi hesabın kotasının görüldüğü belli olsun |
 | 0.22.0 | 2026-11-26 | Konuşma: yazma kutusu | Gönderilmeyen metin çekmece kapanınca siliniyordu | Taslak oturum başına saklanır, açınca ve panel yeniden açılınca geri gelir, gönderince silinir | Kullanıcı: yazıp bırakılan metin kayboluyordu |
 | 0.22.0 | 2026-11-26 | Ekran görüntüleri | 0.12.1 düzeni (Ayarlar penceresi) | 0.22.0 ile yeniden üretildi; Ayarlar görseli sekme düzeninde (Hesaplar, Yapay zekâ işçileri) | Görseller güncel arayüzü göstersin |
 | 0.21.0 | 2026-11-25 | Ayarlar | Ayarlar tek pencerede, dış bağlantılar elle kuruluyordu, telefonda kota yenilenme süresi görünmüyordu | Ayrı Ayarlar sekmesi: Hesaplar, anahtar bağlama, Yapay zekâ işçileri, İş yönlendirme, Google tablosu; telefonda yenilenme süresi | Kullanıcı isteği (taslak onayı 24.11) |

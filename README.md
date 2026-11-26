@@ -20,7 +20,7 @@ can reach (`127.0.0.1`).
 - **Go to window**: brings the session's terminal window to the front.
 - **Background work** (0.18.0): a sub-agent or background command still running in a panel session shows as a badge on the card ("in background: 1 sub-agent, 1 command") and as a total in the footer. Clicking the footer indicator opens a list (0.19.0): which session, what the job is, its type and how long it has been running; a job that may be stuck is red.
 - **Codex sessions** (0.18.0, read-only): if the Codex CLI is installed, open and running Codex sessions get their own lane, appear in Recent sessions with a "Codex" badge, and a Codex quota indicator sits in the top bar. The panel never writes to Codex.
-- **Two Claude accounts** (0.20.0): personal and work account on the same computer. An extra account is a `~/.claude-<name>` folder (logged in with `CLAUDE_CONFIG_DIR`). Each account's quota in the top bar, the session's account on its card, "continue in the other account" in the ⋯ menu (the same conversation reopens with that account), a per-project account for new sessions, and a suggestion to move idle sessions when one account runs low; night mode checks each account's own quota.
+- **Two Claude accounts** (0.20.0, account name in the terminal line 0.23.0): personal and work account on the same computer. An extra account is a `~/.claude-<name>` folder (logged in with `CLAUDE_CONFIG_DIR`). Each account's quota in the top bar, the session's account on its card, "continue in the other account" in the ⋯ menu (the same conversation reopens with that account), a per-project account for new sessions, and a suggestion to move idle sessions when one account runs low; night mode checks each account's own quota. With more than one account, the quota/context line in the terminal and the info line of the conversation drawer start with the session's account name.
 - **Settings tab** (0.21.0): settings in their own tab with a section menu. Accounts (each Claude account's quota and projects; connect ElevenLabs, OpenRouter and Gemini API keys by opening the key page and pasting, the key is checked with a test request and kept in the OS encrypted store), AI workers (Codex/Gemini on/off), Task routing (ordered tool list for images, video, document summaries, translation, code review; Google and Higgsfield are skipped for company work), What you can do with Google.
 - **Go to tab**: picks the right tab in Windows Terminal (the tab title is matched against the folder name; if there's no match it asks once and remembers your choice).
 - A Windows notification and a sound when a session finishes.
@@ -40,6 +40,7 @@ can reach (`127.0.0.1`).
 ### New session
 
 - **New session**: pick a folder, describe the task, and it starts in the background with `claude --bg` (or inside the panel).
+- **New folder** (0.23.0): "＋ New folder" under Folders creates a folder inside the current one, opens it and selects it; the session starts there. The name is checked against Windows and macOS rules and an existing folder is never overwritten. Works from the phone too. The "This computer" drive list no longer waits for disconnected network drives (28 s → 1.6 s).
 
 ![New session window: recently used projects, the selected folder, session name, model, task text, and the "In the panel / In the background" choice](docs/img/yeni-oturum.png)
 
@@ -193,6 +194,9 @@ The detailed changelog is in Turkish: [CHANGELOG.md](CHANGELOG.md).
 
 | Version | Date | Area | Before | After | Why |
 |---|---|---|---|---|---|
+| 0.23.0 | 2026-11-26 | New session: Folders | A folder could only be picked | "＋ New folder" creates a folder inside the current one and selects it | User: start a new project from the panel |
+| 0.23.0 | 2026-11-26 | New session: "This computer" | Drive list took 28 s to open | 1.6 s; a network drive that does not answer is left out | Each disconnected network drive held the list for 5-6 s |
+| 0.23.0 | 2026-11-26 | Terminal status line, conversation info line | No account name | Starts with the session's account name when there is more than one account | Make clear whose quota is shown |
 | 0.22.0 | 2026-11-26 | Conversation: message box | Unsent text was lost when the drawer was closed | The draft is kept per session, comes back when reopened and after the panel restarts, and is removed once sent | User: text typed and left unsent disappeared |
 | 0.22.0 | 2026-11-26 | Screenshots | 0.12.1 layout (Settings dialog) | Regenerated with 0.22.0; the Settings image shows the tab layout (Accounts, AI workers) | Screenshots should match the current UI |
 | 0.21.0 | 2026-11-25 | Settings | Settings in one dialog, external connections set up by hand, reset time not visible on phones | Separate Settings tab: Accounts, key connection, AI workers, Task routing, Google table; reset time on phones | User request (draft approved 24.11) |

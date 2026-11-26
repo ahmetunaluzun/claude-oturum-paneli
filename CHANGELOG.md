@@ -2,7 +2,7 @@
 
 Sürüm numarasının tek kaynağı `src/ClaudePanel/ClaudePanel.csproj` içindeki `<Version>`. Panelin alt bilgisinde görünür.
 
-## Yayınlanmamış
+## 0.23.0 — 2026-11-26
 - **Yeni oturumda yeni klasör.** Yeni oturum → Klasörler'de "＋ Yeni klasör" düğmesi: bulunulan klasörün içine ad yazılır, Enter (ya da Oluştur) ile panel klasörü açar, içine girer ve seçer; oturum orada başlatılır. Esc yalnız ad satırını kapatır. Ad Windows ve Mac'te aynı kurallarla denetlenir (`\ / : * ? " < > |` yok, nokta/boşlukla bitmez, CON/NUL/COM1… gibi ayrılmış adlar yok, en çok 120 karakter); aynı adla klasör ya da dosya varsa üstüne yazılmaz, uyarı çıkar; üst klasörün dışına çıkılamaz. Telefondan da çalışır (`POST /api/dirs/create`, oturum anahtarı + aynı köken). "Bu bilgisayar" (sürücü listesi) görünümünde düğme gizli. git init yapılmaz. Test: `tools/yeni_klasor_test.sh` (API ad denetimleri + arayüz geniş/telefon)
 - **"Bu bilgisayar" sürücü listesi hızlandı.** Bağlı olmayan ağ sürücüleri (ör. V:–Z:) her biri 5-6 sn bekletiyordu, liste 28 sn'de açılıyordu. Artık sürücüler birlikte soruluyor, 1,5 sn içinde cevap vermeyen listeye girmiyor (ölçüm: 1,6 sn)
 - **Hesap adı terminal durum satırında ve konuşma çekmecesinde.** Birden çok Claude hesabı varken terminaldeki kota/bağlam satırı oturumun hesabıyla başlar (kart rozetindeki ad: kuruluş adı, varsayılan hesapta "Kişisel"); konuşma çekmecesinin bilgi satırı da hesap adıyla başlar. Tek hesapta yazılmaz
