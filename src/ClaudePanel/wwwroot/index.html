@@ -96,6 +96,7 @@
         <small class="muted" id="fuChecked"></small>
         <button type="button" class="btn small" id="btnFuBulk" aria-haspopup="menu" data-i18n="fuBulkBtn" hidden></button>
         <button type="button" class="btn small" id="btnFuFold" hidden></button>
+        <button type="button" class="btn small" id="btnFuMail" data-i18n="msBtn" data-i18n-title="msBtnHint"></button>
         <button type="button" class="btn small" id="btnFuRefresh" data-i18n="fuRefresh"></button>
       </div>
       <div id="fuBody"></div>
@@ -208,8 +209,12 @@
           <h2 data-i18n="setNavMail"></h2>
           <fieldset class="mail-set" id="mailBox">
             <legend data-i18n="smTitle"></legend>
-            <p class="mail-note" data-i18n="smIntro"></p>
-            <ol class="mw local-only" id="mwWizard">
+            <p class="mail-note" data-i18n="msIntro"></p>
+            <div class="set-btns"><button type="button" class="btn small primary" id="btnSetMail" data-i18n="msBtn"></button></div>
+            <details class="mw-legacy" id="mwLegacy" hidden>
+            <summary data-i18n="msLegacyTitle"></summary>
+            <p class="mail-note" data-i18n="msLegacyText"></p>
+            <ol class="mw local-only" id="mwWizard" hidden>
               <li class="mw-step" id="mwS1">
                 <span class="mw-mark" id="mwM1" aria-hidden="true"></span>
                 <div class="mw-body">
@@ -257,7 +262,7 @@
               </li>
             </ol>
             <ul class="mail-accounts" id="smAccounts"></ul>
-            <details class="mw-adv local-only" id="mwAdv">
+            <details class="mw-adv local-only" id="mwAdv" hidden>
               <summary data-i18n="mwAdvTitle"></summary>
               <div class="mail-client" id="smClient">
                 <ol class="mail-steps" id="smSteps">
@@ -283,6 +288,7 @@
               <label class="mail-field"><span data-i18n="smKeywords"></span><input type="text" id="smKeywords" autocomplete="off"></label>
               <label class="mail-field"><span data-i18n="smLabels"></span><input type="text" id="smLabels" autocomplete="off"></label>
             </div>
+            </details>
           </fieldset>
         </section>
         <section class="set-sec set-own-title" id="setPhone">
@@ -608,6 +614,7 @@
   <script src="/assets/followup-mail.js"></script>
   <script src="/assets/followup-pushguard.js"></script>
   <script src="/assets/settings-mail.js"></script>
+  <script src="/assets/mail-summary.js"></script>
   <script src="/assets/bgjobs.js"></script>
   <script src="/assets/i18n-settings.js"></script>
   <script src="/assets/settings-hub.js"></script>

@@ -175,6 +175,9 @@ window.PanelSettingsMail = function (c) {
     $("smLogin").hidden = !waiting;
     $("btnSmAdd").disabled = waiting;
     if (waiting) $("mwAdv").open = true;
+    // Panelin kendi mail bağlantısı (IMAP/Google girişi) 0.25.0'dan beri kurulmaz; kayıtlı hesap varsa Takip listesi sürer ve
+    // hesap/süzgeç katlanmış "eski bağlantı" bölümünde yönetilir (kaldırılabilir). Yeni hesap yok → bölüm görünmez.
+    $("mwLegacy").hidden = !st.accounts.length;
     const ul = $("smAccounts");
     ul.replaceChildren();
     if (!st.accounts.length) ul.innerHTML = `<li class="mail-none">${esc(t("smNoAccounts"))}</li>`;

@@ -1947,6 +1947,11 @@
   const SK = window.PanelSettingsKeys({ t, api, esc, toast, confirmBox, REMOTE, lang: () => settings.lang, hub: H });
   window.PanelSettingsRouting({ t, api, getJson, esc, toast, hub: H, keys: SK });
   window.PanelSettingsAbout({ t, api, getJson, toast, esc, hub: H });
+  window.PanelMailSummary({ t, api, ask, accounts: () => accountList, accountName, toast, lang: () => settings.lang,
+    open: (key, cwd, name) => {
+      setView("sessions");
+      openDrawer(items.find(s => s.key === key) || { id: "h:" + key, kind: "panel", key, cwd, name, lane: "busy", status: "busy" });
+    } });
   $("btnSettings").addEventListener("click", () => {
     $("sNotify").checked = settings.notify; $("sSound").checked = settings.sound;
     $("sLight").checked = settings.light; $("sLang").value = settings.lang;

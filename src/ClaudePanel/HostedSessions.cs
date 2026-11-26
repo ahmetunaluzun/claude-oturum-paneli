@@ -45,6 +45,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         public bool LastFailed;
         /// <summary>Ek Claude hesabında çalışıyorsa hesabın kimliği (Accounts.cs); varsayılan hesapta null.</summary>
         public string? Account;
+        /// <summary>Mail özeti oturumu: Google bağlayıcıları açık, yalnız okuma araçları (Mail/MailSummary.cs).</summary>
+        public bool Mail;
     }
 
     /// <summary>Panel ya da Windows yeniden başlarken çalışmakta olan oturuma, geri bağlanınca gönderilir.</summary>
@@ -92,7 +94,8 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     /// <param name="hidden">Arka plan işi: oturum listesinde görünmez, diske yazılmaz.</param>
     /// <param name="account">Claude hesabı (Accounts.cs kimliği). Ek hesapta claude o hesabın klasörüyle
     /// (CLAUDE_CONFIG_DIR) başlar. null: projenin kayıtlı hesabı (ProjectAccounts), o da yoksa varsayılan hesap.</param>
-    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false, string? account = null)
+    /// <param name="mail">Mail özeti oturumu: claude.ai Gmail/Takvim bağlayıcıları açık, yazma araçları kapalı (MailSummary).</param>
+    public string Start(string cwd, string? prompt, string? model, string? name, string? resumeId, bool hidden = false, string? account = null, bool mail = false)
     {
         if (string.IsNullOrWhiteSpace(prompt)) prompt = null;
         var psi = new ProcessStartInfo(Launcher.ClaudeExe())
@@ -113,7 +116,9 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         if (!string.IsNullOrWhiteSpace(name)) { psi.ArgumentList.Add("--name"); psi.ArgumentList.Add(name.Trim()); }
         if (resumeId is not null && Guid.TryParse(resumeId, out _)) { psi.ArgumentList.Add("--resume"); psi.ArgumentList.Add(resumeId); }
         // Gece koruması panelle birlikte gelir; ~/.claude/hooks altında betik olmayan bilgisayarda (Mac) da çalışır.
-        if (NightGuard.SettingsArg() is { } guard) { psi.ArgumentList.Add("--settings"); psi.ArgumentList.Add(guard); }
+        var settingsArg = mail ? MailSummary.Settings(NightGuard.SettingsArg()) : NightGuard.SettingsArg();
+        if (settingsArg is not null) { psi.ArgumentList.Add("--settings"); psi.ArgumentList.Add(settingsArg); }
+        if (mail) MailSummary.AddToolArgs(psi);
         var acct = Accounts.Find(account ?? ProjectAccounts.Of(cwd));
         ProjectAccounts.ApplyEnv(psi, acct);
 
@@ -127,7 +132,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
         {
             Key = Guid.NewGuid().ToString("N")[..12], Proc = proc, Cwd = cwd, Name = name, Model = model,
             SessionId = resumeId, StartedAt = now, StatusSince = now, Status = "idle", Hidden = hidden,
-            Account = acct is { IsDefault: false } ? acct.Id : null
+            Account = acct is { IsDefault: false } ? acct.Id : null, Mail = mail
         };
         _sessions[h.Key] = h;
         Persist();
@@ -405,7 +410,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     readonly object _persistLock = new();
 
     /// <param name="Busy">Kayıt anında çalışıyordu (eski dosyalarda yok → false).</param>
-    sealed record Saved(string SessionId, string Cwd, string? Name, string? Model, bool Busy = false, string? Account = null);
+    sealed record Saved(string SessionId, string Cwd, string? Name, string? Model, bool Busy = false, string? Account = null, bool Mail = false);
     volatile bool _closing; // panel kapanıyor: listeyi artık yeniden yazma (oturumlar tek tek düşerken liste boşalmasın)
 
     /// <summary>Açık panel oturumlarının listesini diske yazar (oturum kimliği belli olanlar).</summary>
@@ -413,7 +418,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
     {
         if (_closing) return;
         var list = _sessions.Values.Where(h => h.SessionId is not null && !h.Hidden)
-            .Select(h => new Saved(h.SessionId!, h.Cwd, h.Name, h.Model, h.Status == "busy", h.Account))
+            .Select(h => new Saved(h.SessionId!, h.Cwd, h.Name, h.Model, h.Status == "busy", h.Account, h.Mail))
             .Concat(_pending) // henüz bağlanamamış olanlar da listede kalır
             .GroupBy(s => s.SessionId).Select(g => g.First()).ToList();
         lock (_persistLock)
@@ -476,7 +481,7 @@ public sealed partial class HostedSessions(ILogger<HostedSessions> log, ContextW
                 _pending.Remove(s);
                 var model = s.Model is { } m && (Models.Contains(m) || System.Text.RegularExpressions.Regex.IsMatch(m, "^claude-[a-z0-9.-]+$")) ? m : null;
                 // Kayıtta hesap yoksa varsayılan hesapta açılmıştı: projenin hesabına kaymasın.
-                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId, account: s.Account ?? Accounts.List()[0].Id);
+                Start(s.Cwd, s.Busy ? ResumePrompt : null, model, s.Name, s.SessionId, account: s.Account ?? Accounts.List()[0].Id, mail: s.Mail);
                 if (s.Busy) log.LogInformation("Yarıda kalan iş sürdürülüyor: oturum {Sid} klasör={Cwd}", s.SessionId, s.Cwd);
                 n++;
             }

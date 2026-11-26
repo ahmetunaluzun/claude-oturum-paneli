@@ -635,6 +635,7 @@ app.MapFollow(Authorized); // Takip'in arka plan işleri: /api/follow/* (FollowE
 app.MapSchedule(Authorized, IsLocal); // Zamanlanmış işler: /api/schedule/* (ScheduleEndpoints.cs)
 app.MapPlans(Authorized); // Planlı işler: /api/plans* (PlanEndpoints.cs)
 app.MapMail(Authorized, IsLocal); // Mail ve takvim: /api/mail* (Mail/MailEndpoints.cs)
+app.MapMailSummary(Authorized); // "Maillerimi özetle": Claude bağlayıcısıyla salt okuma oturumu (Mail/MailSummary.cs)
 app.MapCodex(Authorized); // Codex oturumları, salt okuma: /api/codex* (CodexEndpoints.cs)
 app.MapHub(Authorized, IsLocal); // Ayarlar sekmesi → Hesaplar: /api/hub (HubEndpoints.cs)
 app.MapAbout(); // Ayarlar sekmesi → Hakkında: /api/about (About.cs)
