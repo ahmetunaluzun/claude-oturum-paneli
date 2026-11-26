@@ -57,7 +57,7 @@ public static class HubEndpoints
             return Results.Json(WorkerCards());
         });
 
-        // Gemini CLI'yi hemen yeniden dener (kurulumdan sonra); en çok zaman aşımı kadar sürer.
+        // Antigravity CLI'yi (agy) hemen yeniden dener (kurulumdan sonra); en çok zaman aşımı kadar sürer.
         app.MapPost("/api/workers/gemini/check", async (HttpContext ctx) =>
         {
             if (!authorized(ctx)) return Results.StatusCode(403);

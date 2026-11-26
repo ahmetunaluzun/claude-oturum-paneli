@@ -255,7 +255,7 @@ const worker = (id) => ev(`(() => { const c = document.querySelector('#wkCards [
   return { who: c.querySelector(".set-who").textContent, on: c.querySelector(".wk-switch").getAttribute("aria-checked"), role: c.querySelector(".wk-switch").getAttribute("role") }; })()`);
 await until(`document.querySelector('#wkCards [data-worker="gemini"] .set-who')?.textContent.includes("0.1.7")`, 8000);
 check("Codex kartı: plan, CLI sürümü, açık", await worker("codex"), { who: "go · codex CLI 0.171.0", on: "true", role: "switch" });
-check("Gemini kartı: CLI sürümü (sahte betik), kapalı", await worker("gemini"), { who: "gemini CLI 0.1.7", on: "false", role: "switch" });
+check("Gemini kartı: CLI sürümü (sahte betik), kapalı", await worker("gemini"), { who: "Antigravity CLI 0.1.7", on: "false", role: "switch" });
 check("işçi kartı: ne yapar / ne yapmaz; kurulu olanda kurulum kutusu yok", await ev(`(() => { const c = document.querySelector('#wkCards [data-worker="codex"]');
   return [[...c.querySelectorAll(".key-facts dt")].map(d => d.textContent), !!c.querySelector(".wk-setup")]; })()`), [["Ne yapar", "Ne yapmaz"], false]);
 check("Gemini notu: CLI ile API anahtarı ayrı yollar, anahtar bağlama bağlantısı", await ev(`(() => { const n = document.querySelector('#wkCards [data-worker="gemini"] .wk-note');
@@ -268,8 +268,8 @@ await until(`!!document.querySelector('#wkCards [data-worker="codex"] .wk-setup'
 check("kurulu değil: kurulum ve giriş komutları, kopyala ve yeniden dene", await ev(`(() => { const c = document.querySelector('#wkCards [data-worker="codex"] .wk-setup');
   return [c.querySelector(".wk-setup-h").textContent, [...c.querySelectorAll("code")].map(x => x.textContent), [...c.querySelectorAll("button")].map(b => b.textContent)]; })()`),
   ["Kurulum (bilgisayarda bir kez)", ["npm install -g @openai/codex", "codex"], ["Kopyala", "Kopyala", "Yeniden dene"]]);
-check("Gemini CLI kurulu değil: gemini-cli komutu", await ev(`[...document.querySelectorAll('#wkCards [data-worker="gemini"] .wk-setup code')].map(x => x.textContent)`),
-  ["npm install -g @google/gemini-cli", "gemini"]);
+check("Antigravity CLI kurulu değil: Windows kurulum komutu ve agy girişi", await ev(`[...document.querySelectorAll('#wkCards [data-worker="gemini"] .wk-setup code')].map(x => x.textContent)`),
+  ["irm https://antigravity.google/cli/install.ps1 | iex", "agy"]);
 await elShot("#wkCards", "isci_kurulum", "işçi kurulum kutusu");
 await ev(`(() => { window.fetch = window.__fetch; })()`);
 await ev(`document.getElementById("btnSettings").click()`);
@@ -280,13 +280,13 @@ check("iş türleri taslaktaki sırada", await ev(`[...document.querySelectorAll
   ["Görsel üretme", "Video", "Uzun belge, kayıt özeti", "Çeviri, toplu metin işleme", "Kod incelemesi (ikinci göz)"]);
 check("görsel: hepsi kapalı/bağlı değil → Claude'un kendi yolu", await route("image"), { now: "Şu an: Claude'un kendi yolu",
   chips: ["Gemini (Nano Banana) [kapalı · kişisel]", "OpenRouter [bağlı değil]", "Higgsfield [bağlı değil · kişisel]", "Claude: SVG / HTML çizim *"] });
-check("özet: Codex açık → Şu an Codex", await route("summary"), { now: "Şu an: Codex", chips: ["Gemini CLI [kapalı · kişisel]", "Codex [açık] *", "Claude okur (bağlam ve kota harcar)"] });
+check("özet: Codex açık → Şu an Codex", await route("summary"), { now: "Şu an: Codex", chips: ["Antigravity CLI [kapalı · kişisel]", "Codex [açık] *", "Claude okur (bağlam ve kota harcar)"] });
 check("inceleme: Codex salt okuma, sıra düğmesi yok (tek araç)", [await route("review"), await ev(`!!document.querySelector('#rtList [data-job="review"] [data-rt-edit]')`)],
   [{ now: "Şu an: Codex", chips: ["Codex [açık · salt okuma] *", "Claude inceleme alt ajanı"] }, false]);
 await ev(`document.querySelector('#wkCards [data-wk="gemini"]').click()`);
 await until(`document.querySelector('#rtList [data-job="image"] .rt-now').textContent.includes("Gemini")`);
 check("Gemini açılınca: kart açık, görsel ve özet Gemini'ye geçer", [(await worker("gemini")).on, (await route("image")).now, (await route("summary")).now],
-  ["true", "Şu an: Gemini (Nano Banana)", "Şu an: Gemini CLI"]);
+  ["true", "Şu an: Gemini (Nano Banana)", "Şu an: Antigravity CLI"]);
 check("işçi ayarı sunucuda", await ev(`fetch("/api/workers").then(r => r.json()).then(d => [d.codex.enabled, d.gemini.enabled])`), [true, true]);
 await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-edit]').click()`); await sleep(200);
 check("Sırayı değiştir: çipler alt alta, yukarı/aşağı düğmeleri, ilkinde yukarı kapalı", await ev(`(() => { const c = document.querySelector('#rtList [data-job="summary"]');
@@ -296,7 +296,7 @@ check("sıra düğmesi parmakla basılacak boyda (≥ 36 px)", await ev(`Math.mi
 await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-move="1"][data-i="0"]').click()`);
 await until(`document.querySelector('#rtList [data-job="summary"] .rt-now').textContent === "Şu an: Codex"`);
 check("Gemini aşağı: Codex öne geçti ve seçildi, düzenleme açık kalır", [(await route("summary")).chips.map(c => c.split(" [")[0]), await ev(`!!document.querySelector('#rtList [data-job="summary"] .rt-editing')`)],
-  [["Codex", "Gemini CLI", "Claude okur (bağlam ve kota harcar)"], true]);
+  [["Codex", "Antigravity CLI", "Claude okur (bağlam ve kota harcar)"], true]);
 check("sıra sunucuda kalıcı", await ev(`fetch("/api/routing").then(r => r.json()).then(d => d.jobs.find(j => j.id === "summary").chain.map(c => c.tool))`), ["codex", "gemini"]);
 await ev(`document.querySelector('#rtList [data-job="summary"] [data-rt-edit]').click()`); await sleep(200);
 check("Bitti: zincir yeniden yatay", await ev(`getComputedStyle(document.querySelector('#rtList [data-job="summary"] .rt-chain')).flexDirection`), "row");
@@ -310,7 +310,7 @@ const CARDS = ["#setAbout .about-card .set-name", "#abVer", "#abData", "#abOpenD
 // ---- (e) Google ile neler yapılır: statik tablo, ücret/sınır rakamı yok ----
 check("Google tablosu: altı iş, araçlar, rakam yok, kişisel notu", await ev(`(() => { const tb = document.querySelector("#setGoogle .gg-table");
   return [[...tb.querySelectorAll("tbody tr")].map(r => r.cells[1].textContent), /\\d/.test(tb.textContent), document.querySelector("#setGoogle .gg-foot .set-tag").textContent]; })()`),
-  [["Gemini (Nano Banana), Imagen", "Veo", "Gemini CLI / API", "Gemini Flash", "Gemini TTS", "Doğrudan Google API"], false, "Kişisel"]);
+  [["Gemini (Nano Banana), Imagen", "Veo", "Antigravity CLI / Gemini API", "Gemini Flash", "Gemini TTS", "Doğrudan Google API"], false, "Kişisel"]);
 // ---- (f) Hakkında: sürüm ve derleme, sistem, veri klasörü, bu sürümün yenilikleri (gömülü CHANGELOG), bağlantılar ----
 await until(`document.getElementById("abVer").textContent !== ""`);
 const ab = await ev(`(() => ({ ver: document.getElementById("abVer").textContent, footer: document.getElementById("ver").textContent,

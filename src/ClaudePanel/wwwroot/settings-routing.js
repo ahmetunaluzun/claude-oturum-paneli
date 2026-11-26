@@ -9,7 +9,7 @@ window.PanelSettingsRouting = function (d) {
   const LABEL = {
     image: { gemini: "Gemini (Nano Banana)", openrouter: "OpenRouter", higgsfield: "Higgsfield" },
     video: { higgsfield: "Higgsfield", gemini: "Veo (Gemini)" },
-    summary: { gemini: "Gemini CLI", codex: "Codex" },
+    summary: { gemini: "Antigravity CLI", codex: "Codex" },
     translate: { gemini: "Gemini Flash", codex: "Codex" },
     review: { codex: "Codex" }
   };
@@ -18,10 +18,13 @@ window.PanelSettingsRouting = function (d) {
   const editing = new Set();
 
   // ---- Yapay zekâ işçileri ----
-  // Kurulum ve giriş komutları resmi depolardan (github.com/openai/codex, github.com/google-gemini/gemini-cli README, 26.11.2026).
+  // Kurulum ve giriş komutları resmi belgelerden (github.com/openai/codex README; antigravity.google/docs/getting-started?tab=cli,
+  // 26.11.2026). Gemini işçisi Antigravity CLI (agy) ile çalışır: Gemini CLI 18.06.2026'dan beri kişisel hesabı karşılamıyor.
+  // Kurulum kutusu yalnız paneli çalıştıran bilgisayarda görünür (local-only); komut o bilgisayarın sistemine göre.
   const SETUP = {
     codex: { install: "npm install -g @openai/codex", login: "codex", loginNote: "wkCodexLoginNote" },
-    gemini: { install: "npm install -g @google/gemini-cli", login: "gemini", loginNote: "wkGeminiLoginNote" }
+    gemini: { install: /Windows/.test(navigator.userAgent) ? "irm https://antigravity.google/cli/install.ps1 | iex"
+      : "curl -fsSL https://antigravity.google/cli/install.sh | bash", login: "agy", loginNote: "wkGeminiLoginNote" }
   };
   const cmd = (c) => `<span class="wk-cmd"><code>${esc(c)}</code><button type="button" class="btn small" data-wk-copy="${esc(c)}">${esc(t("wkCopy"))}</button></span>`;
 
@@ -44,10 +47,10 @@ window.PanelSettingsRouting = function (d) {
       who = w.installed ? [w.plan, t("wkCodexCli", w.version || "")].filter(Boolean).join(" · ").trim() : t("wkNotInstalled", "codex CLI");
       if (on && !w.installed) extra = t("wkOnButMissing");
     } else {
-      who = w.state === "ok" ? t("wkGeminiCli", w.version) : w.state === "checking" ? t("wkChecking") : t("wkNotInstalled", "gemini CLI");
+      who = w.state === "ok" ? t("wkGeminiCli", w.version) : w.state === "checking" ? t("wkChecking") : t("wkNotInstalled", "Antigravity CLI");
       if (w.apiKey) who += " · " + t("wkGeminiKey");
       if (on && w.state === "none" && !w.apiKey) extra = t("wkOnButMissing");
-      // Gemini CLI ile Gemini API anahtarı ayrı yollardır; ikisinden biri işçiyi çalıştırır (Routing.cs).
+      // Antigravity CLI ile Gemini API anahtarı ayrı yollardır; ikisinden biri işçiyi çalıştırır (Routing.cs).
       btn = `<p class="wk-note">${esc(t(w.apiKey ? "wkGeminiKeyNote" : "wkGeminiNoKeyNote"))}${w.apiKey ? "" : ` <button type="button" class="linkbtn" data-go="setAccounts">${esc(t("wkGoKeys"))}</button>`}</p>`;
     }
     const name = id === "codex" ? "Codex" : `Gemini <span class="set-tag">${esc(t("setConnPersonal"))}</span>`;
