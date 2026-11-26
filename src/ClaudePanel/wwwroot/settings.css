@@ -153,3 +153,18 @@
   .gg-table td { padding: 0; border: 0; }
   .gg-table td:first-child { font-weight: 600; }
 }
+
+/* Hakkında (settings-about.js) */
+.about-desc { margin: 0; line-height: 1.45; }
+.about-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 4px 0 0; font-size: 13.5px; }
+.about-facts dt { color: var(--muted); }
+.about-facts dt { align-self: center; }
+.about-facts dd { margin: 0; overflow-wrap: anywhere; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.about-facts dd > span { min-width: 0; }
+.about-facts a { color: var(--accent); }
+#abNewWrap:not([hidden]) { display: grid; gap: 12px; }
+.about-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.about-links a.btn { text-decoration: none; }
+.about-h { font-size: 15px; margin: 4px 0 0; }
+.about-list { margin: 0; padding-left: 20px; display: grid; gap: 5px; line-height: 1.45; }
+@media (max-width: 520px) { .about-facts { grid-template-columns: minmax(0, 1fr); gap: 2px; } .about-facts dd { margin-bottom: 8px; } }

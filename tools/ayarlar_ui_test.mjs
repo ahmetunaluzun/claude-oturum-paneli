@@ -75,13 +75,13 @@ await ev(`document.querySelector('#nav button[data-view="sessions"]').click()`);
 check("Oturumlar'a dönüş", await ev(`[document.getElementById("viewSettings").hidden, document.getElementById("viewSessions").hidden]`), [true, false]);
 await ev(`document.querySelector('#nav button[data-view="settings"]').click()`); await sleep(700);
 check("Ayarlar sekmesi: görünüm açık ve ayarlar dolu (dil seçili)", await ev(`[!document.getElementById("viewSettings").hidden, document.getElementById("sLang").value]`), [true, "tr"]);
-const NAV_ALL = ["setAccounts", "setWorkers", "setRouting", "setGeneral", "setNotify", "setNight", "setMail", "setPhone", "setGoogle", "setAdvanced"];
+const NAV_ALL = ["setAccounts", "setWorkers", "setRouting", "setGeneral", "setNotify", "setNight", "setMail", "setPhone", "setGoogle", "setAdvanced", "setAbout"];
 const navShown = await ev(`[...document.querySelectorAll("#setNav button")].filter(b => !b.hidden).map(b => b.dataset.sec)`);
 check("bölüm menüsü: görünen her satırın bölümü var ve sıra doğru",
   [navShown.every(s => NAV_ALL.includes(s)), JSON.stringify(navShown) === JSON.stringify(NAV_ALL.filter(s => navShown.includes(s))),
     await ev(`[...document.querySelectorAll("#setNav button")].filter(b => !b.hidden).every(b => { const s = document.getElementById(b.dataset.sec); return s && !s.hidden && s.querySelector("h2"); })`)],
   [true, true, true]);
-for (const need of ["setGeneral", "setNotify", "setNight", "setMail", "setPhone", "setAdvanced"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
+for (const need of ["setGeneral", "setNotify", "setNight", "setMail", "setPhone", "setAdvanced", "setAbout"]) check(`bölüm var: ${need}`, navShown.includes(need), true);
 check("ayarlar bölümlerine dağılmış", await ev(`(() => { const sec = (id) => document.getElementById(id).closest(".set-sec")?.id;
   return [sec("sLight"), sec("sLang"), sec("sGithub"), sec("tqBox"), sec("sNotify"), sec("sSound"), sec("nEnabled"), sec("mailBox"), sec("remoteBox"), sec("btnResetTabs"), sec("btnRestart"), sec("btnQuit")]; })()`),
   ["setGeneral", "setGeneral", "setGeneral", "setGeneral", "setNotify", "setNotify", "setNight", "setMail", "setPhone", "setAdvanced", "setAdvanced", "setAdvanced"]);
@@ -205,7 +205,7 @@ check("Bitti: zincir yeniden yatay", await ev(`getComputedStyle(document.querySe
 check("şirket işi notu ve üstü çizili örnek", await ev(`(() => { const s = document.querySelector("#setRouting .rt-example .rt-chip.skip .rt-label");
   return [document.querySelector("#setRouting .rt-company .set-tag").textContent, getComputedStyle(s).textDecorationLine]; })()`), ["Şirket işi", "line-through"]);
 
-const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
+const CARDS = ["#setAbout .about-card .set-name", "#abVer", "#abData", "#abOpenData", "#abNew li", "#setAbout .about-links a", "#setClaude .set-card[data-acct='claude'] .set-state", "#setClaude .set-card[data-acct='claude-is'] .set-proj summary", "#setClaude .set-add b",
   "#setConns [data-conn='google'] button", "#setConns [data-conn='github'] button", "#setConns [data-key='elevenlabs'] .set-state", "#setConns [data-key='gemini'] button", "#setKeyProfile",
   "#wkCards [data-wk='codex']", "#wkCards [data-wk='gemini']", "#rtList [data-job='image'] [data-rt-edit]", "#rtList [data-job='review'] .rt-now b", "#setRouting .rt-example .rt-chip.skip", "#setGoogle .gg-table tbody tr:nth-child(6) td:last-child"];
 
@@ -213,8 +213,24 @@ const CARDS = ["#setClaude .set-card[data-acct='claude'] .set-state", "#setClaud
 check("Google tablosu: altı iş, araçlar, rakam yok, kişisel notu", await ev(`(() => { const tb = document.querySelector("#setGoogle .gg-table");
   return [[...tb.querySelectorAll("tbody tr")].map(r => r.cells[1].textContent), /\\d/.test(tb.textContent), document.querySelector("#setGoogle .gg-foot .set-tag").textContent]; })()`),
   [["Gemini (Nano Banana), Imagen", "Veo", "Gemini CLI / API", "Gemini Flash", "Gemini TTS", "Doğrudan Google API"], false, "Kişisel"]);
-const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name, #setWorkers .btn, #setWorkers .set-name, #setRouting .btn, #setRouting .rt-chip, #setRouting .rt-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
-  const out = [...document.querySelectorAll("#setAccounts .set-card *, #setWorkers .set-card *, #setRouting .rt-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card, .rt-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
+// ---- (f) Hakkında: sürüm ve derleme, sistem, veri klasörü, bu sürümün yenilikleri (gömülü CHANGELOG), bağlantılar ----
+await until(`document.getElementById("abVer").textContent !== ""`);
+const ab = await ev(`(() => ({ ver: document.getElementById("abVer").textContent, footer: document.getElementById("ver").textContent,
+    os: document.getElementById("abOs").textContent, rt: document.getElementById("abRuntime").textContent, data: document.getElementById("abData").textContent,
+    news: [...document.querySelectorAll("#abNew li")].map(l => l.textContent), newsShown: !document.getElementById("abNewWrap").hidden,
+    feats: document.querySelectorAll("#setAbout .about-list:not(#abNew) li").length,
+    links: [...document.querySelectorAll("#setAbout a")].map(a => [a.textContent, a.target, a.href.replace("https://github.com/ahmetunaluzun/claude-oturum-paneli", "R")]) }))()`);
+check("Hakkında: sürüm alt bilgiyle aynı", ab.ver.split(" · ")[0], ab.footer);
+check("Hakkında: sistem, .NET ve veri klasörü dolu", [ab.os.length > 3, /^\.NET /.test(ab.rt), /data$/i.test(ab.data)], [true, true, true]);
+check("Hakkında: bu sürümün yenilikleri CHANGELOG'dan", [ab.newsShown, ab.news.length >= 1, ab.news.every(n => n.length > 3 && !n.includes("**"))], [true, true, true]);
+check("Hakkında: 8 özellik satırı dolu", ab.feats, 8);
+check("Hakkında: bağlantılar yeni pencerede, depoya", ab.links, [["MIT", "_blank", "R/blob/main/LICENSE"], ["Kaynak kod", "_blank", "R"], ["Sürümler", "_blank", "R/releases"], ["Değişiklik günlüğü", "_blank", "R/blob/main/CHANGELOG.md"]]);
+await ev(`(() => { const s = JSON.parse(localStorage.getItem("panel.settings")||"{}"); document.getElementById("sLang").value = "en"; document.getElementById("sLang").dispatchEvent(new Event("change")); })()`); await sleep(300);
+check("Hakkında: İngilizce", await ev(`[document.querySelector('#setNav button[data-sec="setAbout"]').textContent, document.querySelector("#setAbout .about-card .set-name").textContent, document.querySelector("#setAbout .about-links a").textContent]`), ["About", "Claude Session Panel", "Source code"]);
+await ev(`document.getElementById("sLang").value = "tr"; document.getElementById("sLang").dispatchEvent(new Event("change"))`); await sleep(300);
+
+const cardLayout = () => ev(`(() => { const clipped = [...document.querySelectorAll("#setAccounts .set-state, #setAccounts .btn, #setAccounts .set-name, #setWorkers .btn, #setWorkers .set-name, #setRouting .btn, #setRouting .rt-chip, #setRouting .rt-name, #setAbout .btn, #setAbout .set-name")].filter(e => e.offsetWidth && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
+  const out = [...document.querySelectorAll("#setAccounts .set-card *, #setWorkers .set-card *, #setRouting .rt-card *, #setAbout .about-card *")].filter(e => { if (!e.offsetWidth) return false; const c = e.closest(".set-card, .rt-card").getBoundingClientRect(), b = e.getBoundingClientRect(); return b.right > c.right + 1 || b.left < c.left - 1; }).length;
   return { clipped, out }; })()`);
 
 for (const [light, tn] of [[false, "koyu"], [true, "acik"]]) {

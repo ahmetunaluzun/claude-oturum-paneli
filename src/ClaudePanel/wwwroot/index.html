@@ -136,6 +136,7 @@
         <button type="button" data-sec="setPhone"><span data-i18n="setNavPhone"></span></button>
         <button type="button" data-sec="setGoogle"><span data-i18n="setNavGoogle"></span></button>
         <button type="button" data-sec="setAdvanced"><span data-i18n="setNavAdvanced"></span></button>
+        <button type="button" data-sec="setAbout"><span data-i18n="setNavAbout"></span></button>
       </nav>
       <div class="set-main">
         <section class="set-sec" id="setAccounts">
@@ -338,6 +339,36 @@
             <button type="button" class="btn" id="btnRestart" data-i18n="rsGo"></button>
             <button type="button" class="btn danger local-only" id="btnQuit" data-i18n="quit"></button>
           </div>
+        </section>
+        <section class="set-sec" id="setAbout">
+          <h2 data-i18n="setNavAbout"></h2>
+          <div class="set-card about-card">
+            <div class="set-card-top">
+              <span class="set-logo set-logo-a" aria-hidden="true">C</span>
+              <div class="set-card-id"><div class="set-name" data-i18n="abName"></div><div class="set-who" id="abVer"></div></div>
+            </div>
+            <p class="about-desc" data-i18n="abDesc"></p>
+            <dl class="about-facts">
+              <dt data-i18n="abOs"></dt><dd id="abOs"></dd>
+              <dt data-i18n="abRuntime"></dt><dd id="abRuntime"></dd>
+              <dt data-i18n="abData"></dt><dd><span id="abData"></span> <button type="button" class="btn small local-only" id="abOpenData" data-i18n="abOpen"></button></dd>
+              <dt data-i18n="abLicense"></dt><dd><a href="https://github.com/ahmetunaluzun/claude-oturum-paneli/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a></dd>
+            </dl>
+            <div class="about-links">
+              <a class="btn small" href="https://github.com/ahmetunaluzun/claude-oturum-paneli" target="_blank" rel="noopener" data-i18n="abSource"></a>
+              <a class="btn small" href="https://github.com/ahmetunaluzun/claude-oturum-paneli/releases" target="_blank" rel="noopener" data-i18n="abReleases"></a>
+              <a class="btn small" href="https://github.com/ahmetunaluzun/claude-oturum-paneli/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-i18n="abChangelog"></a>
+            </div>
+          </div>
+          <div id="abNewWrap" hidden>
+            <h3 class="about-h" data-i18n="abNewTitle"></h3>
+            <ul class="about-list" id="abNew"></ul>
+          </div>
+          <h3 class="about-h" data-i18n="abFeatTitle"></h3>
+          <ul class="about-list">
+            <li data-i18n="abF1"></li><li data-i18n="abF2"></li><li data-i18n="abF3"></li><li data-i18n="abF4"></li>
+            <li data-i18n="abF5"></li><li data-i18n="abF6"></li><li data-i18n="abF7"></li><li data-i18n="abF8"></li>
+          </ul>
         </section>
       </div>
     </div>
@@ -585,6 +616,7 @@
   <script src="/assets/settings-hub.js"></script>
   <script src="/assets/settings-keys.js"></script>
   <script src="/assets/settings-routing.js"></script>
+  <script src="/assets/settings-about.js"></script>
   <script src="/assets/restart.js"></script>
   <script src="/assets/codex.js"></script>
   <script src="/assets/cost.js"></script>

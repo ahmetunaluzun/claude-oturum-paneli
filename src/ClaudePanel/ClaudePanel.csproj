@@ -43,6 +43,8 @@
   <ItemGroup>
     <Content Remove="wwwroot\**" />
     <EmbeddedResource Include="wwwroot\**" LogicalName="web/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Ayarlar → Hakkında: bu sürümün yenilikleri (About.cs) -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" />
   </ItemGroup>
 
   <ItemGroup>
